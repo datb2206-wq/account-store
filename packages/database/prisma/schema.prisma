@@ -1,0 +1,370 @@
+// =============================================================
+//  Account Store — Database Schema
+//  DB: PostgreSQL (bắt buộc cho FOR UPDATE SKIP LOCKED)
+//  Quy ước tiền tệ: mọi số tiền lưu bằng USD (base currency),
+//  kiểu Decimal(18, 6) — KHÔNG BAO GIỜ dùng Float cho tiền.
+// =============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------------------------------------------------
+//  ENUMS
+// -------------------------------------------------------------
+
+enum Role {
+  USER
+  STAFF
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+  PENDING_VERIFY
+}
+
+enum Locale {
+  en
+  id
+  ru
+  zh
+}
+
+enum ProductSource {
+  LOCAL // kho do mình tự nhập
+  RESELLER // lấy hàng từ web gốc qua API
+}
+
+enum StockStatus {
+  AVAILABLE
+  RESERVED // đang giữ chỗ trong 1 giao dịch (hiếm khi tồn tại lâu)
+  SOLD
+  INVALID // admin đánh dấu hỏng / bị khóa
+}
+
+enum OrderStatus {
+  PENDING // đã trừ tiền, chờ giao (đơn reseller đang xử lý ở queue)
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum TransactionType {
+  DEPOSIT // nạp tiền
+  PURCHASE // mua hàng (trừ tiền)
+  REFUND // hoàn tiền
+  ADJUSTMENT // admin cộng/trừ tay
+}
+
+enum TransactionStatus {
+  PENDING // chờ xác minh (USDT chờ confirmations / bank chờ admin duyệt)
+  COMPLETED
+  REJECTED
+  EXPIRED
+}
+
+enum PaymentMethod {
+  USDT_TRC20
+  USDT_BEP20
+  BANK_TRANSFER
+  BALANCE // giao dịch nội bộ bằng số dư (mua hàng, hoàn tiền)
+  MANUAL // admin điều chỉnh
+}
+
+// -------------------------------------------------------------
+//  USER
+// -------------------------------------------------------------
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  username      String?    @unique
+  passwordHash  String
+  role          Role       @default(USER)
+  status        UserStatus @default(ACTIVE)
+
+  // Số dư luôn tính bằng USD. Chỉ thay đổi qua câu lệnh
+  // UPDATE có điều kiện trong DB transaction, kèm 1 bản ghi Transaction.
+  balance       Decimal    @default(0) @db.Decimal(18, 6)
+
+  locale        Locale     @default(en)
+  currency      String     @default("USD") @db.VarChar(3) // tiền tệ hiển thị
+
+  // API key cho khách hàng muốn mua qua API (lưu HASH, không lưu plain)
+  apiKeyHash    String?    @unique
+  twoFactorSecret String?  // mã hóa trước khi lưu
+
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  orders        Order[]
+  transactions  Transaction[]         @relation("UserTransactions")
+  reviewedTxs   Transaction[]         @relation("ReviewedTransactions")
+  auditLogs     AuditLog[]
+
+  @@index([role])
+  @@map("users")
+}
+
+// -------------------------------------------------------------
+//  CATALOG
+// -------------------------------------------------------------
+
+model Category {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  // Đa ngôn ngữ: { "en": "Twitter", "ru": "Твиттер", "zh": "推特", "id": "Twitter" }
+  name        Json
+  description Json?
+  iconUrl     String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Category[] @relation("CategoryTree")
+
+  // Đồng bộ từ web gốc
+  supplierId  String?
+  supplier    Supplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  externalId  String?
+
+  products    Product[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([supplierId, externalId])
+  @@index([parentId, sortOrder])
+  @@map("categories")
+}
+
+model Product {
+  id           String        @id @default(cuid())
+  slug         String        @unique
+  categoryId   String
+  category     Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  name         Json          // i18n
+  description  Json?         // i18n, có thể chứa định dạng giao hàng: "login:pass:email:emailpass"
+
+  price        Decimal       @db.Decimal(18, 6) // giá bán (USD)
+  costPrice    Decimal?      @db.Decimal(18, 6) // giá vốn (giá web gốc) — chỉ admin xem
+  minQty       Int           @default(1)
+  maxQty       Int           @default(1000)
+  isActive     Boolean       @default(true)
+  sortOrder    Int           @default(0)
+
+  source       ProductSource @default(LOCAL)
+  supplierId   String?
+  supplier     Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  externalId   String?       // ID sản phẩm bên web gốc
+  externalStock Int?         // tồn kho bên web gốc (cập nhật bởi sync job)
+  lastSyncedAt DateTime?
+
+  stockItems   StockItem[]
+  orders       Order[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([supplierId, externalId])
+  @@index([categoryId, isActive, sortOrder])
+  @@map("products")
+}
+
+// Mỗi dòng = 1 tài khoản cụ thể trong kho
+model StockItem {
+  id          String      @id @default(cuid())
+  productId   String
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Dữ liệu tài khoản ĐƯỢC MÃ HÓA (AES-256-GCM) ở tầng ứng dụng
+  content     String
+  // SHA-256 của nội dung gốc -> chống nhập trùng cùng 1 tài khoản 2 lần
+  contentHash String
+
+  status      StockStatus @default(AVAILABLE)
+  orderId     String?
+  order       Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  soldAt      DateTime?
+
+  importBatch String?     // mã lô nhập, tiện rollback 1 lô lỗi
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([productId, contentHash])
+  // Index phục vụ câu SELECT ... WHERE product_id = ? AND status = 'AVAILABLE' FOR UPDATE SKIP LOCKED
+  @@index([productId, status, createdAt])
+  // Lấy hàng ngẫu nhiên: contentHash là HMAC nên phân bố đều, quét từ 1 điểm ngẫu nhiên thay cho ORDER BY random()
+  @@index([productId, status, contentHash])
+  @@index([orderId])
+  @@map("stock_items")
+}
+
+// -------------------------------------------------------------
+//  ORDERS
+// -------------------------------------------------------------
+
+model Order {
+  id              String      @id @default(cuid())
+  code            String      @unique // mã hiển thị cho khách, VD: ORD-20261027-8F3K2
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  productId       String
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  quantity        Int
+  unitPrice       Decimal     @db.Decimal(18, 6) // snapshot giá lúc mua
+  totalAmount     Decimal     @db.Decimal(18, 6)
+  status          OrderStatus @default(PENDING)
+
+  // Client gửi kèm header Idempotency-Key -> bấm "Mua" 2 lần không bị tạo 2 đơn
+  idempotencyKey  String?     @unique
+
+  // Đơn reseller
+  supplierId      String?
+  supplier        Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  externalOrderId String?
+  failReason      String?
+
+  stockItems      StockItem[]
+  transactions    Transaction[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([supplierId, externalOrderId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("orders")
+}
+
+// -------------------------------------------------------------
+//  TRANSACTIONS (Sổ cái — ledger, chỉ INSERT, không sửa số tiền)
+// -------------------------------------------------------------
+
+model Transaction {
+  id            String            @id @default(cuid())
+  userId        String
+  user          User              @relation("UserTransactions", fields: [userId], references: [id], onDelete: Restrict)
+
+  type          TransactionType
+  method        PaymentMethod
+  status        TransactionStatus @default(PENDING)
+
+  // amount > 0: cộng tiền, amount < 0: trừ tiền (USD)
+  amount        Decimal           @db.Decimal(18, 6)
+  balanceBefore Decimal?          @db.Decimal(18, 6) // ghi khi COMPLETED
+  balanceAfter  Decimal?          @db.Decimal(18, 6)
+
+  // Số tiền gốc theo đơn vị thanh toán (VD: 25.0037 USDT hoặc 500000 VND)
+  originalAmount   Decimal?       @db.Decimal(24, 6)
+  originalCurrency String?        @db.VarChar(10)
+  exchangeRate     Decimal?       @db.Decimal(18, 8)
+
+  // ---- USDT ----
+  network       String?           // "TRC20" | "BEP20"
+  txHash        String?           // TxID on-chain, lưu dạng lowercase, đã trim
+  fromAddress   String?
+  toAddress     String?
+  confirmations Int?
+
+  // ---- Bank ----
+  // Nội dung chuyển khoản duy nhất, VD: "NAP 8F3K2" -> map 1-1 với yêu cầu nạp
+  transferCode  String?           @unique
+  bankRef       String?           // mã giao dịch ngân hàng (khi gắn API tự động)
+  proofImageUrl String?           // khóa file biên lai trong UPLOAD_DIR (VD "proofs/abc.jpg"), xem qua /api/deposits/[id]/proof
+  claimedAt     DateTime?         // khách bấm "Tôi đã chuyển khoản" -> chờ admin duyệt, không tự hết hạn nữa
+  // Mã giao dịch do KHÁCH tự khai, chưa xác minh -> tách khỏi bankRef (unique, chỉ admin/webhook ghi)
+  // để không ai "giữ chỗ" được mã ngân hàng của người khác.
+  customerRef   String?
+
+  orderId       String?
+  order         Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Admin duyệt / điều chỉnh
+  reviewedById  String?
+  reviewedBy    User?             @relation("ReviewedTransactions", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt    DateTime?
+  note          String?
+
+  expiresAt     DateTime?         // yêu cầu nạp hết hạn sau X phút
+  metadata      Json?             // raw response từ blockchain API / bank API
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  // CHỐNG DOUBLE-SPENDING: 1 TxID trên 1 mạng chỉ được ghi nhận DUY NHẤT 1 LẦN.
+  // (Postgres cho phép nhiều NULL trong unique -> không ảnh hưởng giao dịch không phải crypto)
+  @@unique([network, txHash])
+  @@unique([method, bankRef])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([type, status])
+  @@index([orderId])
+  @@index([customerRef])
+  @@map("transactions")
+}
+
+// -------------------------------------------------------------
+//  SUPPLIER (Web gốc cho Reseller API)
+// -------------------------------------------------------------
+
+model Supplier {
+  id           String     @id @default(cuid())
+  name         String
+  baseUrl      String
+  apiKeyEnc    String     // API key MÃ HÓA
+  adapter      String     @default("generic") // định dạng API của web gốc: "generic" | "accszone"
+  priceMarkup  Decimal    @default(1.2) @db.Decimal(8, 4) // giá bán = giá gốc * markup
+  isActive     Boolean    @default(true)
+  lastSyncAt   DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  categories   Category[]
+  products     Product[]
+  orders       Order[]
+
+  @@map("suppliers")
+}
+
+// -------------------------------------------------------------
+//  SYSTEM CONFIG & AUDIT
+// -------------------------------------------------------------
+
+// Key-value config chỉnh được từ Admin Panel, cache trong Redis.
+// VD: key="usdt.trc20.wallet", "usdt.min_confirmations", "rates.VND", "bank.accounts"
+model SystemConfig {
+  key         String   @id
+  value       Json
+  isSecret    Boolean  @default(false) // true -> không trả về cho frontend
+  description String?
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+// Ghi lại mọi hành động của Staff/Admin (duyệt nạp, sửa số dư, nhập kho...)
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String   // VD: "transaction.approve", "user.balance.adjust"
+  entity    String   // VD: "Transaction"
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}

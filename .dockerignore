@@ -1,0 +1,18 @@
+# Cài lại node_modules bên trong image (binary Prisma/esbuild phải đúng nền tảng Linux)
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+
+# Không bao giờ đưa secret vào image — biến môi trường truyền lúc chạy qua docker compose
+.env
+.env.*
+!.env.example
+
+.git
+**/*.log
+backups
+uploads
+deploy
+docker/*.yml

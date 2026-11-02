@@ -1,0 +1,33 @@
+{
+  "name": "@accszone/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "dotenv -e ../../.env -- next dev --port 3000",
+    "build": "next build",
+    "start": "dotenv -e ../../.env -- next start --port 3000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@accszone/core": "workspace:*",
+    "@accszone/database": "workspace:*",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.81.0",
+    "ioredis": "^5.4.2",
+    "jose": "^6.0.0",
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.17.10",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "dotenv-cli": "^7.4.4",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.2"
+  }
+}

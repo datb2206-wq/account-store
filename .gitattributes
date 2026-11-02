@@ -1,0 +1,4 @@
+# Script shell phải giữ LF, CRLF từ Windows làm bash trên VPS báo lỗi ""
+*.sh text eol=lf
+*.conf text eol=lf
+Dockerfile text eol=lf
