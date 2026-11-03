@@ -33,3 +33,6 @@ uploads/
 # PM2 logs + backup cục bộ
 logs/
 backups/
+
+.vercel
+.env*

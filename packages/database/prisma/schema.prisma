@@ -7,6 +7,8 @@
 
 generator client {
   provider = "prisma-client-js"
+  // native: máy dev/Docker; rhel-openssl-3.0.x: Vercel serverless
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
