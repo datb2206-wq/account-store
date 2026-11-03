@@ -52,6 +52,8 @@ export interface SupplierAdapter {
   // reference = orderId của mình: web gốc nên dùng làm idempotency key để retry không tạo 2 đơn
   placeOrder(opts: Credentials & { externalProductId: string; quantity: number; reference: string }): Promise<SupplierOrderResult>;
   getOrder(opts: Credentials & { externalOrderId: string }): Promise<SupplierOrderResult>;
+  // Số dư (USD) của tài khoản mình tại web gốc. Không bắt buộc: nguồn không hỗ trợ thì bỏ trống.
+  getBalance?(opts: Credentials): Promise<string>;
 }
 
 const decimalString = z

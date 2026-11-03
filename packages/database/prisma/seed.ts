@@ -56,38 +56,40 @@ const DEFAULT_CONFIGS: Array<{
 
 type I18nName = Partial<Record<'en' | 'id' | 'ru' | 'zh', string>>;
 
+const same = (name: string): I18nName => ({ en: name, id: name, ru: name, zh: name });
 const accounts = (brand: string): I18nName => ({ en: `${brand} Accounts`, id: `Akun ${brand}`, ru: `Аккаунты ${brand}`, zh: `${brand} 账号` });
 
 // Danh mục cho mega menu, xếp theo thứ tự hiển thị (trái -> phải, trên -> dưới).
 // Danh mục con chỉ gồm các mục đã có trong yêu cầu; nhóm còn lại admin tự thêm ở Admin > Danh mục.
-const DEFAULT_CATEGORIES: Array<{ slug: string; name: I18nName; children?: string[] }> = [
-  { slug: 'facebook-accounts', name: accounts('Facebook'), children: ['USA Facebook', 'Facebook With Friends', 'Facebook With Page', 'Old Facebook Ads Accounts', 'Selfie Verified'] },
+// Danh mục con: chuỗi = tên riêng giống nhau ở mọi ngôn ngữ
+const DEFAULT_CATEGORIES: Array<{ slug: string; name: I18nName; children?: (string | I18nName)[] }> = [
+  { slug: 'facebook-accounts', name: accounts('Facebook'), children: [{ en: 'USA Facebook', id: 'Facebook USA', ru: 'Facebook США', zh: '美国 Facebook' }, { en: 'Facebook With Friends', id: 'Facebook dengan Teman', ru: 'Facebook с друзьями', zh: '带好友的 Facebook' }, { en: 'Facebook With Page', id: 'Facebook dengan Halaman', ru: 'Facebook со страницей', zh: '带主页的 Facebook' }, { en: 'Old Facebook Ads Accounts', id: 'Akun Iklan Facebook Lama', ru: 'Старые рекламные аккаунты Facebook', zh: 'Facebook 老广告账号' }, { en: 'Selfie Verified', id: 'Terverifikasi Selfie', ru: 'С верификацией по селфи', zh: '自拍认证' }] },
   { slug: 'instagram-accounts', name: accounts('Instagram') },
-  { slug: 'threads', name: { en: 'Threads' } },
+  { slug: 'threads', name: same('Threads') },
   { slug: 'gmail-accounts', name: accounts('Gmail') },
   { slug: 'mobile-proxies', name: { en: 'Mobile Proxies', id: 'Proksi Seluler', ru: 'Мобильные прокси', zh: '移动代理' } },
   { slug: 'youtube-accounts-channels', name: { en: 'Youtube Accounts & Channels', id: 'Akun & Kanal Youtube', ru: 'Аккаунты и каналы Youtube', zh: 'Youtube 账号和频道' } },
-  { slug: 'google-voice', name: { en: 'Google Voice' } },
-  { slug: 'odnoklassniki', name: { en: 'Odnoklassniki (OK.RU)' } },
+  { slug: 'google-voice', name: same('Google Voice') },
+  { slug: 'odnoklassniki', name: { en: 'Odnoklassniki (OK.RU)', id: 'Odnoklassniki (OK.RU)', ru: 'Одноклассники (OK.RU)', zh: 'Odnoklassniki (OK.RU)' } },
   { slug: 'whatsapp-accounts', name: accounts('WhatsApp') },
   { slug: 'telegram-accounts', name: accounts('Telegram') },
   { slug: 'linkedin-accounts', name: accounts('Linkedin') },
   { slug: 'indeed-accounts', name: accounts('Indeed') },
-  { slug: 'tiktok', name: { en: 'TikTok' } },
-  { slug: 'twitter-x', name: { en: 'Twitter/X' } },
+  { slug: 'tiktok', name: same('TikTok') },
+  { slug: 'twitter-x', name: same('Twitter/X') },
   { slug: 'buy-ai-accounts', name: { en: 'Buy AI Accounts', id: 'Beli Akun AI', ru: 'Купить AI-аккаунты', zh: '购买 AI 账号' } },
-  { slug: 'truth-social', name: { en: 'Truth Social' } },
+  { slug: 'truth-social', name: same('Truth Social') },
   { slug: 'google-ads-accounts', name: accounts('Google Ads') },
-  { slug: 'bluesky', name: { en: 'Bluesky' } },
-  { slug: 'reddit', name: { en: 'Reddit' } },
-  { slug: 'discord', name: { en: 'Discord' } },
-  { slug: 'twitch', name: { en: 'Twitch' } },
-  { slug: 'trustpilot', name: { en: 'Trustpilot' } },
-  { slug: 'yelp', name: { en: 'Yelp' } },
-  { slug: 'quora', name: { en: 'Quora' } },
+  { slug: 'bluesky', name: same('Bluesky') },
+  { slug: 'reddit', name: same('Reddit') },
+  { slug: 'discord', name: same('Discord') },
+  { slug: 'twitch', name: same('Twitch') },
+  { slug: 'trustpilot', name: same('Trustpilot') },
+  { slug: 'yelp', name: same('Yelp') },
+  { slug: 'quora', name: same('Quora') },
   { slug: 'dating-app', name: { en: 'Dating App', id: 'Aplikasi Kencan', ru: 'Приложения для знакомств', zh: '交友应用' } },
-  { slug: 'snapchat', name: { en: 'Snapchat' } },
-  { slug: 'grindr', name: { en: 'Grindr' } },
+  { slug: 'snapchat', name: same('Snapchat') },
+  { slug: 'grindr', name: same('Grindr') },
   { slug: 'gaming-accounts', name: { en: 'Gaming Accounts', id: 'Akun Game', ru: 'Игровые аккаунты', zh: '游戏账号' } },
   {
     slug: 'premium-subscriptions',
@@ -97,12 +99,12 @@ const DEFAULT_CATEGORIES: Array<{ slug: string; name: I18nName; children?: strin
   {
     slug: 'gift-cards-subscriptions',
     name: { en: 'Gift Cards & Subscriptions', id: 'Kartu Hadiah & Langganan', ru: 'Подарочные карты и подписки', zh: '礼品卡和订阅' },
-    children: ['Apple ID', 'Google Play', 'Amazon', 'Playstation', 'Steam', 'IPTV', 'VPN', 'Netflix', 'Spotify', 'E-commerce', 'Walmart', 'Etsy', 'Craigslist'],
+    children: ['Apple ID', 'Google Play', 'Amazon', 'Playstation', 'Steam', 'IPTV', 'VPN', 'Netflix', 'Spotify', { en: 'E-commerce', id: 'E-commerce', ru: 'Электронная коммерция', zh: '电商' }, 'Walmart', 'Etsy', 'Craigslist'],
   },
   {
     slug: 'email-leads-tools',
     name: { en: 'Email Leads & Tools', id: 'Email Leads & Alat', ru: 'Email-базы и инструменты', zh: '邮件线索和工具' },
-    children: ['Pinterest', 'Windows Keys', 'CapCut Pro', 'VPS/RDP', 'Yahoo', 'Outlook', 'ProtonMail', 'Mail.ru', 'Yandex', 'Rambler', 'GitHub', 'Roblox', 'Uber'],
+    children: ['Pinterest', { en: 'Windows Keys', id: 'Kunci Windows', ru: 'Ключи Windows', zh: 'Windows 密钥' }, 'CapCut Pro', 'VPS/RDP', 'Yahoo', 'Outlook', 'ProtonMail', 'Mail.ru', 'Yandex', 'Rambler', 'GitHub', 'Roblox', 'Uber'],
   },
 ];
 
@@ -153,19 +155,27 @@ async function seedSystemConfigs() {
 }
 
 // `update: {}`: chạy lại seed không ghi đè tên, thứ tự, trạng thái admin đã chỉnh
+// Chưa có: tạo mới. Đã có: chỉ bổ sung ngôn ngữ còn thiếu trong tên, giữ nguyên mọi chỉnh sửa của admin
+// (kể cả thứ tự, danh mục cha, ẩn/hiện).
+async function upsertCategory(slug: string, name: I18nName, create: { description: object; sortOrder: number; parentId?: string }) {
+  const existing = await prisma.category.findUnique({ where: { slug }, select: { id: true, name: true } });
+  if (!existing) return prisma.category.create({ data: { slug, name, ...create }, select: { id: true } });
+  const current = (existing.name ?? {}) as I18nName;
+  const merged = { ...name, ...current };
+  if (Object.keys(merged).length > Object.keys(current).length) {
+    await prisma.category.update({ where: { id: existing.id }, data: { name: merged } });
+  }
+  return existing;
+}
+
 async function seedCategories() {
   let order = 0;
   for (const category of DEFAULT_CATEGORIES) {
     order += 10;
-    const data = { name: category.name, description: {}, sortOrder: order };
-    const parent = await prisma.category.upsert({ where: { slug: category.slug }, update: {}, create: { slug: category.slug, ...data } });
-    for (const [i, name] of (category.children ?? []).entries()) {
-      const slug = toSlug(name);
-      await prisma.category.upsert({
-        where: { slug },
-        update: {},
-        create: { slug, name: { en: name }, description: {}, sortOrder: i, parentId: parent.id },
-      });
+    const parent = await upsertCategory(category.slug, category.name, { description: {}, sortOrder: order });
+    for (const [i, child] of (category.children ?? []).entries()) {
+      const name = typeof child === 'string' ? same(child) : child;
+      await upsertCategory(toSlug(name.en!), name, { description: {}, sortOrder: i, parentId: parent.id });
     }
   }
   console.log(`✔ Danh mục: ${DEFAULT_CATEGORIES.length} nhóm`);

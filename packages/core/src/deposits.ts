@@ -234,13 +234,14 @@ export async function rejectDeposit(id: string, reviewerId: string, note: string
   if (res.count === 0) throw domainError(409, 'Yêu cầu này đã được xử lý trước đó');
 }
 
-// Khách bấm "Tôi đã chuyển khoản", phải kèm mã giao dịch HOẶC biên lai -> yêu cầu chờ admin duyệt.
+// Khách báo đã thanh toán, phải kèm mã giao dịch HOẶC biên lai -> yêu cầu chờ admin duyệt.
+// Ngân hàng: mã giao dịch ngân hàng. USDT: TxID (dùng khi tự kiểm tra on-chain không khớp, VD chuyển lệch số tiền).
 // Yêu cầu vừa hết hạn vẫn báo được trong 24h (khách chuyển trễ) và được mở lại thành PENDING.
 // Báo lại lần nữa khi đang chờ: chỉ thay mã giao dịch / biên lai (nếu có giá trị mới).
 // Trả về khóa biên lai cũ (nếu bị thay) để nơi gọi xóa file.
-export async function claimBankDeposit(userId: string, id: string, proofKey: string | null, customerRef: string | null) {
+export async function claimDeposit(userId: string, id: string, proofKey: string | null, customerRef: string | null) {
   const t = await prisma.transaction.findFirst({
-    where: { id, userId, type: 'DEPOSIT', method: 'BANK_TRANSFER' },
+    where: { id, userId, type: 'DEPOSIT', method: { in: ['BANK_TRANSFER', 'USDT_TRC20', 'USDT_BEP20'] } },
     select: { status: true, createdAt: true, claimedAt: true, proofImageUrl: true, customerRef: true },
   });
   if (!t) throw domainError(404, 'Deposit not found');

@@ -4,6 +4,7 @@
 //  - Giá bán luôn = giá vốn × priceMarkup của nhà cung cấp (đổi markup để chỉnh giá hàng loạt).
 //  - Không ghi đè tên/mô tả/danh mục admin đã sửa; chỉ cập nhật giá, tồn kho, min/max.
 //  - Sản phẩm biến mất khỏi catalog -> externalStock = 0 (không xóa: có thể đã có đơn hàng).
+//  - Danh mục nguồn trùng tên với danh mục có sẵn của shop (cùng cấp cha) -> dùng luôn danh mục đó, không tạo bản trùng.
 import { createHash } from 'node:crypto';
 import { Prisma, prisma } from '@accszone/database';
 import { decrypt } from '../crypto';
@@ -14,6 +15,7 @@ export interface SyncResult {
   supplier: string;
   fetched: number;
   categoriesCreated: number;
+  categoriesMatched: number;
   productsCreated: number;
   productsUpdated: number;
   productsMissing: number;
@@ -24,6 +26,16 @@ export interface SyncResult {
 function stableSlug(name: string, supplierId: string, externalId: string) {
   const hash = createHash('sha256').update(`${supplierId}:${externalId}`).digest('hex').slice(0, 6);
   return `${slugify(name).slice(0, 80) || 'item'}-${hash}`;
+}
+
+// Danh mục do shop tự tạo (không thuộc nhà cung cấp nào), cùng tên tiếng Anh (không phân biệt hoa thường) và cùng danh mục cha
+async function findShopCategory(name: string, parentId: string | null) {
+  const [row] = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM categories
+    WHERE "supplierId" IS NULL AND lower(trim(name->>'en')) = lower(trim(${name})) AND "parentId" IS NOT DISTINCT FROM ${parentId}
+    ORDER BY "sortOrder" ASC, "createdAt" ASC
+    LIMIT 1`;
+  return row?.id ?? null;
 }
 
 export async function syncSupplier(supplierId: string): Promise<SyncResult> {
@@ -37,6 +49,7 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
     supplier: supplier.name,
     fetched: catalog.products.length,
     categoriesCreated: 0,
+    categoriesMatched: 0,
     productsCreated: 0,
     productsUpdated: 0,
     productsMissing: 0,
@@ -66,6 +79,13 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
   for (const [externalId, name] of wanted) {
     if (categoryIds.has(externalId)) continue;
     if (externalId === fallbackKey && !catalog.products.some((p) => !p.category)) continue;
+    const parentId = categoryIds.get(parentOf.get(externalId) ?? '') ?? null;
+    const local = externalId === fallbackKey ? null : await findShopCategory(name, parentId);
+    if (local) {
+      categoryIds.set(externalId, local);
+      result.categoriesMatched++;
+      continue;
+    }
     const created = await prisma.category.create({
       data: {
         supplierId,
@@ -73,7 +93,7 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
         slug: stableSlug(name, supplierId, `cat:${externalId}`),
         name: { en: name },
         description: {},
-        parentId: categoryIds.get(parentOf.get(externalId) ?? '') ?? null,
+        parentId,
       },
       select: { id: true },
     });

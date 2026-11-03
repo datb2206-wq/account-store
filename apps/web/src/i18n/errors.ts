@@ -24,7 +24,7 @@ const PATTERNS: Array<[RegExp, ErrorKey]> = [
   [/^Insufficient balance$/, 'insufficientBalance'],
   [/^Out of stock$/, 'outOfStock'],
   [/^Only (\d+) left in stock$/, 'stockLeft'],
-  [/^This product is (?:not|temporarily un)available$/, 'productUnavailable'],
+  [/^This product is (?:not |temporarily un)available$/, 'productUnavailable'],
   [/^Quantity must be between (\d+) and (\d+)$/, 'quantityRange'],
   [/^Enter a valid amount$/, 'validAmount'],
   [/^Whole USDT amounts only \(e\.g\. 25\)$/, 'wholeUsdt'],
@@ -46,6 +46,9 @@ const PATTERNS: Array<[RegExp, ErrorKey]> = [
   [/^The receipt image must be 5 MB or smaller$/, 'receiptTooLarge'],
   [/^Upload a JPG, PNG or WebP image$/, 'receiptType'],
   [/^Deposit not found$/, 'depositNotFound'],
+  [/^(?:Order not found|Not found)$/, 'notFound'],
+  // Yêu cầu bị chặn ở tầng kỹ thuật (form hỏng, khóa chống mua trùng, sai nguồn gửi): khách chỉ cần tải lại trang
+  [/^(?:Invalid form data|Invalid order|Invalid origin|Unsupported locale|Missing or invalid Idempotency-Key header|Idempotency-Key was already used)/, 'invalidRequest'],
   [/^Amount mismatch: this transaction sent ([\d.]+) USDT but this request expects exactly ([\d.]+) USDT\./, 'amountMismatch'],
   [/^Invalid (?:\w+ )?TxID$/, 'txInvalid'],
   [/^Please enter your TxID$/, 'txRequired'],

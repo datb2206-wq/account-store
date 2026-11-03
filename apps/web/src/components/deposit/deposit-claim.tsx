@@ -11,11 +11,23 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 
 // claimedAt: thời điểm khách đã báo, định dạng sẵn ở server (tránh lệch hydration do múi giờ)
-// Nạp ngân hàng: khách báo "Tôi đã chuyển khoản" + mã giao dịch hoặc ảnh biên lai -> trạng thái "Chờ duyệt"
-export function BankClaim({ id, claimedAt, hasProof, customerRef }: { id: string; claimedAt: string | null; hasProof: boolean; customerRef: string | null }) {
+// Khách báo đã thanh toán + mã giao dịch (ngân hàng) / TxID (USDT) hoặc ảnh biên lai -> trạng thái "Chờ duyệt"
+export function DepositClaim({
+  kind,
+  id,
+  claimedAt,
+  hasProof,
+  customerRef,
+}: {
+  kind: 'bank' | 'usdt';
+  id: string;
+  claimedAt: string | null;
+  hasProof: boolean;
+  customerRef: string | null;
+}) {
   const router = useRouter();
   const { d } = useI18n();
-  const t = d.bankClaim;
+  const t = kind === 'usdt' ? d.usdtClaim : d.bankClaim;
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [reference, setReference] = useState('');
@@ -61,8 +73,8 @@ export function BankClaim({ id, claimedAt, hasProof, customerRef }: { id: string
   const form = (
     <form onSubmit={submit} className="space-y-3">
       <div>
-        <label htmlFor="bank-ref" className="label">{t.reference}</label>
-        <input id="bank-ref" className="input font-mono text-sm" maxLength={100} placeholder={t.referencePlaceholder} value={reference} onChange={(e) => setReference(e.target.value)} spellCheck={false} />
+        <label htmlFor={`${kind}-ref`} className="label">{t.reference}</label>
+        <input id={`${kind}-ref`} className="input font-mono text-sm" maxLength={100} placeholder={t.referencePlaceholder} value={reference} onChange={(e) => setReference(e.target.value)} spellCheck={false} />
       </div>
       <div>
         <p className="label">{t.receipt}</p>
@@ -93,7 +105,7 @@ export function BankClaim({ id, claimedAt, hasProof, customerRef }: { id: string
         <div className="rounded-lg bg-sky-50 p-4 text-sm text-sky-900">
           <p className="font-semibold">{t.awaitingTitle}</p>
           <p className="mt-1">{fmt(t.awaitingText, { date: claimedAt })}</p>
-          {customerRef && <p className="mt-1">{t.reference}: <b className="font-mono">{customerRef}</b></p>}
+          {customerRef && <p className="mt-1 break-all">{t.reference}: <b className="font-mono">{customerRef}</b></p>}
           <p className="mt-2 flex flex-wrap gap-3">
             {hasProof ? (
               <a href={`/api/deposits/${id}/proof`} target="_blank" rel="noreferrer" className="font-medium underline">{t.viewReceipt}</a>

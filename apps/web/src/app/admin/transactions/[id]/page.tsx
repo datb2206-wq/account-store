@@ -52,15 +52,15 @@ export default async function AdminTransactionDetailPage({ params }: { params: P
     ['Số dư trước → sau', t.balanceBefore && t.balanceAfter ? `${formatUsd(t.balanceBefore)} → ${formatUsd(t.balanceAfter)}` : '—'],
     ['Mã nội dung CK', t.transferCode ? <span key="c" className="font-mono">{t.transferCode}</span> : '—'],
     ['Mã GD ngân hàng', t.bankRef ?? '—'],
-    ...(t.method === 'BANK_TRANSFER'
-      ? ([['Mã GD khách khai', t.customerRef ? (
+    ...(t.type === 'DEPOSIT'
+      ? ([[isUsdt ? 'TxID khách khai' : 'Mã GD khách khai', t.customerRef ? (
           <span key="cr" className="font-mono text-xs">
             {t.customerRef}
             {duplicateRefs > 0 && <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-red-700">Trùng với {duplicateRefs} yêu cầu khác</span>}
           </span>
         ) : '—']] as [string, React.ReactNode][])
       : []),
-    ...(t.method === 'BANK_TRANSFER'
+    ...(t.type === 'DEPOSIT'
       ? ([['Khách báo đã chuyển', t.claimedAt ? <span key="cl" className="font-medium text-sky-700">{formatDate(t.claimedAt)}</span> : 'Chưa']] as [string, React.ReactNode][])
       : []),
     ['Mạng / Ví nhận', t.network ? <span key="n" className="font-mono text-xs">{t.network} · {t.toAddress}</span> : '—'],
@@ -96,15 +96,19 @@ export default async function AdminTransactionDetailPage({ params }: { params: P
             ))}
           </section>
 
-          {t.method === 'BANK_TRANSFER' && t.proofImageUrl && (
+          {t.proofImageUrl && (
             <section className="card space-y-2">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold">Biên lai khách tải lên</h2>
                 <a href={`/api/deposits/${t.id}/proof`} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">Mở ảnh gốc ↗</a>
               </div>
-              <p className="text-xs text-zinc-500">Đối chiếu số tiền, nội dung <b className="font-mono">{t.transferCode}</b> và tài khoản nhận với sao kê ngân hàng trước khi duyệt.</p>
+              <p className="text-xs text-zinc-500">
+                {isUsdt
+                  ? <>Tra TxID trên blockchain, đối chiếu ví nhận <b className="font-mono">{t.toAddress}</b> và số tiền thực nhận trước khi duyệt.</>
+                  : <>Đối chiếu số tiền, nội dung <b className="font-mono">{t.transferCode}</b> và tài khoản nhận với sao kê ngân hàng trước khi duyệt.</>}
+              </p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/api/deposits/${t.id}/proof`} alt="Biên lai chuyển khoản" className="max-h-[480px] rounded-lg border border-zinc-200 object-contain" />
+              <img src={`/api/deposits/${t.id}/proof`} alt="Biên lai khách tải lên" className="max-h-[480px] rounded-lg border border-zinc-200 object-contain" />
             </section>
           )}
 

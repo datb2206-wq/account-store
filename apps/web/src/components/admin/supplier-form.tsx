@@ -100,6 +100,31 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
   );
 }
 
+export function PublishButton({ supplierId, count }: { supplierId: string; count: number }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function publish() {
+    if (!window.confirm(`Bật bán ${count} sản phẩm đang ẩn còn hàng? Hãy kiểm tra giá (markup) trước.`)) return;
+    setPending(true);
+    setMessage(null);
+    const res = await apiRequest<{ published: number }>(`/api/admin/suppliers/${supplierId}/publish`, 'POST');
+    setPending(false);
+    setMessage(res.ok ? `Đã bật bán ${res.data.published} sản phẩm.` : (res.data.error ?? 'Không thể bật bán'));
+    if (res.ok) router.refresh();
+  }
+
+  return (
+    <div className="space-y-2">
+      <button type="button" className="btn-ghost border border-zinc-200" onClick={publish} disabled={pending || count === 0}>
+        {pending ? 'Đang bật…' : `Bật bán ${count} sản phẩm còn hàng`}
+      </button>
+      {message && <p className="text-xs text-zinc-600">{message}</p>}
+    </div>
+  );
+}
+
 export function SyncButton({ supplierId, disabled }: { supplierId: string; disabled?: boolean }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);

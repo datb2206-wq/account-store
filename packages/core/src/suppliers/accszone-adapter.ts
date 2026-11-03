@@ -39,6 +39,7 @@ const listingSchema = z.object({
   subcategory: refSchema.nullish(),
 });
 
+const balanceSchema = z.object({ balance: z.string().regex(/^-?\d+(\.\d+)?$/) });
 const purchaseSchema = z.object({ order_id: z.number(), accounts: z.array(z.string()).nullish() });
 const orderSchema = z.object({ id: z.number(), is_refund: z.boolean().nullish(), accounts: z.array(z.string()).nullish() });
 
@@ -157,6 +158,15 @@ export const accszoneAdapter: SupplierAdapter = {
     const order = purchaseSchema.safeParse(res.data);
     if (!order.success) throw new SupplierTransientError('AccsZone trả về đơn sai định dạng');
     return { status: 'completed', externalOrderId: String(order.data.order_id), items: delivered(order.data.accounts) };
+  },
+
+  // GET /user/balance: không bị giới hạn tần suất, đúng số dư web gốc dùng để trừ khi đặt hàng
+  async getBalance({ baseUrl, apiKey }) {
+    const res = await orderRequest(`${base(baseUrl)}/user/balance`, apiKey);
+    if (res.rejected) throw new SupplierTransientError(res.rejected);
+    const parsed = balanceSchema.safeParse(res.data);
+    if (!parsed.success) throw new SupplierTransientError('AccsZone trả về số dư sai định dạng');
+    return parsed.data.balance;
   },
 
   async getOrder({ baseUrl, apiKey, externalOrderId }): Promise<SupplierOrderResult> {

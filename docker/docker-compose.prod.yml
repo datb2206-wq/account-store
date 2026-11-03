@@ -33,6 +33,20 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD chưa đặt}
       POSTGRES_DB: ${POSTGRES_DB}
+    # Tối ưu cho VPS ổ NVMe (đọc ngẫu nhiên gần nhanh như đọc tuần tự) và truy vấn kho hàng lớn.
+    # Bộ nhớ chỉnh theo RAM của VPS qua .env, xem bảng trong deploy/README.md (mục "Tối ưu PostgreSQL").
+    command: >
+      postgres
+      -c shared_buffers=${PG_SHARED_BUFFERS:-256MB}
+      -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-1GB}
+      -c work_mem=${PG_WORK_MEM:-8MB}
+      -c maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-128MB}
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c wal_compression=on
+      -c max_wal_size=2GB
+      -c checkpoint_completion_target=0.9
+      -c jit=off
     # Không publish port: chỉ web/worker trong mạng nội bộ truy cập được
     volumes:
       - pg_data:/var/lib/postgresql/data

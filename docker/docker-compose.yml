@@ -8,6 +8,20 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    # Cùng thông số với docker-compose.prod.yml (file này cũng dùng cho DB khi chạy app bằng PM2 trên VPS)
+    command: >
+      postgres
+      -c shared_buffers=${PG_SHARED_BUFFERS:-256MB}
+      -c effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-1GB}
+      -c work_mem=${PG_WORK_MEM:-8MB}
+      -c maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-128MB}
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c wal_compression=on
+      -c max_wal_size=2GB
+      -c checkpoint_completion_target=0.9
+      -c jit=off
+    shm_size: 256mb
     # Chỉ bind vào localhost — không mở DB ra mạng ngoài
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"

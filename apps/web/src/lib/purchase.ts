@@ -1,6 +1,6 @@
 // Luồng mua hàng bằng số dư. Chỉ dùng phía server.
 import { prisma, type Prisma } from '@accszone/database';
-import { decrypt, newOrderCode, pickRandomStock } from '@accszone/core';
+import { decrypt, fulfillResellerOrder, newOrderCode, pickRandomStock } from '@accszone/core';
 import { invalidateCache, SHOP_STOCK_CACHE } from './cache';
 import { localized } from './format';
 import { enqueueOrderFulfillment } from './queue';
@@ -33,9 +33,7 @@ export async function purchase(input: PurchaseInput) {
       maxWait: 5_000,
       timeout: 15_000,
     });
-    // Đơn RESELLER: worker đặt hàng sang web gốc. Không đẩy được job (Redis lỗi) cũng không sao:
-    // job quét định kỳ của worker sẽ tự nhặt các đơn PENDING.
-    if (reseller) await enqueueOrderFulfillment(orderId).catch((err) => console.error('enqueue fulfill failed', err));
+    if (reseller) await fulfillNow(orderId);
     else await invalidateCache(SHOP_STOCK_CACHE); // khách thấy số tồn mới ngay sau khi mua
     return { ...(await loadDelivery(orderId)), replayed: false };
   } catch (err) {
@@ -47,6 +45,28 @@ export async function purchase(input: PurchaseInput) {
       if (replay) return replay;
     }
     throw err;
+  }
+}
+
+// Web gốc giao tài khoản ngay trong phản hồi đặt hàng -> đặt luôn trong request mua để khách nhận hàng tức thì.
+// Lỗi tạm thời / web gốc chậm / web gốc trả "đang xử lý": giao cho worker thử lại. Chạy trùng với worker vẫn an toàn:
+// đặt hàng gửi kèm mã tham chiếu cố định (web gốc trả lại đơn cũ) và giao hàng/hoàn tiền là UPDATE có điều kiện PENDING.
+// Không đẩy được job (Redis lỗi) cũng không sao: job quét định kỳ của worker tự nhặt các đơn PENDING.
+const INLINE_FULFILL_MS = 20_000;
+const fulfillLog = { info: (m: string) => console.info(`[fulfill] ${m}`), warn: (m: string) => console.warn(`[fulfill] ${m}`) };
+
+async function fulfillNow(orderId: string) {
+  let timer: NodeJS.Timeout | undefined;
+  const outcome = await Promise.race([
+    fulfillResellerOrder(orderId, { isLastAttempt: false }, fulfillLog).catch((err) => {
+      fulfillLog.warn(`order ${orderId}: inline fulfil failed (${err instanceof Error ? err.message : err}), handing over to worker`);
+      return 'error' as const;
+    }),
+    new Promise<'timeout'>((resolve) => (timer = setTimeout(() => resolve('timeout'), INLINE_FULFILL_MS))),
+  ]);
+  clearTimeout(timer);
+  if (outcome === 'pending' || outcome === 'error' || outcome === 'timeout') {
+    await enqueueOrderFulfillment(orderId).catch((err) => console.error('enqueue fulfill failed', err));
   }
 }
 

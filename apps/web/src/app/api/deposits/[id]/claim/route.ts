@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { claimBankDeposit } from '@accszone/core';
+import { claimDeposit } from '@accszone/core';
 import { badRequest, userRoute } from '@/lib/admin-route';
 import { tooManyRequests } from '@/lib/http';
 import { rateLimit } from '@/lib/rate-limit';
@@ -9,7 +9,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 const MAX_REFERENCE = 100;
 
-// Khách bấm "Tôi đã chuyển khoản", multipart/form-data: "reference" (mã giao dịch) và/hoặc "proof" (ảnh biên lai)
+// Khách báo đã thanh toán (ngân hàng / USDT), multipart/form-data: "reference" (mã giao dịch / TxID) và/hoặc "proof" (ảnh biên lai)
 export const POST = userRoute<Ctx>(async (req, { params }, user) => {
   const limit = await rateLimit(`deposit:claim:${user.id}`, 10, 10 * 60);
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
@@ -32,7 +32,7 @@ export const POST = userRoute<Ctx>(async (req, { params }, user) => {
   }
 
   try {
-    const { replacedProof } = await claimBankDeposit(user.id, id, proofKey, reference || null);
+    const { replacedProof } = await claimDeposit(user.id, id, proofKey, reference || null);
     await deleteProof(replacedProof);
   } catch (err) {
     await deleteProof(proofKey); // không gắn được vào yêu cầu nào -> xóa file vừa lưu

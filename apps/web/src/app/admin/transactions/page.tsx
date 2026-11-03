@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { prisma, type PaymentMethod, type Prisma, type TransactionStatus, type TransactionType } from '@accszone/database';
+import { prisma } from '@accszone/database';
 import { AdjustBalanceButton } from '@/components/admin/adjust-balance';
 import { Badge } from '@/components/badge';
 import { Pagination } from '@/components/pagination';
 import { StatCard } from '@/components/stat-card';
 import { requireStaff } from '@/lib/auth';
-import { shortHash } from '@/lib/chain-links';
+import { parseTxFilters, TX_METHODS, TX_STATUSES, TX_TYPES, txQuery, txWhere } from '@/lib/admin-transactions';
+import { explorerTxUrl, shortHash } from '@/lib/chain-links';
 import { expireStaleDeposits } from '@accszone/core';
 import { formatDate, formatOriginal, formatUsd, METHOD_LABEL } from '@/lib/format';
 import { buildHref } from '@/lib/url';
@@ -14,41 +15,20 @@ import { buildHref } from '@/lib/url';
 export const metadata: Metadata = { title: 'Giao dịch' };
 
 const PAGE_SIZE = 30;
-const TYPES: TransactionType[] = ['DEPOSIT', 'PURCHASE', 'REFUND', 'ADJUSTMENT'];
-const STATUSES: TransactionStatus[] = ['PENDING', 'COMPLETED', 'REJECTED', 'EXPIRED'];
-const METHODS: PaymentMethod[] = ['BANK_TRANSFER', 'USDT_TRC20', 'USDT_BEP20', 'BALANCE', 'MANUAL'];
-
-const pick = <T extends string>(list: T[], v?: string) => list.find((x) => x === v);
 
 export default async function AdminTransactionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; status?: string; method?: string; q?: string; page?: string }>;
+  searchParams: Promise<Partial<Record<string, string>>>;
 }) {
   const admin = await requireStaff();
   const sp = await searchParams;
-  const type = pick(TYPES, sp.type);
-  const status = pick(STATUSES, sp.status);
-  const method = pick(METHODS, sp.method);
-  const q = sp.q?.trim() ?? '';
+  const f = parseTxFilters(sp);
+  const { type, status, method, q } = f;
   const page = Math.max(1, Number.parseInt(sp.page ?? '1', 10) || 1);
   await expireStaleDeposits();
 
-  const where: Prisma.TransactionWhereInput = {
-    type,
-    status,
-    method,
-    ...(q && {
-      OR: [
-        { id: q },
-        { transferCode: q.toUpperCase() },
-        { txHash: q.toLowerCase() },
-        { bankRef: q },
-        { order: { code: q.toUpperCase() } },
-        { user: { email: { contains: q, mode: 'insensitive' } } },
-      ],
-    }),
-  };
+  const where = txWhere(f);
 
   const [total, sums, pendingDeposits, rows] = await Promise.all([
     prisma.transaction.count({ where }),
@@ -63,8 +43,10 @@ export default async function AdminTransactionsPage({
     }),
   ]);
 
-  const filters = { type, status, method, q };
-  const isPendingView = type === 'DEPOSIT' && status === 'PENDING' && !method && !q;
+  const filters = txQuery(f);
+  const filtered = Object.values(filters).some(Boolean);
+  const isPendingView = type === 'DEPOSIT' && status === 'PENDING' && !method && !q && !f.from && !f.to && !f.tx;
+  const isTxLog = method === 'USDT' && f.tx === '1';
 
   return (
     <div className="space-y-6">
@@ -77,26 +59,43 @@ export default async function AdminTransactionsPage({
           >
             Chờ duyệt nạp {pendingDeposits > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-xs text-white">{pendingDeposits}</span>}
           </Link>
+          {/* Log đối soát: mọi giao dịch USDT đã gắn TxID (cả 2 mạng), đối chiếu với lịch sử ví */}
+          <Link href={buildHref('/admin/transactions', { method: 'USDT', tx: '1' })} className={isTxLog ? 'btn-primary' : 'btn-ghost border border-zinc-200'}>
+            Log TxID USDT
+          </Link>
+          <a href={buildHref('/api/admin/transactions/export', filters)} className="btn-ghost border border-zinc-200" title="Xuất CSV đúng theo bộ lọc đang xem (tối đa 50.000 dòng)">
+            Xuất CSV
+          </a>
           {admin.role === 'SUPER_ADMIN' && <AdjustBalanceButton />}
         </div>
       </div>
 
       <form className="flex flex-wrap gap-2">
-        <input name="q" defaultValue={q} placeholder="Email, mã NAP, TxID, mã đơn, ID…" className="input w-72" />
+        <input name="q" defaultValue={q} placeholder="Email, mã NAP, TxID, ví gửi, mã đơn, ID…" className="input w-72" />
         <select name="type" defaultValue={type ?? ''} className="input w-40">
           <option value="">Mọi loại</option>
-          {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          {TX_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         <select name="status" defaultValue={status ?? ''} className="input w-40">
           <option value="">Mọi trạng thái</option>
-          {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          {TX_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <select name="method" defaultValue={method ?? ''} className="input w-44">
           <option value="">Mọi phương thức</option>
-          {METHODS.map((m) => <option key={m} value={m}>{METHOD_LABEL[m]}</option>)}
+          <option value="USDT">USDT (cả 2 mạng)</option>
+          {TX_METHODS.map((m) => <option key={m} value={m}>{METHOD_LABEL[m]}</option>)}
         </select>
+        <label className="flex items-center gap-1.5 text-sm text-zinc-600">
+          Từ <input type="date" name="from" defaultValue={f.from ?? ''} className="input w-40" />
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-zinc-600">
+          đến <input type="date" name="to" defaultValue={f.to ?? ''} className="input w-40" />
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-zinc-600">
+          <input type="checkbox" name="tx" value="1" defaultChecked={f.tx === '1'} /> Chỉ có TxID
+        </label>
         <button className="btn-primary">Lọc</button>
-        {(type || status || method || q) && <Link href="/admin/transactions" className="btn-ghost">Xóa lọc</Link>}
+        {filtered && <Link href="/admin/transactions" className="btn-ghost">Xóa lọc</Link>}
       </form>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -137,7 +136,7 @@ export default async function AdminTransactionsPage({
                   {t.status === 'PENDING' && t.claimedAt && <span className="ml-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700" title="Khách đã bấm Tôi đã chuyển khoản">Đã báo CK{t.proofImageUrl ? ' + ảnh' : ''}</span>}
                 </td>
                 <td className="font-mono text-xs text-zinc-500">
-                  {t.transferCode ?? (t.txHash && shortHash(t.txHash, 6)) ?? (t.order && <Link href={`/admin/orders/${t.order.code}`} className="text-blue-600 hover:underline">{t.order.code}</Link>) ?? (t.note && <span className="font-sans">{t.note.slice(0, 30)}</span>) ?? '—'}
+                  {t.transferCode ?? (t.txHash && <a href={explorerTxUrl(t.network, t.txHash)} target="_blank" rel="noreferrer" title={t.txHash} className="text-blue-600 hover:underline">{shortHash(t.txHash, 6)} ↗</a>) ?? (t.order && <Link href={`/admin/orders/${t.order.code}`} className="text-blue-600 hover:underline">{t.order.code}</Link>) ?? (t.note && <span className="font-sans">{t.note.slice(0, 30)}</span>) ?? '—'}
                 </td>
                 <td className="text-right">
                   <Link href={`/admin/transactions/${t.id}`} className="text-sm font-medium text-blue-600 hover:underline">

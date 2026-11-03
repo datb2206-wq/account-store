@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import QRCode from 'qrcode';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
 import { CopyButton } from '@/components/copy-button';
-import { BankClaim } from '@/components/deposit/bank-claim';
+import { DepositClaim } from '@/components/deposit/deposit-claim';
 import { UsdtVerify } from '@/components/deposit/usdt-verify';
 import { requireUser } from '@/lib/auth';
 import { explorerTxUrl, shortHash } from '@/lib/chain-links';
@@ -52,6 +53,9 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
   const required = isUsdt ? (await getConfig(t.network === 'BEP20' ? 'usdt.bep20' : 'usdt.trc20')).minConfirmations : 0;
   const bank = (t.metadata as BankMeta | null)?.bank;
   const exactUsdt = t.originalAmount?.toString() ?? '';
+  // QR chỉ chứa địa chỉ ví (chuẩn chung mọi ví đọc được). Số tiền khách tự nhập theo số lẻ hiển thị bên cạnh.
+  // Địa chỉ ví đã được kiểm tra định dạng ở cấu hình, SVG do thư viện sinh ra.
+  const qrSvg = open && isUsdt && t.toAddress ? await QRCode.toString(t.toAddress, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) : null;
 
   return (
     <div className="max-w-xl space-y-6">
@@ -103,17 +107,30 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
             </ul>
           </div>
           <section className="card">
-            <BankClaim id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
+            <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
           </section>
         </>
       )}
 
       {open && isUsdt && (
         <>
-          <section className="card divide-y divide-zinc-100 p-0">
-            <Row label={tr.network} value={t.network === 'BEP20' ? 'BNB Smart Chain (BEP20)' : 'TRON (TRC20)'} />
-            <Row label={tr.wallet} value={<span className="font-mono text-xs">{t.toAddress}</span>} copy={t.toAddress ?? ''} />
-            <Row label={tr.exactAmount} value={`${exactUsdt} USDT`} copy={exactUsdt} highlight />
+          <section className="card overflow-hidden p-0">
+            {qrSvg && (
+              <div className="flex flex-col items-center gap-4 border-b border-zinc-100 p-5 sm:flex-row">
+                <div
+                  role="img"
+                  aria-label={tr.qrAlt}
+                  className="size-44 shrink-0 rounded-xl border border-zinc-200 bg-white p-2 [&>svg]:size-full"
+                  dangerouslySetInnerHTML={{ __html: qrSvg }}
+                />
+                <p className="text-center text-sm text-zinc-600 sm:text-left">{tr.qrHint}</p>
+              </div>
+            )}
+            <div className="divide-y divide-zinc-100">
+              <Row label={tr.network} value={t.network === 'BEP20' ? 'BNB Smart Chain (BEP20)' : 'TRON (TRC20)'} />
+              <Row label={tr.wallet} value={<span className="font-mono text-xs">{t.toAddress}</span>} copy={t.toAddress ?? ''} />
+              <Row label={tr.exactAmount} value={`${exactUsdt} USDT`} copy={exactUsdt} highlight />
+            </div>
           </section>
           <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
             <ul className="list-disc space-y-1 pl-5">
@@ -122,7 +139,11 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
               <li>{fmt(tr.usdtNote3, { n: required })}</li>
             </ul>
           </div>
-          <section className="card">
+          <section className="card space-y-3">
+            <div>
+              <p className="font-semibold">{tr.verifyTitle}</p>
+              <p className="text-sm text-zinc-500">{tr.verifyHint}</p>
+            </div>
             <UsdtVerify
               endpoint={`/api/deposits/${t.id}/verify`}
               network={t.network ?? 'TRC20'}
@@ -131,6 +152,12 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
               required={required}
             />
           </section>
+          {/* Không tự xác minh được (chuyển lệch số tiền, sàn không cho xem TxID…): gửi biên lai để admin duyệt tay */}
+          {!t.txHash && (
+            <section className="card">
+              <DepositClaim kind="usdt" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
+            </section>
+          )}
         </>
       )}
     </div>

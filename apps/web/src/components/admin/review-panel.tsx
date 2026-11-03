@@ -23,7 +23,8 @@ export function ReviewPanel({
   const [approveAmount, setApproveAmount] = useState(amount);
   // Mã khách khai chỉ là gợi ý, admin đối chiếu sao kê rồi mới duyệt
   const [bankRef, setBankRef] = useState(customerRef ?? '');
-  const [txHash, setTxHash] = useState('');
+  // USDT: khách có thể khai TxID kèm biên lai -> điền sẵn, admin vẫn phải tự kiểm tra trên blockchain
+  const [txHash, setTxHash] = useState(needsTxHash ? (customerRef ?? '') : '');
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);

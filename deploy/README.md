@@ -10,7 +10,26 @@ Có 2 cách chạy. Chọn **một**:
 
 Cả hai đều đặt **Nginx trên máy chủ** phía trước để lo HTTPS.
 
-Yêu cầu VPS: Ubuntu 22.04/24.04, tối thiểu 2 GB RAM (build Next.js ngốn ~1.5 GB, máy 1 GB cần thêm swap).
+Yêu cầu VPS: Ubuntu 22.04/24.04, tối thiểu 2 GB RAM (build Next.js ngốn ~1.5 GB, máy 1 GB cần thêm swap). Nên chọn VPS ổ **NVMe**: PostgreSQL đã được cấu hình sẵn cho loại ổ này (xem [Tối ưu PostgreSQL](#tối-ưu-postgresql-vps-nvme)).
+
+### Tối ưu PostgreSQL (VPS NVMe)
+
+Cả 2 file compose khởi động PostgreSQL với thông số cho ổ NVMe và kho hàng lớn:
+
+- `random_page_cost=1.1`, `effective_io_concurrency=200`: NVMe đọc ngẫu nhiên gần nhanh như đọc tuần tự, nên PostgreSQL ưu tiên dùng index (lấy hàng trong kho hàng triệu dòng chỉ đọc vài trang thay vì quét cả bảng).
+- `wal_compression`, `max_wal_size=2GB`, `checkpoint_completion_target=0.9`: nhập kho số lượng lớn ghi đĩa đều hơn, không bị khựng theo đợt.
+- `jit=off`: truy vấn của shop đều ngắn, JIT chỉ làm chậm thêm.
+
+Phần bộ nhớ đặt trong `.env` theo RAM của VPS. Web, worker và Redis cũng cần RAM nên không cấp hết cho PostgreSQL:
+
+| RAM VPS | `PG_SHARED_BUFFERS` | `PG_EFFECTIVE_CACHE_SIZE` | `PG_WORK_MEM` | `PG_MAINTENANCE_WORK_MEM` |
+|---|---|---|---|---|
+| 2 GB (mặc định) | `256MB` | `1GB` | `8MB` | `128MB` |
+| 4 GB | `768MB` | `2GB` | `16MB` | `256MB` |
+| 8 GB | `2GB` | `5GB` | `32MB` | `512MB` |
+| 16 GB | `4GB` | `11GB` | `32MB` | `1GB` |
+
+Đổi xong chạy lại container PostgreSQL (dữ liệu nằm trong volume, không mất): `docker compose -f docker/docker-compose.prod.yml --env-file .env up -d postgres`. Kiểm tra: `docker compose -f docker/docker-compose.prod.yml exec postgres psql -U <user> -c "SHOW shared_buffers"`.
 
 ---
 
