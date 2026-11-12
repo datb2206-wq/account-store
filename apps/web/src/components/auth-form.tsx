@@ -91,7 +91,7 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next: str
       )}
 
       <button type="submit" className="btn-primary w-full" disabled={pending}>
-        {pending ? t.wait : isRegister ? t.createAccount : t.signIn}
+        {pending ? <span key="w">{t.wait}</span> : <span key="s">{isRegister ? t.createAccount : t.signIn}</span>}
       </button>
 
       <p className="text-center text-sm text-zinc-500">

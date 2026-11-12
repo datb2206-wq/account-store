@@ -128,7 +128,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
         <div className="space-y-4 p-6">
           <div className="flex items-start justify-between gap-4">
             <h2 className="text-lg font-semibold">
-              {!result ? product.name : paid ? t.titleComplete : t.titleRefunded}
+              {!result ? <span key="n">{product.name}</span> : paid ? <span key="c">{t.titleComplete}</span> : <span key="r">{t.titleRefunded}</span>}
             </h2>
             <button type="button" onClick={close} disabled={pending} className="text-zinc-400 hover:text-zinc-700" aria-label={d.common.close}>✕</button>
           </div>
@@ -205,7 +205,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
               <div className="flex items-center justify-between border-t border-zinc-100 pt-4">
                 <div>
                   <p className="text-sm text-zinc-500">{t.total}</p>
-                  <p className="text-xl font-semibold tabular-nums">{validQty ? <Money value={total} /> : '—'}</p>
+                  <p className="text-xl font-semibold tabular-nums">{validQty ? <Money value={total} /> : <span>—</span>}</p>
                   {fx && validQty && <p translate="no" className="text-xs text-zinc-400 tabular-nums">{formatFx(total, fx, locale)}</p>}
                 </div>
                 <div className="text-right text-sm">
@@ -220,7 +220,8 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
               )}
 
               <button type="button" onClick={pay} disabled={pending || !validQty || notEnough} className="btn-primary w-full">
-                {pending ? t.processing : validQty ? rich(t.pay, { amount: <Money value={total} /> }) : t.invalidQty}
+                {/* Mỗi trạng thái 1 <span> riêng: đổi chữ = thay cả thẻ, an toàn khi trang đang bị Google Dịch */}
+                {pending ? <span key="p">{t.processing}</span> : validQty ? <span key="v">{rich(t.pay, { amount: <Money value={total} /> })}</span> : <span key="i">{t.invalidQty}</span>}
               </button>
             </>
           )}
