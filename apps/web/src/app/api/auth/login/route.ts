@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@accszone/database';
+import { writeAudit } from '@/lib/audit';
 import { createSession, setAuthCookies } from '@/lib/auth';
 import { getClientIp, jsonError, readJson, tooManyRequests } from '@/lib/http';
 import { rateLimit, resetRateLimit } from '@/lib/rate-limit';
@@ -31,12 +32,18 @@ export async function POST(req: NextRequest) {
     select: { id: true, email: true, username: true, role: true, status: true, passwordHash: true },
   });
   const valid = await bcrypt.compare(password, user?.passwordHash ?? (await getDummyHash()));
-  if (!user || !valid) return jsonError(401, 'Invalid email or password');
+  const userAgent = req.headers.get('user-agent');
+  if (!user || !valid) {
+    // Chỉ ghi khi email có thật: sai mật khẩu nhiều lần là dấu hiệu bị dò mật khẩu
+    if (user) await writeAudit({ actorId: user.id, action: 'auth.login_failed', entity: 'User', entityId: user.id, after: { userAgent }, ip }).catch(() => null);
+    return jsonError(401, 'Invalid email or password');
+  }
   if (user.status === 'BANNED') return jsonError(403, 'This account has been suspended');
 
   await Promise.all([
     prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), lastLoginIp: ip } }),
     resetRateLimit(emailKey),
+    writeAudit({ actorId: user.id, action: 'auth.login', entity: 'User', entityId: user.id, after: { userAgent }, ip }).catch(() => null),
   ]);
 
   const { passwordHash: _, status: __, ...publicUser } = user;

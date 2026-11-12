@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma, type Prisma } from '@accszone/database';
+import { writeAudit } from '@/lib/audit';
 import { createSession, setAuthCookies } from '@/lib/auth';
 import { getClientIp, jsonError, readJson, tooManyRequests } from '@/lib/http';
 import { rateLimit } from '@/lib/rate-limit';
@@ -40,6 +41,9 @@ export async function POST(req: NextRequest) {
     }
     throw err;
   }
+
+  // Nhật ký hoạt động (Admin > Lịch sử). Lỗi ghi log không được chặn việc đăng ký.
+  await writeAudit({ actorId: user.id, action: 'auth.register', entity: 'User', entityId: user.id, after: { userAgent: req.headers.get('user-agent') }, ip }).catch(() => null);
 
   const res = NextResponse.json({ user }, { status: 201 });
   setAuthCookies(res, await createSession(user));
