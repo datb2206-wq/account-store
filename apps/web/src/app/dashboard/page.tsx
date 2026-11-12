@@ -2,11 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
+import { Money } from '@/components/money';
 import { StatCard } from '@/components/stat-card';
 import { fmt } from '@/i18n/config';
 import { getI18n } from '@/i18n/server';
 import { requireUser } from '@/lib/auth';
-import { formatDate, formatUsd, localized } from '@/lib/format';
+import { formatDate, localized } from '@/lib/format';
 
 export async function generateMetadata(): Promise<Metadata> {
   const { d } = await getI18n();
@@ -54,9 +55,9 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label={t.balance} value={formatUsd(user.balance)} />
+        <StatCard label={t.balance} value={<Money value={user.balance} />} />
         <StatCard label={t.completedOrders} value={completed._count} />
-        <StatCard label={t.totalSpent} value={formatUsd(completed._sum.totalAmount)} />
+        <StatCard label={t.totalSpent} value={<Money value={completed._sum.totalAmount} />} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -74,7 +75,7 @@ export default async function DashboardPage() {
                   <tr key={o.id}>
                     <td><Link href={`/dashboard/orders/${o.code}`} className="font-mono text-xs text-blue-600 hover:underline">{o.code}</Link></td>
                     <td>{localized(o.product.name, locale)} × {o.quantity}</td>
-                    <td className="tabular-nums">{formatUsd(o.totalAmount)}</td>
+                    <td className="tabular-nums"><Money value={o.totalAmount} /></td>
                     <td><Badge value={o.status} label={d.status[o.status]} /></td>
                   </tr>
                 ))}
@@ -97,7 +98,7 @@ export default async function DashboardPage() {
                   <tr key={tx.id}>
                     <td>{d.txType[tx.type] ?? tx.type}</td>
                     <td className={`tabular-nums ${tx.amount.isNegative() ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {formatUsd(tx.amount)}
+                      <Money value={tx.amount} />
                     </td>
                     <td><Badge value={tx.status} label={d.status[tx.status]} /></td>
                     <td className="text-zinc-500">{formatDate(tx.createdAt)}</td>

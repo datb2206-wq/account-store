@@ -245,9 +245,9 @@ export default async function ShopPage({
                       </div>
                       <p className="hidden text-sm text-zinc-500 lg:block">{t.pricePerPc}</p>
                       <div>
-                        <p className="text-base font-bold text-zinc-900 tabular-nums">{formatUsd(p.price)}</p>
+                        <p translate="no" className="text-base font-bold text-zinc-900 tabular-nums">{formatUsd(p.price)}</p>
                         {/* Giá quy đổi theo ngôn ngữ (≈ Rp / ₽ / ¥) */}
-                        {(local ?? minNote) && <p className="text-[11px] whitespace-nowrap text-zinc-500 tabular-nums">{local ?? minNote}</p>}
+                        {(local ?? minNote) && <p translate={local ? 'no' : undefined} className="text-[11px] whitespace-nowrap text-zinc-500 tabular-nums">{local ?? minNote}</p>}
                         {local && minNote && <p className="text-[11px] text-zinc-500">{minNote}</p>}
                       </div>
                       <div className="flex justify-end">

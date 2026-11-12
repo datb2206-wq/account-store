@@ -1,4 +1,4 @@
-export function StatCard({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
+export function StatCard({ label, value, hint }: { label: string; value: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <div className="card">
       <p className="text-sm text-zinc-500">{label}</p>

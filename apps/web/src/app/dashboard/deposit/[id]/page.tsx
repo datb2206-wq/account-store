@@ -7,10 +7,11 @@ import { Badge } from '@/components/badge';
 import { CopyButton } from '@/components/copy-button';
 import { DepositClaim } from '@/components/deposit/deposit-claim';
 import { UsdtVerify } from '@/components/deposit/usdt-verify';
+import { Money } from '@/components/money';
 import { requireUser } from '@/lib/auth';
 import { explorerTxUrl, shortHash } from '@/lib/chain-links';
 import { expireStaleDeposits, getConfig } from '@accszone/core';
-import { formatDate, formatOriginal, formatUsd } from '@/lib/format';
+import { formatDate, formatOriginal } from '@/lib/format';
 import { fmt } from '@/i18n/config';
 import { rich } from '@/i18n/rich';
 import { getI18n } from '@/i18n/server';
@@ -71,7 +72,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
 
       {t.status === 'COMPLETED' && (
         <div className="card space-y-1 border-emerald-200 bg-emerald-50">
-          <p className="font-semibold text-emerald-800">{fmt(tr.credited, { amount: formatUsd(t.amount) })}</p>
+          <p className="font-semibold text-emerald-800">{rich(tr.credited, { amount: <Money value={t.amount} /> })}</p>
           {t.txHash && (
             <p className="text-sm text-emerald-700">
               TxID: <a href={explorerTxUrl(t.network, t.txHash)} target="_blank" rel="noreferrer" className="font-mono underline">{shortHash(t.txHash)}</a>
@@ -103,7 +104,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
             <p className="font-semibold">{tr.important}</p>
             <ul className="mt-1 list-disc space-y-1 pl-5">
               <li>{rich(tr.bankNote1, { code: <b className="font-mono">{t.transferCode}</b> })}</li>
-              <li>{rich(tr.bankNote2, { amount: <b>{formatUsd(t.amount)}</b> })}</li>
+              <li>{rich(tr.bankNote2, { amount: <b><Money value={t.amount} /></b> })}</li>
             </ul>
           </div>
           <section className="card">

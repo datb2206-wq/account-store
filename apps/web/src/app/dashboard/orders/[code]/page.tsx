@@ -3,13 +3,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AutoRefresh } from '@/components/auto-refresh';
 import { Badge } from '@/components/badge';
+import { Money } from '@/components/money';
 import { DeliveryBox } from '@/components/shop/delivery-box';
 import { StatCard } from '@/components/stat-card';
-import { fmt } from '@/i18n/config';
+import { rich } from '@/i18n/rich';
 import { translateError } from '@/i18n/errors';
 import { getI18n } from '@/i18n/server';
 import { requireUser } from '@/lib/auth';
-import { formatDate, formatUsd } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 import { getOrderForUser } from '@/lib/purchase';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -38,8 +39,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ co
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label={t.product} value={<span className="text-lg">{order.productName}</span>} />
-        <StatCard label={t.quantity} value={order.quantity} hint={fmt(t.perItem, { price: formatUsd(order.unitPrice) })} />
-        <StatCard label={t.totalPaid} value={formatUsd(order.totalAmount)} />
+        <StatCard label={t.quantity} value={order.quantity} hint={rich(t.perItem, { price: <Money value={order.unitPrice} /> })} />
+        <StatCard label={t.totalPaid} value={<Money value={order.totalAmount} />} />
       </div>
 
       {order.failReason && order.status !== 'PENDING' && (

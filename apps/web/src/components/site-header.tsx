@@ -70,7 +70,7 @@ export async function SiteHeader({ user, q = '', category }: { user: CurrentUser
                   title={h.balanceHint}
                 >
                   <WalletIcon size={15} />
-                  {formatUsd(user.balance)}
+                  <span translate="no">{formatUsd(user.balance)}</span>
                   <span className="ml-0.5 text-emerald-500">+</span>
                 </Link>
                 <Link href="/dashboard" className="hidden max-w-36 truncate text-sm font-medium text-zinc-600 hover:text-zinc-900 2xl:inline">

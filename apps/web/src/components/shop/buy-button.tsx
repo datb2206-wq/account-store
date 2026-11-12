@@ -6,7 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 import { apiRequest, newIdempotencyKey } from '@/lib/client-api';
 import { CartIcon } from '@/components/icons';
 import { useI18n } from '@/i18n/client';
-import { fmt, formatFx } from '@/i18n/config';
+import { formatFx } from '@/i18n/config';
+import { Money } from '@/components/money';
 import { translateError } from '@/i18n/errors';
 import { rich } from '@/i18n/rich';
 import { DeliveryBox } from './delivery-box';
@@ -41,7 +42,6 @@ interface PurchaseResult {
 const POLL_MS = 3_000;
 
 // Tối đa 4 chữ số lẻ: giá sản phẩm đồng bộ từ nhà cung cấp được làm tròn tới 4 chữ số
-const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
 export function BuyButton({ product, balance }: { product: ShopProduct; balance: string | null }) {
   const router = useRouter();
@@ -144,7 +144,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
             <>
               <p className="text-sm text-zinc-600">
                 {t.order} <Link href={`/dashboard/orders/${result.order.code}`} className="font-mono font-medium text-blue-600 hover:underline">{result.order.code}</Link>
-                {' · '}{result.order.quantity} × {product.name} · {usd.format(Number(result.order.totalAmount))}
+                {' · '}{result.order.quantity} × {product.name} · <Money value={result.order.totalAmount} />
               </p>
               {result.order.status === 'PENDING' && (
                 <div className="flex items-center gap-3 rounded-lg bg-blue-50 p-4 text-sm text-blue-900">
@@ -159,7 +159,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
               )}
               {result.items.length > 0 && <DeliveryBox items={result.items} orderCode={result.order.code} />}
               <p className="text-xs text-zinc-500">
-                {result.balance && result.order.status !== 'REFUNDED' && <>{rich(t.remainingBalance, { amount: <b>{usd.format(Number(result.balance))}</b> })} </>}
+                {result.balance && result.order.status !== 'REFUNDED' && <>{rich(t.remainingBalance, { amount: <b><Money value={result.balance} /></b> })} </>}
                 {rich(t.viewAnytime, { link: <Link href="/dashboard/orders" className="text-blue-600 hover:underline">{t.ordersLink}</Link> })}
               </p>
             </>
@@ -170,8 +170,8 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg bg-zinc-50 p-3">
                   <p className="text-zinc-500">{t.price}</p>
-                  <p className="font-semibold">{usd.format(Number(product.price))} <span className="font-normal text-zinc-400">{t.perItem}</span></p>
-                  {fx && <p className="text-xs text-zinc-400 tabular-nums">{formatFx(product.price, fx, locale)}</p>}
+                  <p className="font-semibold"><Money value={product.price} /> <span className="font-normal text-zinc-400">{t.perItem}</span></p>
+                  {fx && <p translate="no" className="text-xs text-zinc-400 tabular-nums">{formatFx(product.price, fx, locale)}</p>}
                 </div>
                 <div className="rounded-lg bg-zinc-50 p-3">
                   <p className="text-zinc-500">{t.inStock}</p>
@@ -199,12 +199,12 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
               <div className="flex items-center justify-between border-t border-zinc-100 pt-4">
                 <div>
                   <p className="text-sm text-zinc-500">{t.total}</p>
-                  <p className="text-xl font-semibold tabular-nums">{validQty ? usd.format(total) : '—'}</p>
-                  {fx && validQty && <p className="text-xs text-zinc-400 tabular-nums">{formatFx(total, fx, locale)}</p>}
+                  <p className="text-xl font-semibold tabular-nums">{validQty ? <Money value={total} /> : '—'}</p>
+                  {fx && validQty && <p translate="no" className="text-xs text-zinc-400 tabular-nums">{formatFx(total, fx, locale)}</p>}
                 </div>
                 <div className="text-right text-sm">
                   <p className="text-zinc-500">{t.yourBalance}</p>
-                  <p className={`font-medium tabular-nums ${notEnough ? 'text-red-600' : ''}`}>{usd.format(Number(balance))}</p>
+                  <p className={`font-medium tabular-nums ${notEnough ? 'text-red-600' : ''}`}><Money value={balance} /></p>
                 </div>
               </div>
 
@@ -214,7 +214,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
               )}
 
               <button type="button" onClick={pay} disabled={pending || !validQty || notEnough} className="btn-primary w-full">
-                {pending ? t.processing : validQty ? fmt(t.pay, { amount: usd.format(total) }) : t.invalidQty}
+                {pending ? t.processing : validQty ? rich(t.pay, { amount: <Money value={total} /> }) : t.invalidQty}
               </button>
             </>
           )}

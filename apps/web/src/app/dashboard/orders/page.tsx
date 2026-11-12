@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
+import { Money } from '@/components/money';
 import { Pagination } from '@/components/pagination';
 import { getI18n } from '@/i18n/server';
 import { requireUser } from '@/lib/auth';
-import { formatDate, formatUsd, localized } from '@/lib/format';
+import { formatDate, localized } from '@/lib/format';
 import { buildHref } from '@/lib/url';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -61,7 +62,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                 <td className="font-mono text-xs">{o.code}</td>
                 <td>{localized(o.product.name, locale)}</td>
                 <td className="tabular-nums">{o.quantity}</td>
-                <td className="tabular-nums">{formatUsd(o.totalAmount)}</td>
+                <td className="tabular-nums"><Money value={o.totalAmount} /></td>
                 <td><Badge value={o.status} label={d.status[o.status]} /></td>
                 <td className="text-zinc-500">{formatDate(o.createdAt)}</td>
                 <td className="text-right">
