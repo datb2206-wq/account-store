@@ -10,7 +10,6 @@ import { formatFx } from '@/i18n/config';
 import { Money } from '@/components/money';
 import { translateError } from '@/i18n/errors';
 import { rich } from '@/i18n/rich';
-import { DeliveryBox } from './delivery-box';
 
 const TRIGGER = 'btn-buy min-w-24 shadow-sm';
 
@@ -40,8 +39,6 @@ interface PurchaseResult {
 }
 
 const POLL_MS = 3_000;
-
-// Tối đa 4 chữ số lẻ: giá sản phẩm đồng bộ từ nhà cung cấp được làm tròn tới 4 chữ số
 
 export function BuyButton({ product, balance }: { product: ShopProduct; balance: string | null }) {
   const router = useRouter();
@@ -85,6 +82,8 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
   const total = Number(product.price) * qty;
   const notEnough = Number(balance) < total;
   const validQty = Number.isInteger(qty) && qty >= product.minQty && qty <= maxBuy;
+  // Đã trừ tiền: giao xong (COMPLETED) hoặc đang chờ nhà cung cấp xác nhận (PENDING)
+  const paid = result?.order.status === 'COMPLETED' || result?.order.status === 'PENDING';
 
   function open() {
     idempotencyKey.current = newIdempotencyKey();
@@ -129,39 +128,46 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
         <div className="space-y-4 p-6">
           <div className="flex items-start justify-between gap-4">
             <h2 className="text-lg font-semibold">
-              {!result
-                ? product.name
-                : result.order.status === 'PENDING'
-                  ? t.titleProcessing
-                  : result.order.status === 'COMPLETED'
-                    ? t.titleComplete
-                    : t.titleRefunded}
+              {!result ? product.name : paid ? t.titleComplete : t.titleRefunded}
             </h2>
             <button type="button" onClick={close} disabled={pending} className="text-zinc-400 hover:text-zinc-700" aria-label={d.common.close}>✕</button>
           </div>
 
           {result ? (
             <>
-              <p className="text-sm text-zinc-600">
-                {t.order} <Link href={`/dashboard/orders/${result.order.code}`} className="font-mono font-medium text-blue-600 hover:underline">{result.order.code}</Link>
-                {' · '}{result.order.quantity} × {product.name} · <Money value={result.order.totalAmount} />
-              </p>
-              {result.order.status === 'PENDING' && (
-                <div className="flex items-center gap-3 rounded-lg bg-blue-50 p-4 text-sm text-blue-900">
-                  <span className="size-5 shrink-0 animate-spin rounded-full border-2 border-blue-300 border-t-blue-700" aria-hidden />
-                  <span>{t.pendingNote}</span>
+              {/* Không hiện tài khoản ở đây: hàng được lưu vào Lịch sử mua hàng */}
+              {paid && (
+                <div className="flex items-start gap-3 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-emerald-600 text-xs font-bold text-white" aria-hidden>✓</span>
+                  <div className="space-y-1">
+                    <p className="font-semibold">{rich(t.charged, { amount: <Money value={result.order.totalAmount} /> })}</p>
+                    {result.order.status === 'PENDING' ? (
+                      <p className="flex items-center gap-2">
+                        <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-emerald-300 border-t-emerald-700" aria-hidden />
+                        {t.sentPending}
+                      </p>
+                    ) : (
+                      <p>{t.sentToHistory}</p>
+                    )}
+                  </div>
                 </div>
               )}
+              <p className="text-sm text-zinc-600">
+                {t.order} <span className="font-mono font-medium text-zinc-900">{result.order.code}</span>
+                {' · '}{result.order.quantity} × {product.name}
+              </p>
               {result.order.failReason && result.order.status !== 'PENDING' && (
                 <p className={`rounded-lg px-3 py-2 text-sm ${result.order.status === 'COMPLETED' ? 'bg-amber-50 text-amber-900' : 'bg-red-50 text-red-800'}`}>
                   {translateError(result.order.failReason, d)}
                 </p>
               )}
-              {result.items.length > 0 && <DeliveryBox items={result.items} orderCode={result.order.code} />}
-              <p className="text-xs text-zinc-500">
-                {result.balance && result.order.status !== 'REFUNDED' && <>{rich(t.remainingBalance, { amount: <b><Money value={result.balance} /></b> })} </>}
-                {rich(t.viewAnytime, { link: <Link href="/dashboard/orders" className="text-blue-600 hover:underline">{t.ordersLink}</Link> })}
-              </p>
+              {result.balance && result.order.status !== 'REFUNDED' && (
+                <p className="text-sm text-zinc-500">{rich(t.remainingBalance, { amount: <b className="text-zinc-900"><Money value={result.balance} /></b> })}</p>
+              )}
+              <div className="flex gap-2">
+                <Link href="/dashboard/orders" className="btn-primary flex-1">{t.openHistory}</Link>
+                <button type="button" onClick={close} className="btn-ghost border border-zinc-200">{d.common.close}</button>
+              </div>
             </>
           ) : (
             <>

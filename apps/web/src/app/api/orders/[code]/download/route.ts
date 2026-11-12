@@ -10,7 +10,8 @@ function csvCell(value: string) {
 }
 
 // Tải hàng đã mua: ?format=txt (mặc định, mỗi dòng 1 tài khoản) hoặc ?format=csv
-// (tách các trường theo dấu "|", VD user|pass|cookie -> 3 cột; có BOM để Excel đọc đúng UTF-8)
+// (tách các trường theo dấu "|", VD user|pass|cookie -> 3 cột; có BOM để Excel đọc đúng UTF-8).
+// ?view=1: mở file .txt ngay trong trình duyệt thay vì tải về (link file trong Lịch sử mua hàng)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const user = await getCurrentUser();
   if (!user) return jsonError(401, 'Unauthorized');
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
   if (!result) return jsonError(404, 'Order not found');
 
   const csv = req.nextUrl.searchParams.get('format') === 'csv';
+  const view = !csv && req.nextUrl.searchParams.get('view') === '1';
   const body = csv
     ? '﻿' + result.items.map((line) => line.split('|').map(csvCell).join(',')).join('\r\n') + '\r\n'
     : result.items.join('\n') + '\n';
@@ -26,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
   return new Response(body, {
     headers: {
       'Content-Type': csv ? 'text/csv; charset=utf-8' : 'text/plain; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${result.order.code}.${csv ? 'csv' : 'txt'}"`,
+      'Content-Disposition': `${view ? 'inline' : 'attachment'}; filename="${result.order.code}.${csv ? 'csv' : 'txt'}"`,
       'Cache-Control': 'no-store',
     },
   });

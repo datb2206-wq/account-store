@@ -76,7 +76,7 @@ export default async function DashboardPage() {
                     <td><Link href={`/dashboard/orders/${o.code}`} className="font-mono text-xs text-blue-600 hover:underline">{o.code}</Link></td>
                     <td>{localized(o.product.name, locale)} × {o.quantity}</td>
                     <td className="tabular-nums"><Money value={o.totalAmount} /></td>
-                    <td><Badge value={o.status} label={d.status[o.status]} /></td>
+                    <td><Badge value={o.status} label={d.orders.status[o.status] ?? d.status[o.status]} /></td>
                   </tr>
                 ))}
               </tbody>

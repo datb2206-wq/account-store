@@ -32,7 +32,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ co
         <Link href="/dashboard/orders" className="text-sm text-zinc-500 hover:underline">{t.back}</Link>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <h1 className="font-mono text-2xl font-semibold">{order.code}</h1>
-          <Badge value={order.status} label={d.status[order.status]} />
+          <Badge value={order.status} label={t.status[order.status] ?? d.status[order.status]} />
         </div>
         <p className="text-sm text-zinc-500">{formatDate(new Date(order.createdAt))}</p>
       </div>
