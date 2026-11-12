@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@accszone/database';
 import { getCurrentUser } from '@/lib/auth';
-import { isSameOrigin, jsonError, readJson, tooManyRequests } from '@/lib/http';
+import { getClientIp, isSameOrigin, jsonError, readJson, tooManyRequests } from '@/lib/http';
+import { blockedIpResponse } from '@/lib/ip-block';
 import { purchase, PurchaseError } from '@/lib/purchase';
 import { rateLimit } from '@/lib/rate-limit';
 import { blockedByMaintenance, MAINTENANCE_ERROR } from '@/lib/site';
@@ -10,6 +11,8 @@ import { fieldErrors, IDEMPOTENCY_KEY_RE, orderSchema } from '@/lib/validation';
 // Mua hàng. Header bắt buộc: Idempotency-Key (gửi lại đúng key khi retry -> nhận lại đúng đơn cũ)
 export async function POST(req: NextRequest) {
   if (!isSameOrigin(req)) return jsonError(403, 'Invalid origin');
+  const blocked = await blockedIpResponse(getClientIp(req));
+  if (blocked) return blocked;
   const user = await getCurrentUser();
   if (!user) return jsonError(401, 'Unauthorized');
   if (await blockedByMaintenance(user)) return jsonError(503, MAINTENANCE_ERROR);

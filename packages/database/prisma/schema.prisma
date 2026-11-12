@@ -63,6 +63,7 @@ enum TransactionType {
   PURCHASE // mua hàng (trừ tiền)
   REFUND // hoàn tiền
   ADJUSTMENT // admin cộng/trừ tay
+  BONUS // tiền thưởng khuyến mãi nạp tiền
 }
 
 enum TransactionStatus {
@@ -237,6 +238,11 @@ model Order {
   externalOrderId String?
   failReason      String?
 
+  // Mã giảm giá đã dùng: totalAmount là số tiền SAU giảm, discountAmount là phần được giảm
+  couponId        String?
+  coupon          Coupon?     @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  discountAmount  Decimal     @default(0) @db.Decimal(18, 6)
+
   stockItems      StockItem[]
   transactions    Transaction[]
   createdAt       DateTime    @default(now())
@@ -369,4 +375,87 @@ model AuditLog {
   @@index([actorId, createdAt(sort: Desc)])
   @@index([entity, entityId])
   @@map("audit_logs")
+}
+
+// -------------------------------------------------------------
+//  MARKETING: mã giảm giá, khuyến mãi nạp tiền
+// -------------------------------------------------------------
+
+model Coupon {
+  id              String    @id @default(cuid())
+  code            String    @unique // luôn lưu IN HOA
+  discountPercent Decimal   @db.Decimal(5, 2) // 0 < x <= 100
+  maxDiscount     Decimal?  @db.Decimal(18, 6) // giảm tối đa (USD), null = không giới hạn
+  minOrder        Decimal?  @db.Decimal(18, 6) // giá trị đơn tối thiểu (USD)
+  productIds      String[]  // rỗng = áp dụng mọi sản phẩm
+  maxUses         Int       // tổng số lượt dùng
+  usedCount       Int       @default(0)
+  expiresAt       DateTime?
+  isActive        Boolean   @default(true)
+  orders          Order[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("coupons")
+}
+
+// Nạp từ minAmount (USD) trở lên được thưởng thêm bonusPercent % (lấy mốc cao nhất đạt được)
+model DepositBonus {
+  id           String   @id @default(cuid())
+  minAmount    Decimal  @unique @db.Decimal(18, 6)
+  bonusPercent Decimal  @db.Decimal(5, 2)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@map("deposit_bonuses")
+}
+
+// -------------------------------------------------------------
+//  BẢO MẬT: chặn IP
+// -------------------------------------------------------------
+
+model BlockedIp {
+  id          String    @id @default(cuid())
+  ip          String    @unique
+  reason      String
+  attempts    Int       @default(0) // số lần đăng nhập sai khi bị chặn tự động
+  expiresAt   DateTime? // null = chặn vĩnh viễn
+  createdById String?   // null = hệ thống tự chặn
+  createdAt   DateTime  @default(now())
+
+  @@map("blocked_ips")
+}
+
+// -------------------------------------------------------------
+//  BLOG
+// -------------------------------------------------------------
+
+model BlogCategory {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  sortOrder Int        @default(0)
+  isActive  Boolean    @default(true)
+  posts     BlogPost[]
+  createdAt DateTime   @default(now())
+
+  @@map("blog_categories")
+}
+
+model BlogPost {
+  id          String        @id @default(cuid())
+  title       String
+  slug        String        @unique
+  excerpt     String?
+  content     String        // văn bản thường: "## " = tiêu đề, "- " = gạch đầu dòng, dòng trống = đoạn mới
+  coverUrl    String?
+  categoryId  String?
+  category    BlogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  isPublished Boolean       @default(true)
+  views       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([isPublished, createdAt(sort: Desc)])
+  @@map("blog_posts")
 }

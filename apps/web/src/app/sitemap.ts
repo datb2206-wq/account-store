@@ -5,7 +5,10 @@ import { getSiteUrl } from '@/lib/site';
 // Dựng theo tên miền đang truy cập nên chạy được với nhiều tên miền (.co, .me, .info…)
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = await getSiteUrl();
-  const categories = await prisma.category.findMany({ where: { isActive: true }, select: { slug: true, updatedAt: true } });
+  const [categories, posts] = await Promise.all([
+    prisma.category.findMany({ where: { isActive: true }, select: { slug: true, updatedAt: true } }),
+    prisma.blogPost.findMany({ where: { isPublished: true }, select: { slug: true, updatedAt: true }, take: 5000 }),
+  ]);
   return [
     { url: base, changeFrequency: 'hourly', priority: 1 },
     ...categories.map((c) => ({
@@ -14,5 +17,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily' as const,
       priority: 0.8,
     })),
+    { url: `${base}/blog`, changeFrequency: 'daily', priority: 0.6 },
+    ...posts.map((p) => ({ url: `${base}/blog/${p.slug}`, lastModified: p.updatedAt, changeFrequency: 'weekly' as const, priority: 0.5 })),
   ];
 }

@@ -7,7 +7,7 @@ import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { Pagination } from '@/components/pagination';
 import { requireUser } from '@/lib/auth';
-import { expireStaleDeposits, getConfig } from '@accszone/core';
+import { activeDepositBonuses, expireStaleDeposits, getConfig } from '@accszone/core';
 import { formatOriginal } from '@/lib/format';
 import { rich } from '@/i18n/rich';
 import { getI18n } from '@/i18n/server';
@@ -27,7 +27,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
   const page = Math.max(1, Number.parseInt((await searchParams).page ?? '1', 10) || 1);
   await expireStaleDeposits();
 
-  const [accounts, rates, trc20, bep20, deposit, total, history] = await Promise.all([
+  const [bonuses, [accounts, rates, trc20, bep20, deposit, total, history]] = await Promise.all([activeDepositBonuses(), Promise.all([
     getConfig('bank.accounts'),
     getConfig('currency.rates'),
     getConfig('usdt.trc20'),
@@ -41,7 +41,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
       take: PAGE_SIZE,
       select: { id: true, method: true, status: true, amount: true, originalAmount: true, originalCurrency: true, createdAt: true, claimedAt: true },
     }),
-  ]);
+  ])]);
 
   // Chỉ hiện tài khoản ngân hàng có tỷ giá; không gửi số tài khoản xuống client ở bước này
   const banks: BankOption[] = accounts.flatMap((a, index) =>
@@ -57,6 +57,17 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
         <h1 className="text-2xl font-semibold">{t.title}</h1>
         <p className="text-sm text-zinc-500">{rich(t.currentBalance, { amount: <b className="text-zinc-900"><Money value={user.balance} /></b> })}</p>
       </div>
+
+      {bonuses.length > 0 && (
+        <div className="max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="mb-1.5 text-sm font-semibold text-amber-900">🎁 {t.bonusTitle}</p>
+          <ul className="space-y-0.5 text-sm text-amber-900">
+            {bonuses.map((b) => (
+              <li key={b.minAmount.toString()}>{rich(t.bonusTier, { min: <b><Money value={b.minAmount} /></b>, percent: <b>{Number(b.bonusPercent)}</b> })}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="max-w-xl">
         <DepositForms banks={banks} networks={networks} minUsd={deposit.minAmountUsd} />

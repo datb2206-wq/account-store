@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiRequest, newIdempotencyKey } from '@/lib/client-api';
 import { CartIcon } from '@/components/icons';
 import { useI18n } from '@/i18n/client';
-import { formatFx } from '@/i18n/config';
+import { fmt, formatFx } from '@/i18n/config';
 import { Money } from '@/components/money';
 import { translateError } from '@/i18n/errors';
 import { rich } from '@/i18n/rich';
@@ -40,6 +40,14 @@ interface PurchaseResult {
 
 const POLL_MS = 3_000;
 
+interface AppliedCoupon {
+  code: string;
+  percent: string;
+  discount: string;
+  total: string;
+  qty: number;
+}
+
 export function BuyButton({ product, balance }: { product: ShopProduct; balance: string | null }) {
   const router = useRouter();
   const { locale, d, fx } = useI18n();
@@ -51,6 +59,10 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PurchaseResult | null>(null);
+  const [couponInput, setCouponInput] = useState('');
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const maxBuy = Math.min(product.maxQty, product.stock);
   const soldOut = product.stock < product.minQty;
@@ -79,7 +91,10 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
   }
 
   // Hiển thị tạm phía client — số tiền thật do server tính bằng Decimal
-  const total = Number(product.price) * qty;
+  const subtotal = Number(product.price) * qty;
+  // Mã chỉ đúng với số lượng lúc bấm Áp dụng; đổi số lượng thì phải áp dụng lại
+  const activeCoupon = coupon && coupon.qty === qty ? coupon : null;
+  const total = activeCoupon ? Number(activeCoupon.total) : subtotal;
   const notEnough = Number(balance) < total;
   const validQty = Number.isInteger(qty) && qty >= product.minQty && qty <= maxBuy;
   // Đã trừ tiền: giao xong (COMPLETED) hoặc đang chờ nhà cung cấp xác nhận (PENDING)
@@ -90,11 +105,29 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
     setQty(product.minQty);
     setError(null);
     setResult(null);
+    setCoupon(null);
+    setCouponInput('');
+    setCouponError(null);
     dialogRef.current?.showModal();
   }
 
   function close() {
     dialogRef.current?.close();
+  }
+
+  async function applyCoupon() {
+    const code = couponInput.trim();
+    if (!code || checking) return;
+    setChecking(true);
+    setCouponError(null);
+    const res = await apiRequest<Omit<AppliedCoupon, 'qty'>>('/api/coupons/check', 'POST', { code, productId: product.id, quantity: qty });
+    setChecking(false);
+    if (!res.ok) {
+      setCoupon(null);
+      setCouponError(res.data.error ? translateError(res.data.error, d) : t.failed);
+      return;
+    }
+    setCoupon({ ...res.data, qty });
   }
 
   async function pay() {
@@ -104,7 +137,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
     const res = await apiRequest<PurchaseResult>(
       '/api/orders',
       'POST',
-      { productId: product.id, quantity: qty },
+      { productId: product.id, quantity: qty, couponCode: activeCoupon?.code },
       { 'Idempotency-Key': idempotencyKey.current },
     );
     setPending(false);
@@ -202,9 +235,39 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
                 </div>
               </div>
 
+              <div>
+                <label htmlFor={`coupon-${product.id}`} className="label">{t.couponLabel}</label>
+                <div className="flex gap-2">
+                  <input
+                    id={`coupon-${product.id}`}
+                    value={couponInput}
+                    onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCoupon(null); setCouponError(null); }}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), applyCoupon())}
+                    placeholder={t.couponPlaceholder}
+                    maxLength={40}
+                    className="input font-mono uppercase"
+                  />
+                  {activeCoupon ? (
+                    <button type="button" className="btn-ghost border border-zinc-200 whitespace-nowrap" onClick={() => { setCoupon(null); setCouponInput(''); }}>{t.removeCoupon}</button>
+                  ) : (
+                    <button type="button" className="btn-ghost border border-zinc-200 whitespace-nowrap" disabled={!couponInput.trim() || checking || !validQty} onClick={applyCoupon}>
+                      {checking ? <span key="c">…</span> : <span key="a">{t.applyCoupon}</span>}
+                    </button>
+                  )}
+                </div>
+                {couponError && <p className="mt-1 text-sm text-red-600">{couponError}</p>}
+                {activeCoupon && <p className="mt-1 text-sm text-emerald-700">{fmt(t.couponApplied, { code: activeCoupon.code, percent: Number(activeCoupon.percent) })}</p>}
+              </div>
+
               <div className="flex items-center justify-between border-t border-zinc-100 pt-4">
                 <div>
                   <p className="text-sm text-zinc-500">{t.total}</p>
+                  {activeCoupon && validQty && (
+                    <p className="text-xs text-zinc-400 tabular-nums">
+                      <span className="line-through"><Money value={subtotal} /></span>{' '}
+                      <span className="text-emerald-600">−<Money value={activeCoupon.discount} /></span>
+                    </p>
+                  )}
                   <p className="text-xl font-semibold tabular-nums">{validQty ? <Money value={total} /> : <span>—</span>}</p>
                   {fx && validQty && <p translate="no" className="text-xs text-zinc-400 tabular-nums">{formatFx(total, fx, locale)}</p>}
                 </div>

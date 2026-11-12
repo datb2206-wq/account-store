@@ -2,6 +2,7 @@
 import { prisma, type Prisma } from '@accszone/database';
 import { decrypt, fulfillResellerOrder, newOrderCode, pickRandomStock } from '@accszone/core';
 import { invalidateCache, SHOP_STOCK_CACHE } from './cache';
+import { consumeCoupon, CouponError, evaluateCoupon } from './coupons';
 import { localized } from './format';
 import { enqueueOrderFulfillment } from './queue';
 
@@ -19,6 +20,7 @@ interface PurchaseInput {
   productId: string;
   quantity: number;
   idempotencyKey: string;
+  couponCode?: string;
 }
 
 export async function purchase(input: PurchaseInput) {
@@ -44,6 +46,7 @@ export async function purchase(input: PurchaseInput) {
       const replay = await replayIfExists(key, input);
       if (replay) return replay;
     }
+    if (err instanceof CouponError) throw new PurchaseError(400, err.message);
     throw err;
   }
 }
@@ -138,7 +141,12 @@ async function runPurchase(tx: Prisma.TransactionClient, input: PurchaseInput, k
   }
 
   // Tính tiền bằng Decimal (không dùng Number) — giá snapshot tại thời điểm mua
-  const total = product.price.mul(quantity);
+  const subtotal = product.price.mul(quantity);
+
+  // Mã giảm giá: tính lại ở server, không tin số tiền client gửi lên
+  const applied = input.couponCode ? await evaluateCoupon(tx, input.couponCode, product.id, subtotal) : null;
+  if (applied) await consumeCoupon(tx, applied.coupon.id);
+  const total = applied ? subtotal.sub(applied.discount) : subtotal;
 
   // 1) Tạo đơn TRƯỚC: unique(idempotencyKey) đóng vai trò khóa chống bấm mua 2 lần
   const order = await tx.order.create({
@@ -151,6 +159,8 @@ async function runPurchase(tx: Prisma.TransactionClient, input: PurchaseInput, k
       totalAmount: total,
       status: 'PENDING',
       idempotencyKey: key,
+      couponId: applied?.coupon.id ?? null,
+      discountAmount: applied?.discount ?? 0,
       supplierId: reseller ? product.supplierId : null,
     },
     select: { id: true },
@@ -194,6 +204,7 @@ const orderSelect = {
   quantity: true,
   unitPrice: true,
   totalAmount: true,
+  discountAmount: true,
   status: true,
   failReason: true,
   createdAt: true,
@@ -212,6 +223,7 @@ function serialize(order: OrderWithItems, locale = 'en') {
       quantity: order.quantity,
       unitPrice: order.unitPrice.toString(),
       totalAmount: order.totalAmount.toString(),
+      discountAmount: order.discountAmount.toString(),
       status: order.status,
       // Thông điệp dành cho khách (lý do kỹ thuật chi tiết nằm ở audit log)
       failReason: order.failReason,

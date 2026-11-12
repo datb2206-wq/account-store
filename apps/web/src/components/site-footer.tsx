@@ -35,6 +35,7 @@ export async function SiteFooter() {
           <span className="flex flex-wrap gap-x-4 gap-y-1">
             <Link href="/dashboard/orders" className="hover:text-white">{f.myOrders}</Link>
             <Link href="/dashboard/deposit" className="hover:text-white">{f.topUp}</Link>
+            <Link href="/blog" className="hover:text-white">{d.blog.title}</Link>
             <ContactLink href={contactHref(site.resellerApiUrl)} className="hover:text-white">{d.header.resellerApi}</ContactLink>
             <ContactLink href={contactHref(site.supplierContact)} className="hover:text-white">{d.header.becomeSupplier}</ContactLink>
           </span>

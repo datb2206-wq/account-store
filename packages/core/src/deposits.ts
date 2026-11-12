@@ -223,7 +223,45 @@ export async function creditDeposit(db: Prisma.TransactionClient, id: string, fi
     RETURNING balance`;
   const balanceAfter = row!.balance;
   await db.transaction.update({ where: { id }, data: { balanceBefore: balanceAfter.sub(amount), balanceAfter } });
-  return { userId, amount, balanceAfter };
+  const bonus = await creditDepositBonus(db, id, userId, amount);
+  return { userId, amount, balanceAfter: bonus?.balanceAfter ?? balanceAfter, bonus: bonus?.amount ?? null };
+}
+
+// Khuyến mãi nạp tiền (Admin > Khuyến mãi nạp tiền): lấy mốc cao nhất mà số tiền nạp đạt tới,
+// cộng thêm thành 1 dòng sổ cái BONUS riêng để đối soát được tiền nạp thật và tiền thưởng.
+async function creditDepositBonus(db: Prisma.TransactionClient, depositId: string, userId: string, amount: Prisma.Decimal) {
+  const tier = await db.depositBonus.findFirst({
+    where: { isActive: true, minAmount: { lte: amount } },
+    orderBy: { minAmount: 'desc' },
+    select: { bonusPercent: true },
+  });
+  if (!tier || tier.bonusPercent.lte(0)) return null;
+  const bonus = amount.mul(tier.bonusPercent).div(100).toDecimalPlaces(6, Prisma.Decimal.ROUND_DOWN);
+  if (bonus.lte(0)) return null;
+
+  const [row] = await db.$queryRaw<{ balance: Prisma.Decimal }[]>`
+    UPDATE users SET balance = balance + ${bonus.toString()}::numeric, "updatedAt" = NOW()
+    WHERE id = ${userId}
+    RETURNING balance`;
+  const { method } = await db.transaction.findUniqueOrThrow({ where: { id: depositId }, select: { method: true } });
+  await db.transaction.create({
+    data: {
+      userId,
+      type: 'BONUS',
+      method,
+      status: 'COMPLETED',
+      amount: bonus,
+      balanceBefore: row!.balance.sub(bonus),
+      balanceAfter: row!.balance,
+      note: `Khuyến mãi nạp tiền +${tier.bonusPercent.toString()}% (lệnh nạp ${depositId})`,
+    },
+  });
+  return { amount: bonus, balanceAfter: row!.balance };
+}
+
+/** Các mốc khuyến mãi đang bật, hiển thị cho khách ở trang nạp tiền */
+export function activeDepositBonuses() {
+  return prisma.depositBonus.findMany({ where: { isActive: true }, orderBy: { minAmount: 'asc' }, select: { minAmount: true, bonusPercent: true } });
 }
 
 export async function rejectDeposit(id: string, reviewerId: string, note: string) {

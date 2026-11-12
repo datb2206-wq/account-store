@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BoxIcon, CartIcon, ChevronIcon, ClockIcon, GlobeIcon, GridIcon, KeyIcon, LogoutIcon, ReceiptIcon, UsersIcon, WalletIcon,
+  BoxIcon, CartIcon, ChevronIcon, ClockIcon, CloseIcon, GiftIcon, GlobeIcon, GridIcon, KeyIcon, LogoutIcon, MailIcon, ReceiptIcon, SparklesIcon, UsersIcon, WalletIcon,
 } from '@/components/icons';
 
 type Leaf = { label: string; href: string; badge?: number; badgeTone?: 'amber' | 'red' };
@@ -36,6 +36,7 @@ function buildMenu({ role, pendingDeposits, stuckOrders }: Pick<ShellProps, 'rol
         },
       ],
     },
+    { title: 'Bảo mật', items: [{ label: 'Block IP', href: '/admin/block-ip', icon: CloseIcon }] },
     {
       title: 'Dịch vụ',
       items: [
@@ -63,6 +64,16 @@ function buildMenu({ role, pendingDeposits, stuckOrders }: Pick<ShellProps, 'rol
             { label: 'Lịch sử nạp tiền', href: '/admin/transactions?type=DEPOSIT' },
             { label: 'Log TxID USDT', href: '/admin/transactions?method=USDT&tx=1' },
             { label: 'Tất cả giao dịch', href: '/admin/transactions' },
+          ],
+        },
+        { label: 'Mã giảm giá', href: '/admin/coupons', icon: GiftIcon },
+        { label: 'Khuyến mãi nạp tiền', href: '/admin/promotions', icon: SparklesIcon },
+        {
+          label: 'Bài viết', href: '/admin/blog', icon: MailIcon,
+          children: [
+            { label: 'Viết bài mới', href: '/admin/blog/new' },
+            { label: 'Tất cả bài viết', href: '/admin/blog' },
+            { label: 'Chuyên mục', href: '/admin/blog/categories' },
           ],
         },
       ],

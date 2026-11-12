@@ -4,11 +4,14 @@ import { prisma, type Prisma } from '@accszone/database';
 import { writeAudit } from '@/lib/audit';
 import { createSession, setAuthCookies } from '@/lib/auth';
 import { getClientIp, jsonError, readJson, tooManyRequests } from '@/lib/http';
+import { blockedIpResponse } from '@/lib/ip-block';
 import { rateLimit } from '@/lib/rate-limit';
 import { fieldErrors, registerSchema } from '@/lib/validation';
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
+  const blocked = await blockedIpResponse(ip);
+  if (blocked) return blocked;
   const limit = await rateLimit(`register:ip:${ip}`, 5, 60 * 60);
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 

@@ -4,6 +4,7 @@ import { prisma } from '@accszone/database';
 import { writeAudit } from '@/lib/audit';
 import { createSession, setAuthCookies } from '@/lib/auth';
 import { getClientIp, jsonError, readJson, tooManyRequests } from '@/lib/http';
+import { blockedIpResponse, recordFailedLogin } from '@/lib/ip-block';
 import { rateLimit, resetRateLimit } from '@/lib/rate-limit';
 import { fieldErrors, loginSchema } from '@/lib/validation';
 
@@ -14,6 +15,8 @@ const getDummyHash = () => (dummyHash ??= bcrypt.hash('timing-safe-dummy-passwor
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
+  const blocked = await blockedIpResponse(ip);
+  if (blocked) return blocked;
   const ipLimit = await rateLimit(`login:ip:${ip}`, 30, 15 * 60);
   if (!ipLimit.ok) return tooManyRequests(ipLimit.retryAfter);
 
@@ -35,6 +38,8 @@ export async function POST(req: NextRequest) {
   const userAgent = req.headers.get('user-agent');
   if (!user || !valid) {
     // Chỉ ghi khi email có thật: sai mật khẩu nhiều lần là dấu hiệu bị dò mật khẩu
+    // Sai quá nhiều lần từ cùng 1 IP (kể cả dò email không tồn tại) -> tự chặn IP
+    await recordFailedLogin(ip).catch((err) => console.error('auto block ip failed', err));
     if (user) await writeAudit({ actorId: user.id, action: 'auth.login_failed', entity: 'User', entityId: user.id, after: { userAgent }, ip }).catch(() => null);
     return jsonError(401, 'Invalid email or password');
   }

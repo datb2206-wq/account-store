@@ -27,6 +27,7 @@ export const loginSchema = z.object({
 export const orderSchema = z.object({
   productId: z.string().min(1).max(50),
   quantity: z.coerce.number().int('Quantity must be a whole number').min(1).max(100_000),
+  couponCode: z.string().trim().max(40).optional().transform((v) => v || undefined),
 });
 
 export const bankDepositSchema = z.object({
