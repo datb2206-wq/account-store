@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
+import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { StatCard } from '@/components/stat-card';
 import { fmt } from '@/i18n/config';
+import { rich } from '@/i18n/rich';
 import { getI18n } from '@/i18n/server';
 import { requireUser } from '@/lib/auth';
-import { formatDate, localized } from '@/lib/format';
+import { localized } from '@/lib/format';
 
 export async function generateMetadata(): Promise<Metadata> {
   const { d } = await getI18n();
@@ -51,7 +53,7 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">{fmt(t.hi, { name: user.username ?? user.email.split('@')[0] ?? '' })}</h1>
-        <p className="text-sm text-zinc-500">{fmt(t.memberSince, { date: formatDate(user.createdAt) })}</p>
+        <p className="text-sm text-zinc-500">{rich(t.memberSince, { date: <LocalTime value={user.createdAt} /> })}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -101,7 +103,7 @@ export default async function DashboardPage() {
                       <Money value={tx.amount} />
                     </td>
                     <td><Badge value={tx.status} label={d.status[tx.status]} /></td>
-                    <td className="text-zinc-500">{formatDate(tx.createdAt)}</td>
+                    <td className="text-zinc-500"><LocalTime value={tx.createdAt} /></td>
                   </tr>
                 ))}
               </tbody>

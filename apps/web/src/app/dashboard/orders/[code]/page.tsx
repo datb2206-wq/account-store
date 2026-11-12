@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AutoRefresh } from '@/components/auto-refresh';
 import { Badge } from '@/components/badge';
+import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { DeliveryBox } from '@/components/shop/delivery-box';
 import { StatCard } from '@/components/stat-card';
@@ -10,7 +11,6 @@ import { rich } from '@/i18n/rich';
 import { translateError } from '@/i18n/errors';
 import { getI18n } from '@/i18n/server';
 import { requireUser } from '@/lib/auth';
-import { formatDate } from '@/lib/format';
 import { getOrderForUser } from '@/lib/purchase';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,7 +34,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ co
           <h1 className="font-mono text-2xl font-semibold">{order.code}</h1>
           <Badge value={order.status} label={t.status[order.status] ?? d.status[order.status]} />
         </div>
-        <p className="text-sm text-zinc-500">{formatDate(new Date(order.createdAt))}</p>
+        <p className="text-sm text-zinc-500"><LocalTime value={order.createdAt} /></p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

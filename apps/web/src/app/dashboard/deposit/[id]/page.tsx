@@ -7,6 +7,7 @@ import { Badge } from '@/components/badge';
 import { CopyButton } from '@/components/copy-button';
 import { DepositClaim } from '@/components/deposit/deposit-claim';
 import { UsdtVerify } from '@/components/deposit/usdt-verify';
+import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { requireUser } from '@/lib/auth';
 import { explorerTxUrl, shortHash } from '@/lib/chain-links';
@@ -66,8 +67,8 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
           <h1 className="text-2xl font-semibold">{fmt(tr.title, { method: d.method[t.method] ?? t.method })}</h1>
           <Badge value={t.status} label={awaitingReview ? d.bankClaim.awaitingTitle : d.status[t.status]} />
         </div>
-        <p className="text-sm text-zinc-500">{fmt(tr.created, { date: formatDate(t.createdAt) })}
-          {t.status === 'PENDING' && t.expiresAt && !t.txHash && !t.claimedAt ? ` · ${fmt(tr.expires, { date: formatDate(t.expiresAt) })}` : ''}</p>
+        <p className="text-sm text-zinc-500">{rich(tr.created, { date: <LocalTime value={t.createdAt} /> })}
+          {t.status === 'PENDING' && t.expiresAt && !t.txHash && !t.claimedAt ? <> · {rich(tr.expires, { date: <LocalTime value={t.expiresAt} /> })}</> : ''}</p>
       </div>
 
       {t.status === 'COMPLETED' && (

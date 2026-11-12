@@ -3,11 +3,12 @@ import Link from 'next/link';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
 import { DepositForms, type BankOption } from '@/components/deposit/deposit-forms';
+import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { Pagination } from '@/components/pagination';
 import { requireUser } from '@/lib/auth';
 import { expireStaleDeposits, getConfig } from '@accszone/core';
-import { formatDate, formatOriginal } from '@/lib/format';
+import { formatOriginal } from '@/lib/format';
 import { rich } from '@/i18n/rich';
 import { getI18n } from '@/i18n/server';
 import { buildHref } from '@/lib/url';
@@ -74,7 +75,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
               )}
               {history.map((dep) => (
                 <tr key={dep.id}>
-                  <td className="text-zinc-500">{formatDate(dep.createdAt)}</td>
+                  <td className="text-zinc-500"><LocalTime value={dep.createdAt} /></td>
                   <td>{d.method[dep.method] ?? dep.method}</td>
                   <td className="tabular-nums">{formatOriginal(dep.originalAmount, dep.originalCurrency)}</td>
                   <td className="tabular-nums">{dep.status === 'COMPLETED' ? <Money value={dep.amount} /> : '—'}</td>

@@ -3,12 +3,13 @@ import Link from 'next/link';
 import { prisma } from '@accszone/database';
 import { decrypt } from '@accszone/core';
 import { Badge } from '@/components/badge';
+import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { Pagination } from '@/components/pagination';
 import { fmt } from '@/i18n/config';
 import { getI18n } from '@/i18n/server';
 import { requireUser } from '@/lib/auth';
-import { formatDate, localized } from '@/lib/format';
+import { localized } from '@/lib/format';
 import { buildHref } from '@/lib/url';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -78,7 +79,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               return (
                 <tr key={o.id} className="align-top">
                   <td className="whitespace-nowrap">
-                    <p className="text-zinc-900">{formatDate(o.createdAt)}</p>
+                    <p className="text-zinc-900"><LocalTime value={o.createdAt} /></p>
                     <p className="font-mono text-xs text-zinc-400">{o.code}</p>
                   </td>
                   <td className="min-w-48">{localized(o.product.name, locale)}</td>
