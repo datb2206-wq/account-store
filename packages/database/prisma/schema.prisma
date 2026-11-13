@@ -330,6 +330,10 @@ model Supplier {
   apiKeyEnc    String     // API key MÃ HÓA
   adapter      String     @default("generic") // định dạng API của web gốc: "generic" | "accszone"
   priceMarkup  Decimal    @default(1.2) @db.Decimal(8, 4) // giá bán = giá gốc * markup
+  autoUpdatePrice Boolean @default(true)  // mỗi lần đồng bộ tính lại giá bán theo giá gốc mới
+  priceRounding   String  @default("none") // làm tròn LÊN giá bán: "none" | "0.01" | "0.1" | "1"
+  autoUpdateInfo  Boolean @default(false) // ghi đè tên & mô tả (tiếng Anh) theo nguồn mỗi lần đồng bộ
+  stripHtml       Boolean @default(true)  // lọc thẻ HTML khỏi tên & mô tả lấy từ nguồn
   isActive     Boolean    @default(true)
   lastSyncAt   DateTime?
   createdAt    DateTime   @default(now())

@@ -1,15 +1,30 @@
 // Đồng bộ catalog từ nhà cung cấp -> Category/Product (source = RESELLER).
 // Nguyên tắc:
 //  - Sản phẩm MỚI tạo ở trạng thái ẨN (isActive = false): admin xem giá rồi mới bật bán.
-//  - Giá bán luôn = giá vốn × priceMarkup của nhà cung cấp (đổi markup để chỉnh giá hàng loạt).
-//  - Không ghi đè tên/mô tả/danh mục admin đã sửa; chỉ cập nhật giá, tồn kho, min/max.
+//  - Giá bán = giá vốn × priceMarkup, làm tròn LÊN theo priceRounding (đổi markup để chỉnh giá hàng loạt).
+//    Tắt autoUpdatePrice -> giữ giá admin đặt, trừ khi giá đó thấp hơn giá vốn mới (tránh bán lỗ).
+//  - Mặc định không ghi đè tên/mô tả/danh mục admin đã sửa; bật autoUpdateInfo thì ghi đè bản tiếng Anh theo nguồn.
+//  - stripHtml: lọc thẻ HTML khỏi tên & mô tả lấy từ nguồn.
 //  - Sản phẩm biến mất khỏi catalog -> externalStock = 0 (không xóa: có thể đã có đơn hàng).
 //  - Danh mục nguồn trùng tên với danh mục có sẵn của shop (cùng cấp cha) -> dùng luôn danh mục đó, không tạo bản trùng.
 import { createHash } from 'node:crypto';
 import { Prisma, prisma } from '@accszone/database';
 import { decrypt } from '../crypto';
 import { slugify } from '../slugify';
+import { htmlToText } from './accszone-adapter';
 import { getAdapter } from './adapters';
+
+export const PRICE_ROUNDINGS = ['none', '0.01', '0.1', '1'] as const;
+
+// Giá bán = giá vốn × markup, luôn làm tròn LÊN để không bán thấp hơn mức lãi đã đặt
+export function sellPrice(cost: Prisma.Decimal, markup: Prisma.Decimal | string, rounding: string) {
+  const raw = cost.mul(markup.toString());
+  if (rounding === 'none' || !(PRICE_ROUNDINGS as readonly string[]).includes(rounding)) {
+    return raw.toDecimalPlaces(4, Prisma.Decimal.ROUND_UP);
+  }
+  const step = new Prisma.Decimal(rounding);
+  return raw.div(step).toDecimalPlaces(0, Prisma.Decimal.ROUND_UP).mul(step);
+}
 
 export interface SyncResult {
   supplier: string;
@@ -36,6 +51,10 @@ async function findShopCategory(name: string, parentId: string | null) {
     ORDER BY "sortOrder" ASC, "createdAt" ASC
     LIMIT 1`;
   return row?.id ?? null;
+}
+
+function asObject(v: Prisma.JsonValue | null): Record<string, Prisma.JsonValue> {
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, Prisma.JsonValue>) : {};
 }
 
 export async function syncSupplier(supplierId: string): Promise<SyncResult> {
@@ -104,42 +123,55 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
   // ---- Sản phẩm ----
   const existing = await prisma.product.findMany({
     where: { supplierId },
-    select: { id: true, externalId: true },
+    select: { id: true, externalId: true, price: true, name: true, description: true },
   });
-  const productIds = new Map(existing.map((p) => [p.externalId!, p.id]));
-  const markup = supplier.priceMarkup;
+  const products = new Map(existing.map((p) => [p.externalId!, p]));
+  const clean = (s: string) => (supplier.stripHtml ? htmlToText(s) : s).trim();
   const now = new Date();
 
   for (const item of catalog.products) {
     const cost = new Prisma.Decimal(item.cost);
-    // Làm tròn LÊN 4 chữ số: không bao giờ bán thấp hơn giá vốn × markup
-    const price = cost.mul(markup.toString()).toDecimalPlaces(4, Prisma.Decimal.ROUND_UP);
+    const price = sellPrice(cost, supplier.priceMarkup, supplier.priceRounding);
+    const name = clean(item.name).slice(0, 300) || item.externalId;
+    const description = item.description ? clean(item.description).slice(0, 5000) : '';
     const common = {
       costPrice: cost.toFixed(6),
-      price: price.toFixed(6),
       externalStock: item.stock,
       minQty: item.minQty,
       maxQty: item.maxQty,
       lastSyncedAt: now,
     };
 
-    const id = productIds.get(item.externalId);
-    if (id) {
-      await prisma.product.update({ where: { id }, data: common });
-      productIds.delete(item.externalId);
+    const prev = products.get(item.externalId);
+    if (prev) {
+      // Tắt tự cập nhật giá: giữ giá cũ, chỉ nâng lên khi giá cũ thấp hơn giá vốn mới
+      const keepPrice = !supplier.autoUpdatePrice && prev.price.gte(cost);
+      await prisma.product.update({
+        where: { id: prev.id },
+        data: {
+          ...common,
+          ...(!keepPrice && { price: price.toFixed(6) }),
+          ...(supplier.autoUpdateInfo && {
+            name: { ...asObject(prev.name), en: name },
+            description: { ...asObject(prev.description), ...(description ? { en: description } : {}) },
+          }),
+        },
+      });
+      products.delete(item.externalId);
       result.productsUpdated++;
     } else {
       await prisma.product.create({
         data: {
           ...common,
+          price: price.toFixed(6),
           supplierId,
           externalId: item.externalId,
           source: 'RESELLER',
           isActive: false,
-          slug: stableSlug(item.name, supplierId, item.externalId),
+          slug: stableSlug(name, supplierId, item.externalId),
           categoryId: categoryIds.get(item.category?.externalId ?? fallbackKey)!,
-          name: { en: item.name },
-          description: item.description ? { en: item.description } : {},
+          name: { en: name },
+          description: description ? { en: description } : {},
         },
       });
       result.productsCreated++;
@@ -147,9 +179,9 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
   }
 
   // Còn lại trong map = không còn trong catalog
-  if (productIds.size > 0) {
+  if (products.size > 0) {
     const res = await prisma.product.updateMany({
-      where: { id: { in: [...productIds.values()] } },
+      where: { id: { in: [...products.values()].map((p) => p.id) } },
       data: { externalStock: 0, lastSyncedAt: now },
     });
     result.productsMissing = res.count;

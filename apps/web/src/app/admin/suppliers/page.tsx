@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@accszone/database';
-import { SupplierForm } from '@/components/admin/supplier-form';
+import { PageHeader, Panel } from '@/components/admin/ui';
 import { Badge } from '@/components/badge';
 import { requireStaff } from '@/lib/auth';
 import { formatDate } from '@/lib/format';
 import { workerOnline } from '@/lib/queue';
 
-export const metadata: Metadata = { title: 'Nhà cung cấp' };
+export const metadata: Metadata = { title: 'Kết nối API' };
+
+const ADAPTER_LABEL: Record<string, string> = { accszone: 'AccsZone API v1', generic: 'API khác' };
 
 export default async function AdminSuppliersPage() {
   const user = await requireStaff();
@@ -17,8 +19,12 @@ export default async function AdminSuppliersPage() {
       select: {
         id: true,
         name: true,
+        adapter: true,
         baseUrl: true,
         priceMarkup: true,
+        autoUpdatePrice: true,
+        priceRounding: true,
+        autoUpdateInfo: true,
         isActive: true,
         lastSyncAt: true,
         _count: { select: { products: true } },
@@ -28,47 +34,51 @@ export default async function AdminSuppliersPage() {
   ]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Nhà cung cấp</h1>
+    <div className="space-y-5">
+      <PageHeader title="Kết nối API" count={suppliers.length}>
         <Badge value={online ? 'Worker đang chạy' : 'Worker KHÔNG chạy'} tone={online ? 'green' : 'red'} />
-      </div>
-
-      <div className="grid items-start gap-6 xl:grid-cols-[1fr_380px]">
-        <div className="card overflow-x-auto p-0">
-          <table className="table">
-            <thead>
-              <tr><th>Tên</th><th>Markup</th><th>Sản phẩm</th><th>Đồng bộ gần nhất</th><th>Trạng thái</th><th /></tr>
-            </thead>
-            <tbody>
-              {suppliers.length === 0 && (
-                <tr><td colSpan={6} className="py-10 text-center text-zinc-500">Chưa có nhà cung cấp nào.</td></tr>
-              )}
-              {suppliers.map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    <Link href={`/admin/suppliers/${s.id}`} className="font-medium hover:text-blue-600">{s.name}</Link>
-                    <p className="max-w-64 truncate font-mono text-xs text-zinc-400">{s.baseUrl}</p>
-                  </td>
-                  <td className="tabular-nums">×{s.priceMarkup.toString()}</td>
-                  <td className="tabular-nums">{s._count.products}</td>
-                  <td className="text-zinc-500">{formatDate(s.lastSyncAt)}</td>
-                  <td><Badge value={s.isActive ? 'Bật' : 'Tắt'} tone={s.isActive ? 'green' : 'gray'} /></td>
-                  <td className="text-right">
-                    <Link href={`/admin/suppliers/${s.id}`} className="text-sm font-medium text-blue-600 hover:underline">Chi tiết</Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {user.role === 'SUPER_ADMIN' ? (
-          <SupplierForm />
-        ) : (
-          <div className="card text-sm text-zinc-500">Chỉ SUPER_ADMIN được thêm/sửa nhà cung cấp.</div>
+        {user.role === 'SUPER_ADMIN' && (
+          <Link href="/admin/suppliers/new" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ Thêm API cần kết nối</Link>
         )}
-      </div>
+      </PageHeader>
+
+      <Panel title="Danh sách API đã kết nối" bodyClassName="overflow-x-auto">
+        <table className="table">
+          <thead>
+            <tr><th>Kết nối</th><th>Loại API</th><th>Tăng giá</th><th>Đồng bộ</th><th>Sản phẩm</th><th>Đồng bộ gần nhất</th><th>Trạng thái</th><th /></tr>
+          </thead>
+          <tbody>
+            {suppliers.length === 0 && (
+              <tr>
+                <td colSpan={8} className="py-10 text-center text-zinc-500">
+                  Chưa có kết nối API nào.{' '}
+                  {user.role === 'SUPER_ADMIN' && <Link href="/admin/suppliers/new" className="font-medium text-blue-600 hover:underline">Thêm kết nối đầu tiên</Link>}
+                </td>
+              </tr>
+            )}
+            {suppliers.map((s) => (
+              <tr key={s.id}>
+                <td>
+                  <Link href={`/admin/suppliers/${s.id}`} className="font-medium hover:text-blue-600">{s.name}</Link>
+                  <p className="max-w-64 truncate font-mono text-xs text-zinc-400">{s.baseUrl}</p>
+                </td>
+                <td className="text-sm">{ADAPTER_LABEL[s.adapter] ?? s.adapter}</td>
+                <td className="tabular-nums">+{Math.round((Number(s.priceMarkup) - 1) * 10000) / 100}%</td>
+                <td className="space-y-0.5 text-xs text-zinc-500">
+                  <p>Giá: {s.autoUpdatePrice ? 'tự động' : 'giữ nguyên'}{s.priceRounding !== 'none' && ` · tròn $${s.priceRounding}`}</p>
+                  <p>Tên & mô tả: {s.autoUpdateInfo ? 'tự động' : 'giữ nguyên'}</p>
+                </td>
+                <td className="tabular-nums">{s._count.products}</td>
+                <td className="text-zinc-500">{formatDate(s.lastSyncAt)}</td>
+                <td><Badge value={s.isActive ? 'Bật' : 'Tắt'} tone={s.isActive ? 'green' : 'gray'} /></td>
+                <td className="text-right">
+                  <Link href={`/admin/suppliers/${s.id}`} className="text-sm font-medium text-blue-600 hover:underline">Chi tiết</Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Panel>
     </div>
   );
 }

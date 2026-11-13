@@ -116,6 +116,10 @@ export const supplierSchema = z.object({
   priceMarkup: z
     .preprocess((v) => (typeof v === 'number' ? String(v) : v), z.string().trim().regex(/^\d{1,4}(\.\d{1,4})?$/, 'VD: 1.2 = bán bằng 1.2 lần giá vốn'))
     .refine((v) => Number(v) >= 1, 'Markup phải ≥ 1 (không bán dưới giá vốn)'),
+  autoUpdatePrice: z.boolean().default(true),
+  priceRounding: z.enum(['none', '0.01', '0.1', '1']).default('none'), // khớp PRICE_ROUNDINGS ở core
+  autoUpdateInfo: z.boolean().default(false),
+  stripHtml: z.boolean().default(true),
   isActive: z.boolean().default(true),
 });
 

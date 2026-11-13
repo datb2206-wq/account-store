@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@accszone/database';
 import { decrypt, getAdapter } from '@accszone/core';
 import { PublishButton, SupplierForm, SyncButton } from '@/components/admin/supplier-form';
+import { SupplierNotes } from '@/components/admin/supplier-notes';
+import { Panel } from '@/components/admin/ui';
 import { Badge } from '@/components/badge';
 import { StatCard } from '@/components/stat-card';
 import { requireStaff } from '@/lib/auth';
@@ -30,7 +32,20 @@ export default async function AdminSupplierDetailPage({ params }: { params: Prom
   const [supplier, productStats, publishable, logs, online] = await Promise.all([
     prisma.supplier.findUnique({
       where: { id },
-      select: { id: true, name: true, adapter: true, baseUrl: true, apiKeyEnc: true, priceMarkup: true, isActive: true, lastSyncAt: true },
+      select: {
+        id: true,
+        name: true,
+        adapter: true,
+        baseUrl: true,
+        apiKeyEnc: true,
+        priceMarkup: true,
+        autoUpdatePrice: true,
+        priceRounding: true,
+        autoUpdateInfo: true,
+        stripHtml: true,
+        isActive: true,
+        lastSyncAt: true,
+      },
     }),
     prisma.product.groupBy({ by: ['isActive'], where: { supplierId: id }, _count: true, _sum: { externalStock: true } }),
     prisma.product.count({ where: { supplierId: id, isActive: false, externalStock: { gt: 0 } } }),
@@ -51,7 +66,7 @@ export default async function AdminSupplierDetailPage({ params }: { params: Prom
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/admin/suppliers" className="text-sm text-zinc-500 hover:underline">← Nhà cung cấp</Link>
+        <Link href="/admin/suppliers" className="text-sm text-zinc-500 hover:underline">← Kết nối API</Link>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold">{supplier.name}</h1>
           <Badge value={supplier.isActive ? 'Bật' : 'Tắt'} tone={supplier.isActive ? 'green' : 'gray'} />
@@ -71,8 +86,7 @@ export default async function AdminSupplierDetailPage({ params }: { params: Prom
         />
       </div>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[1fr_380px]">
-        <div className="space-y-6">
+      <div className="space-y-6">
           <section className="card space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold">Lịch sử đồng bộ</h2>
@@ -121,15 +135,29 @@ export default async function AdminSupplierDetailPage({ params }: { params: Prom
             Giá bán tự tính = giá vốn × markup ở mỗi lần đồng bộ. Danh mục nguồn trùng tên với danh mục có sẵn của shop được ghép vào danh mục đó.
             Khách mua hàng của nguồn nhận tài khoản ngay trong lúc mua; nguồn chậm hoặc lỗi thì worker tự thử lại, quá 24 giờ thì hoàn tiền.
           </p>
-        </div>
-
-        {user.role === 'SUPER_ADMIN' && (
-          <SupplierForm
-            supplierId={supplier.id}
-            initial={{ name: supplier.name, adapter: supplier.adapter, baseUrl: supplier.baseUrl, priceMarkup: supplier.priceMarkup.toString(), isActive: supplier.isActive }}
-          />
-        )}
       </div>
+
+      {user.role === 'SUPER_ADMIN' && (
+        <div className="grid items-start gap-5 xl:grid-cols-[1fr_400px]">
+          <Panel title="Cài đặt kết nối API">
+            <SupplierForm
+              supplierId={supplier.id}
+              initial={{
+                name: supplier.name,
+                adapter: supplier.adapter,
+                baseUrl: supplier.baseUrl,
+                priceMarkup: supplier.priceMarkup.toString(),
+                autoUpdatePrice: supplier.autoUpdatePrice,
+                priceRounding: supplier.priceRounding,
+                autoUpdateInfo: supplier.autoUpdateInfo,
+                stripHtml: supplier.stripHtml,
+                isActive: supplier.isActive,
+              }}
+            />
+          </Panel>
+          <SupplierNotes />
+        </div>
+      )}
     </div>
   );
 }

@@ -8,7 +8,18 @@ import { getClientIp } from '@/lib/http';
 
 type Ctx = { params: Promise<{ id: string }> };
 
-const publicFields = { id: true, name: true, adapter: true, baseUrl: true, priceMarkup: true, isActive: true } as const;
+const publicFields = {
+  id: true,
+  name: true,
+  adapter: true,
+  baseUrl: true,
+  priceMarkup: true,
+  autoUpdatePrice: true,
+  priceRounding: true,
+  autoUpdateInfo: true,
+  stripHtml: true,
+  isActive: true,
+} as const;
 
 export const PATCH = adminRoute<Ctx>(
   async (req, { params }, user) => {
