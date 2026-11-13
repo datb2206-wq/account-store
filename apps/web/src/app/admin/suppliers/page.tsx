@@ -9,7 +9,7 @@ import { workerOnline } from '@/lib/queue';
 
 export const metadata: Metadata = { title: 'Kết nối API' };
 
-const ADAPTER_LABEL: Record<string, string> = { accszone: 'AccsZone API v1', generic: 'API khác' };
+const ADAPTER_LABEL: Record<string, string> = { accszone: 'AccsZone API v1', via79: 'Via79', generic: 'API khác' };
 
 export default async function AdminSuppliersPage() {
   const user = await requireStaff();

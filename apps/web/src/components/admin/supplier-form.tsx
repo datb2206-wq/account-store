@@ -19,7 +19,7 @@ export interface SupplierFormValues {
   isActive: boolean;
 }
 
-const DEFAULT_URL: Record<string, string> = { accszone: 'https://accszone.com/api/v1', generic: '' };
+const DEFAULT_URL: Record<string, string> = { accszone: 'https://accszone.com/api/v1', via79: 'https://via79.com/api', generic: '' };
 
 const EMPTY: SupplierFormValues = {
   name: '',
@@ -124,9 +124,10 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
 
       <Section icon="🔌" title="Thông tin kết nối API">
         <div className="grid gap-4 md:grid-cols-2">
-          <FormField label="Loại API *" htmlFor="sp-adapter" error={fields.adapter} hint="AccsZone dùng API v1 chính thức; loại khác dùng chuẩn chung GET /products, POST /orders.">
+          <FormField label="Loại API *" htmlFor="sp-adapter" error={fields.adapter} hint="AccsZone dùng API v1 chính thức; Via79 tính giá VND, tự quy đổi USD theo tỷ giá VND ở Cấu hình; loại khác dùng chuẩn chung GET /products, POST /orders.">
             <select id="sp-adapter" className="input" value={values.adapter} onChange={(e) => changeAdapter(e.target.value)}>
               <option value="accszone">AccsZone API v1</option>
+              <option value="via79">Via79 (giá VND)</option>
               <option value="generic">API khác (chuẩn chung)</option>
             </select>
           </FormField>

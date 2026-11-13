@@ -25,6 +25,15 @@ export function SupplierNotes() {
         </div>
       </div>
       <div className="flex items-center gap-3 rounded-lg bg-zinc-50 px-3 py-3">
+        <span className="text-2xl" aria-hidden>🇻🇳</span>
+        <div>
+          <p className="font-semibold text-zinc-800">Via79</p>
+          <p className="text-xs text-zinc-500">
+            URL <code>https://via79.com/api</code>, key ở trang Tài liệu API của via79. Giá VND được quy đổi USD theo tỷ giá VND ở Cấu hình. Để trống IP Whitelist bên via79.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 rounded-lg bg-zinc-50 px-3 py-3">
         <span className="text-2xl" aria-hidden>🔗</span>
         <div>
           <p className="font-semibold text-zinc-800">API khác (chuẩn chung)</p>
