@@ -31,6 +31,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     maxQty: product.maxQty,
     sortOrder: product.sortOrder,
     isActive: product.isActive,
+    isFeatured: product.isFeatured,
   };
 
   return <ProductForm productId={product.id} initial={initial} categoryOptions={treeOptions(categories)} />;

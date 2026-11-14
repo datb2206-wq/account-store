@@ -8,6 +8,7 @@ export function productWhere({ q = '', category = '', status = '' }: ProductFilt
   return {
     ...(category && { categoryId: category }),
     ...(s && { isActive: s === 'active' }),
+    ...(status === 'featured' && { isFeatured: true }),
     // name là Json đa ngôn ngữ -> tìm theo slug / tên tiếng Anh
     ...(q && {
       OR: [

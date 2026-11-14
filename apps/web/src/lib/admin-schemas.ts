@@ -59,6 +59,7 @@ export const productSchema = z
     maxQty: int(1, 100_000),
     sortOrder: int(-100_000, 100_000).default(0),
     isActive: z.boolean().default(true),
+    isFeatured: z.boolean().default(false),
   })
   .refine((d) => d.minQty <= d.maxQty, { path: ['maxQty'], message: 'Phải ≥ số lượng tối thiểu' });
 

@@ -10,24 +10,30 @@ import { getClientIp } from '@/lib/http';
 const id = z.string().min(1).max(50);
 const schema = z
   .object({
-    action: z.enum(['enable', 'disable', 'delete', 'category']),
+    action: z.enum(['enable', 'disable', 'delete', 'category', 'feature', 'unfeature', 'order']),
+    sortOrder: z.number().int().min(-100_000).max(100_000).optional(),
     ids: z.array(id).min(1).max(1000).optional(),
     // Áp dụng cho TẤT CẢ sản phẩm khớp bộ lọc (không chỉ trang đang xem)
     filter: z.object({ q: z.string().max(200).optional(), category: z.string().max(50).optional(), status: z.string().max(20).optional() }).optional(),
     categoryId: id.optional(),
   })
   .refine((d) => !!d.ids !== !!d.filter, 'Chọn sản phẩm HOẶC áp dụng theo bộ lọc')
-  .refine((d) => d.action !== 'category' || !!d.categoryId, 'Chọn danh mục đích');
+  .refine((d) => d.action !== 'category' || !!d.categoryId, 'Chọn danh mục đích')
+  .refine((d) => d.action !== 'order' || d.sortOrder !== undefined, 'Nhập số thứ tự');
 
 // Thao tác hàng loạt trên sản phẩm: bật bán / ẩn / chuyển danh mục / xóa (chỉ xóa sản phẩm chưa có đơn hàng)
 export const POST = adminRoute(async (req, _ctx, user) => {
-  const { action, ids, filter, categoryId } = await parseBody(req, schema);
+  const { action, ids, filter, categoryId, sortOrder } = await parseBody(req, schema);
   const where: Prisma.ProductWhereInput = ids ? { id: { in: ids } } : productWhere(filter!);
 
   let count = 0;
   let skipped = 0;
   if (action === 'enable' || action === 'disable') {
     ({ count } = await prisma.product.updateMany({ where, data: { isActive: action === 'enable' } }));
+  } else if (action === 'feature' || action === 'unfeature') {
+    ({ count } = await prisma.product.updateMany({ where, data: { isFeatured: action === 'feature' } }));
+  } else if (action === 'order') {
+    ({ count } = await prisma.product.updateMany({ where, data: { sortOrder } }));
   } else if (action === 'category') {
     const cat = await prisma.category.findUnique({ where: { id: categoryId! }, select: { id: true } });
     if (!cat) throw notFound('Danh mục không tồn tại');
@@ -41,6 +47,6 @@ export const POST = adminRoute(async (req, _ctx, user) => {
   }
 
   await invalidateCache(SHOP_STOCK_CACHE);
-  await writeAudit({ actorId: user.id, action: `product.bulk_${action}`, entity: 'Product', after: { ids, filter, categoryId, count, skipped }, ip: getClientIp(req) });
+  await writeAudit({ actorId: user.id, action: `product.bulk_${action}`, entity: 'Product', after: { ids, filter, categoryId, sortOrder, count, skipped }, ip: getClientIp(req) });
   return NextResponse.json({ count, skipped });
 });

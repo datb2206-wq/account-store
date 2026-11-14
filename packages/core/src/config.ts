@@ -204,6 +204,12 @@ export const CONFIG_SCHEMAS = {
       messenger: z.string().trim().regex(/^([A-Za-z0-9.]{3,80})?$/, 'Username trang Facebook (phần sau facebook.com/)'),
       hotline: z.string().trim().regex(/^(\+?\d{6,15})?$/, 'Số điện thoại 6–15 chữ số'),
     }),
+    // Sắp xếp trang chủ: hàng hết đẩy xuống cuối danh mục, hàng "Nổi bật" (sản phẩm ghim) ở đầu trang
+    catalog: z.object({
+      soldOutLast: z.boolean(),
+      featuredRow: z.boolean(),
+      featuredLimit: z.number().int().min(3).max(30),
+    }),
     leaderboard: z.object({
       enabled: z.boolean(),
       period: z.enum(['week', 'month', 'all']),

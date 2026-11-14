@@ -136,6 +136,23 @@ export function SiteExtrasForm({ initial, siteUrl }: { initial: SiteExtras; site
         </div>
       </Panel>
 
+      <Panel title="Sắp xếp sản phẩm trang chủ">
+        <div className="grid items-end gap-4 sm:grid-cols-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <input type="checkbox" checked={f.catalog.soldOutLast} onChange={(e) => set('catalog', { soldOutLast: e.target.checked })} />
+            Đẩy sản phẩm hết hàng xuống cuối danh mục
+          </label>
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <input type="checkbox" checked={f.catalog.featuredRow} onChange={(e) => set('catalog', { featuredRow: e.target.checked })} />
+            Hiện hàng &quot;📌 Nổi bật&quot; ở đầu trang chủ
+          </label>
+          <Field label="Số sản phẩm nổi bật tối đa">
+            <input className="input tabular-nums" inputMode="numeric" value={f.catalog.featuredLimit} onChange={(e) => set('catalog', { featuredLimit: Number(e.target.value.replace(/\D/g, '')) || 0 })} />
+          </Field>
+        </div>
+        <p className="mt-3 text-xs text-zinc-400">Ghim sản phẩm bằng nút 📌 ở trang Sản phẩm. Sản phẩm ghim luôn đứng đầu danh mục của nó; sau đó theo số &quot;Thứ tự&quot; (nhỏ trước).</p>
+      </Panel>
+
       <Panel title="Bảng xếp hạng người mua (trang chủ)">
         <div className="grid items-end gap-4 sm:grid-cols-3">
           <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">

@@ -524,6 +524,7 @@ export const id: Dictionary = {
     noteContent: 'Sertakan catatan ini saat membayar agar kami bisa mencocokkannya',
   },
   extras: {
+    featured: 'Unggulan',
     leaderboardTitle: 'Pembeli teratas',
     periodWeek: 'Minggu ini',
     periodMonth: 'Bulan ini',

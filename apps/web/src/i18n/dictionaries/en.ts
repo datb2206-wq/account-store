@@ -529,6 +529,7 @@ export const en = {
     noteContent: 'Include this note with your payment so we can match it',
   },
   extras: {
+    featured: 'Featured',
     leaderboardTitle: 'Top buyers',
     periodWeek: 'This week',
     periodMonth: 'This month',

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@accszone/database';
-import { BulkAllCheckbox, BulkCheckbox, ProductBulkBar, ProductBulkProvider } from '@/components/admin/product-bulk';
+import { BulkAllCheckbox, BulkCheckbox, ProductBulkBar, ProductBulkProvider, ProductOrderControl } from '@/components/admin/product-bulk';
 import { Badge } from '@/components/badge';
 import { Pagination } from '@/components/pagination';
 import { productWhere } from '@/lib/admin-products';
@@ -25,7 +25,7 @@ export default async function AdminProductsPage({
   const params = await searchParams;
   const q = params.q?.trim() ?? '';
   const category = params.category ?? '';
-  const status = params.status === 'active' || params.status === 'inactive' ? params.status : '';
+  const status = params.status === 'active' || params.status === 'inactive' || params.status === 'featured' ? params.status : '';
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1);
 
   const where = productWhere({ q, category, status });
@@ -34,7 +34,8 @@ export default async function AdminProductsPage({
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+      // Cùng thứ tự với trang chủ: nổi bật trước, rồi theo số thứ tự
+      orderBy: [{ isFeatured: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       include: { category: { select: { name: true } }, seller: { select: { shopName: true } } },
@@ -67,6 +68,7 @@ export default async function AdminProductsPage({
           <option value="">Mọi trạng thái</option>
           <option value="active">Đang bán</option>
           <option value="inactive">Đã ẩn</option>
+          <option value="featured">📌 Nổi bật</option>
         </select>
         <button className="btn-primary">Lọc</button>
         {(q || category || status) && <Link href="/admin/products" className="btn-ghost">Xóa lọc</Link>}
@@ -77,11 +79,11 @@ export default async function AdminProductsPage({
       <div className="card overflow-x-auto p-0">
         <table className="table">
           <thead>
-            <tr>{editable && <th className="w-8"><BulkAllCheckbox /></th>}<th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Giá vốn</th><th>Còn hàng</th><th>Trạng thái</th><th /></tr>
+            <tr>{editable && <th className="w-8"><BulkAllCheckbox /></th>}<th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Giá vốn</th><th>Còn hàng</th><th>Trạng thái</th><th>Thứ tự</th><th /></tr>
           </thead>
           <tbody>
             {products.length === 0 && (
-              <tr><td colSpan={editable ? 8 : 7} className="py-10 text-center text-zinc-500">Không có sản phẩm nào.</td></tr>
+              <tr><td colSpan={editable ? 9 : 8} className="py-10 text-center text-zinc-500">Không có sản phẩm nào.</td></tr>
             )}
             {products.map((p) => {
               const inStock = p.source === 'LOCAL' ? (available.get(p.id) ?? 0) : (p.externalStock ?? 0);
@@ -104,6 +106,9 @@ export default async function AdminProductsPage({
                     {p.source === 'RESELLER' && <Badge value="RESELLER" tone="blue" />}
                     {p.seller && <Badge value={`CTV · ${p.seller.shopName}`} tone="blue" />}
                     {p.approval !== 'APPROVED' && <Badge value={p.approval === 'PENDING' ? 'Chờ duyệt' : 'Bị từ chối'} tone="gray" />}
+                  </td>
+                  <td className="whitespace-nowrap">
+                    {editable ? <ProductOrderControl id={p.id} sortOrder={p.sortOrder} isFeatured={p.isFeatured} /> : <span className="tabular-nums">{p.isFeatured && '📌 '}{p.sortOrder}</span>}
                   </td>
                   <td className="space-x-3 text-right text-sm font-medium whitespace-nowrap">
                     <Link href={`/admin/products/${p.id}`} className="text-blue-600 hover:underline">Sửa</Link>

@@ -524,6 +524,7 @@ export const zh: Dictionary = {
     noteContent: '付款时请填写此备注以便我们核对',
   },
   extras: {
+    featured: '精选',
     leaderboardTitle: '购买排行榜',
     periodWeek: '本周',
     periodMonth: '本月',

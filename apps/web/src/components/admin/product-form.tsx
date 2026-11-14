@@ -19,6 +19,7 @@ export interface ProductFormValues {
   maxQty: number;
   sortOrder: number;
   isActive: boolean;
+  isFeatured: boolean;
 }
 
 const EMPTY: ProductFormValues = {
@@ -32,6 +33,7 @@ const EMPTY: ProductFormValues = {
   maxQty: 1000,
   sortOrder: 0,
   isActive: true,
+  isFeatured: false,
 };
 
 export function ProductForm({
@@ -144,6 +146,10 @@ export function ProductForm({
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={values.isActive} onChange={(e) => set('isActive', e.target.checked)} />
             Đang bán (hiển thị cho khách)
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={values.isFeatured} onChange={(e) => set('isFeatured', e.target.checked)} />
+            📌 Nổi bật (lên đầu danh mục + hàng &quot;Nổi bật&quot; ở trang chủ)
           </label>
         </div>
 

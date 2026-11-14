@@ -524,6 +524,7 @@ export const ru: Dictionary = {
     noteContent: 'Укажите этот комментарий в платеже, чтобы мы его нашли',
   },
   extras: {
+    featured: 'Рекомендуем',
     leaderboardTitle: 'Лучшие покупатели',
     periodWeek: 'На этой неделе',
     periodMonth: 'В этом месяце',

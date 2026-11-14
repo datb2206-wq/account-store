@@ -81,8 +81,9 @@ export default async function ShopPage({
   // Toàn bộ sản phẩm đang bán (cho thanh danh mục), sau đó lọc theo danh mục/tìm kiếm
   const allProducts = await prisma.product.findMany({
     where: { isActive: true, categoryId: { in: categories.map((c) => c.id) } },
-    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    select: { id: true, slug: true, name: true, description: true, price: true, minQty: true, maxQty: true, categoryId: true, source: true, externalStock: true },
+    // 📌 Nổi bật đứng đầu danh mục, sau đó theo số thứ tự admin đặt
+    orderBy: [{ isFeatured: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true, slug: true, name: true, description: true, price: true, minQty: true, maxQty: true, categoryId: true, source: true, externalStock: true, isFeatured: true },
   });
   const ids = new Set(allProducts.map((p) => p.id));
   const [stockRows, soldRows] = await Promise.all([
@@ -117,6 +118,12 @@ export default async function ShopPage({
     stock: (a, b) => stockOf(b) - stockOf(a),
   };
   if (compare[sort]) products.sort(compare[sort]!);
+  // sort() ổn định: chỉ tách còn hàng / hết hàng, giữ nguyên thứ tự trong từng nhóm
+  else if (extras.catalog.soldOutLast) products.sort((a, b) => Number(stockOf(a) <= 0) - Number(stockOf(b) <= 0));
+
+  const catById = new Map(categories.map((c) => [c.id, c]));
+  const featured =
+    extras.catalog.featuredRow && !q && !selected ? products.filter((p) => p.isFeatured && stockOf(p) > 0).slice(0, extras.catalog.featuredLimit) : [];
 
   // Nhóm theo danh mục, giữ thứ tự cây
   const byCategory = new Map<string, typeof products>();
@@ -197,20 +204,28 @@ export default async function ShopPage({
         )}
 
         {/* ---------- BẢNG SẢN PHẨM THEO DANH MỤC ---------- */}
-        {sections.map(({ item: category }) => {
-          const list = byCategory.get(category.id)!;
-          const shown = list.slice(0, limit);
+        {[
+          ...(featured.length ? [{ id: 'featured', title: `📌 ${d.extras.featured}`, href: null, list: featured }] : []),
+          ...sections.map(({ item: category }) => {
+            const categoryName = localized(category.name, locale);
+            const parent = parentOf(category.parentId);
+            return {
+              id: category.id,
+              title: parent ? `${localized(parent.name, locale)} - ${categoryName}` : categoryName,
+              href: buildHref('/', { ...keep, category: category.slug }),
+              list: byCategory.get(category.id)!,
+            };
+          }),
+        ].map((block) => {
+          const list = block.list;
+          const shown = block.href ? list.slice(0, limit) : list;
           const hidden = list.length - shown.length;
-          const categoryName = localized(category.name, locale);
-          const parent = parentOf(category.parentId);
-          const categoryHref = buildHref('/', { ...keep, category: category.slug });
+          const categoryHref = block.href ?? '/';
           return (
-            <section key={category.id} aria-labelledby={`cat-${category.id}`} className="space-y-2">
-              <div className={`grid items-center gap-x-4 rounded-lg bg-zinc-900 px-3 py-2.5 text-white ${COLS}`}>
-                <h2 id={`cat-${category.id}`} className="min-w-0 text-base font-bold sm:text-lg">
-                  <Link href={categoryHref} className="hover:text-orange-400">
-                    {parent ? `${localized(parent.name, locale)} - ${categoryName}` : categoryName}
-                  </Link>
+            <section key={block.id} aria-labelledby={`cat-${block.id}`} className="space-y-2">
+              <div className={`grid items-center gap-x-4 rounded-lg px-3 py-2.5 text-white ${block.href ? 'bg-zinc-900' : 'bg-gradient-to-r from-orange-600 to-amber-500'} ${COLS}`}>
+                <h2 id={`cat-${block.id}`} className="min-w-0 text-base font-bold sm:text-lg">
+                  {block.href ? <Link href={block.href} className="hover:text-orange-400">{block.title}</Link> : block.title}
                 </h2>
                 <span className="hidden font-bold md:block">{t.colStock}</span>
                 <span className="hidden lg:block" />
@@ -226,6 +241,8 @@ export default async function ShopPage({
                   const soldN = (sold.get(p.id) ?? 0).toLocaleString('en-US');
                   const local = formatFx(p.price.toString(), fx, locale);
                   const minNote = p.minQty > 1 ? fmt(t.minQty, { n: p.minQty }) : null;
+                  const category = catById.get(p.categoryId)!;
+                  const categoryName = localized(category.name, locale);
                   return (
                     <li key={p.id} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2.5 rounded-lg bg-white p-3 ${COLS}`}>
                       <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
@@ -235,6 +252,9 @@ export default async function ShopPage({
                         <div className="min-w-0">
                           <p className="text-sm leading-6 font-medium text-zinc-900">
                             {name}
+                            {p.isFeatured && (
+                              <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-bold text-amber-800">📌 {d.extras.featured}</span>
+                            )}
                             {hot.has(p.id) && (
                               <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 align-middle text-[10px] font-bold text-orange-700"><FireIcon size={10} /> {t.hot}</span>
                             )}

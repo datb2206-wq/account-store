@@ -34,8 +34,53 @@ export function BulkAllCheckbox() {
   return <input type="checkbox" aria-label="Chọn tất cả" checked={all} disabled={ids.length === 0} onChange={() => setAll(!all)} />;
 }
 
-type Action = 'enable' | 'disable' | 'delete' | 'category';
-const LABEL: Record<Action, string> = { enable: 'Bật bán', disable: 'Ẩn', delete: 'Xóa', category: 'Chuyển danh mục' };
+type Action = 'enable' | 'disable' | 'delete' | 'category' | 'feature' | 'unfeature' | 'order';
+const LABEL: Record<Action, string> = {
+  enable: 'Bật bán',
+  disable: 'Ẩn',
+  delete: 'Xóa',
+  category: 'Chuyển danh mục',
+  feature: 'Ghim nổi bật',
+  unfeature: 'Bỏ ghim',
+  order: 'Đặt thứ tự',
+};
+
+// Ô thứ tự + nút ghim / lên đầu / xuống cuối trên từng dòng sản phẩm
+export function ProductOrderControl({ id, sortOrder, isFeatured }: { id: string; sortOrder: number; isFeatured: boolean }) {
+  const router = useRouter();
+  const [value, setValue] = useState(String(sortOrder));
+  const [pending, setPending] = useState(false);
+  async function patch(body: object) {
+    setPending(true);
+    const res = await apiRequest<{ sortOrder: number }>(`/api/admin/products/${id}/order`, 'PATCH', body);
+    setPending(false);
+    if (!res.ok) return window.alert(res.data.error ?? 'Lưu thất bại');
+    setValue(String(res.data.sortOrder));
+    router.refresh();
+  }
+  const commit = () => {
+    const n = Number(value);
+    if (!Number.isInteger(n)) return setValue(String(sortOrder));
+    if (n !== sortOrder) void patch({ sortOrder: n });
+  };
+  return (
+    <span className="inline-flex items-center gap-1">
+      <button type="button" disabled={pending} title={isFeatured ? 'Bỏ ghim nổi bật' : 'Ghim nổi bật'} onClick={() => patch({ isFeatured: !isFeatured })} className={`rounded px-1 text-base leading-none ${isFeatured ? '' : 'opacity-25 grayscale hover:opacity-70'}`}>📌</button>
+      <input
+        aria-label="Thứ tự"
+        className="input h-7 w-16 px-1.5 py-0 text-center text-xs tabular-nums"
+        inputMode="numeric"
+        value={value}
+        disabled={pending}
+        onChange={(e) => setValue(e.target.value.replace(/[^\d-]/g, ''))}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
+      />
+      <button type="button" disabled={pending} title="Lên đầu danh mục" onClick={() => patch({ move: 'top' })} className="rounded px-1 text-xs text-zinc-500 hover:bg-zinc-100">▲</button>
+      <button type="button" disabled={pending} title="Xuống cuối danh mục" onClick={() => patch({ move: 'bottom' })} className="rounded px-1 text-xs text-zinc-500 hover:bg-zinc-100">▼</button>
+    </span>
+  );
+}
 
 export function ProductBulkBar({ total, filter, categories }: { total: number; filter: ProductFilter; categories: { id: string; label: string }[] }) {
   const router = useRouter();
@@ -49,6 +94,13 @@ export function ProductBulkBar({ total, filter, categories }: { total: number; f
 
   async function run(action: Action) {
     if (action === 'category' && !categoryId) return window.alert('Chọn danh mục đích');
+    let sortOrder: number | undefined;
+    if (action === 'order') {
+      const v = window.prompt('Số thứ tự cho các sản phẩm đã chọn (nhỏ hiển thị trước):', '0');
+      if (v === null) return;
+      sortOrder = Number(v);
+      if (!Number.isInteger(sortOrder)) return window.alert('Nhập số nguyên');
+    }
     const extra = action === 'delete' ? '\nSản phẩm đã có đơn hàng sẽ được giữ lại (chỉ ẩn được). Hàng trong kho của sản phẩm bị xóa cũng bị xóa theo.' : '';
     if (!window.confirm(`${LABEL[action]} ${n.toLocaleString('en-US')} sản phẩm?${extra}`)) return;
     setPending(true);
@@ -56,6 +108,7 @@ export function ProductBulkBar({ total, filter, categories }: { total: number; f
       action,
       ...(everything ? { filter } : { ids: [...selected] }),
       ...(action === 'category' && { categoryId }),
+      ...(action === 'order' && { sortOrder }),
     });
     setPending(false);
     if (!res.ok) return window.alert(res.data.error ?? 'Thao tác thất bại');
@@ -76,6 +129,9 @@ export function ProductBulkBar({ total, filter, categories }: { total: number; f
       <span className="mx-1 h-4 w-px bg-blue-200" />
       <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('enable')}>Bật bán</button>
       <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('disable')}>Ẩn</button>
+      <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('feature')}>📌 Ghim</button>
+      <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('unfeature')}>Bỏ ghim</button>
+      <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('order')}>Đặt thứ tự</button>
       <select className="input h-7 w-52 py-0 text-xs" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
         <option value="">Chuyển sang danh mục…</option>
         {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}

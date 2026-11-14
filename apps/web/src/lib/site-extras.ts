@@ -11,6 +11,7 @@ export const SITE_EXTRAS_DEFAULTS: SiteExtras = {
   pages: Object.fromEntries(CONTENT_PAGES.map((p) => [p, { title: '', body: '' }])) as SiteExtras['pages'],
   tracking: { gaId: '', fbPixelId: '', bodyHtml: '' },
   widgets: { zalo: '', messenger: '', hotline: '' },
+  catalog: { soldOutLast: true, featuredRow: true, featuredLimit: 10 },
   leaderboard: { enabled: false, period: 'month', size: 10 },
 };
 

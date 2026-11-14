@@ -185,6 +185,7 @@ model Product {
   maxQty       Int           @default(1000)
   isActive     Boolean       @default(true)
   sortOrder    Int           @default(0)
+  isFeatured   Boolean       @default(false) // 📌 Nổi bật: lên đầu danh mục + hàng "Nổi bật" ở trang chủ
 
   source       ProductSource @default(LOCAL)
   supplierId   String?
