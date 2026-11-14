@@ -43,10 +43,17 @@ export async function retryOrderFulfillment(orderId: string) {
   return 'queued' as const;
 }
 
-// Worker có đang chạy không (dựa vào danh sách worker đang kết nối tới queue)
+// Worker có đang chạy không. getWorkersCount dựa vào CLIENT LIST, Redis managed (VD Upstash) không hỗ trợ
+// nên luôn trả 0 -> dự phòng: worker chạy job định kỳ mỗi phút, có job vừa hoàn tất / đang chạy = worker sống.
+const WORKER_ALIVE_MS = 3 * 60 * 1000;
+
 export async function workerOnline() {
   try {
-    return (await getQueue().getWorkersCount()) > 0;
+    const queue = getQueue();
+    if ((await queue.getWorkersCount()) > 0) return true;
+    if ((await queue.getActiveCount()) > 0) return true;
+    const [last] = await queue.getJobs(['completed', 'failed'], 0, 0, false);
+    return !!last?.finishedOn && Date.now() - last.finishedOn < WORKER_ALIVE_MS;
   } catch {
     return false;
   }
