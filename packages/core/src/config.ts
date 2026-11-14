@@ -20,7 +20,11 @@ export const CONTENT_PAGES = ['policy', 'terms', 'faq', 'contact'] as const;
 export type ContentPage = (typeof CONTENT_PAGES)[number];
 
 // Key có trang quản trị riêng (giữ bí mật, xóa cache…): trang Cấu hình chung không hiển thị / không ghi các key này
-export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras'] as const;
+export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual'] as const;
+
+// Nhà mạng thẻ cào theo chuẩn API chargingws/v2 của các web đổi thẻ
+export const CARD_TELCOS = ['VIETTEL', 'VINAPHONE', 'MOBIFONE', 'VIETNAMOBILE', 'ZING', 'GATE', 'VCOIN', 'GARENA'] as const;
+export type CardTelco = (typeof CARD_TELCOS)[number];
 
 export const CONFIG_SCHEMAS = {
   'usdt.trc20': network(TRON_ADDRESS, 'TRON'),
@@ -132,6 +136,35 @@ export const CONFIG_SCHEMAS = {
     resellerApiUrl: z.string().trim().max(200).default(''),
     maintenance: z.boolean(),
   }),
+  // Thẻ cào: gửi thẻ sang đối tác đổi thẻ (API chargingws/v2), đối tác gọi callback báo kết quả
+  'payment.card': z.object({
+    enabled: z.boolean(),
+    // http chỉ cho localhost (thử nghiệm với đối tác giả lập)
+    apiUrl: z.string().trim().refine((v) => v === '' || /^https:\/\/[^\s/]+(\/[^\s]*)?$/i.test(v) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(v), 'URL dạng https://ten-mien.com'),
+    partnerId: z.string().trim().max(100),
+    partnerKey: z.string().trim().max(200), // bí mật: không gửi ra trình duyệt
+    wrongValuePercent: z.number().min(0).max(100), // sai mệnh giá: khách nhận % này của mệnh giá thật
+    amounts: z.array(z.number().int().min(1000).max(10_000_000)).min(1).max(20),
+    telcos: z
+      .array(z.object({ code: z.enum(CARD_TELCOS), fee: z.number().min(0).max(90), enabled: z.boolean() }))
+      .max(CARD_TELCOS.length),
+  }),
+  // Nạp thủ công: MoMo và các phương thức admin tự tạo (khách chuyển rồi báo, admin duyệt)
+  'payment.manual': z
+    .array(
+      z.object({
+        id: z.string().trim().regex(/^[a-z0-9-]{2,30}$/, 'Mã chỉ gồm a-z, 0-9, dấu gạch ngang'),
+        kind: z.enum(['momo', 'custom']),
+        name: z.string().trim().min(1).max(60),
+        accountNo: z.string().trim().min(1).max(200), // số MoMo / email PayPal / ID Binance…
+        accountName: z.string().trim().max(100),
+        currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3,4}$/, 'Mã tiền tệ 3–4 chữ cái'),
+        instructions: z.string().max(3000),
+        enabled: z.boolean(),
+      }),
+    )
+    .max(20)
+    .refine((list) => new Set(list.map((m) => m.id)).size === list.length, 'Mã phương thức bị trùng'),
   // Admin > Cài đặt website: màu, popup, trang nội dung, mã theo dõi, nút liên hệ, bảng xếp hạng
   'site.extras': z.object({
     primaryColor: HEX_COLOR,

@@ -26,6 +26,9 @@ export const METHOD_LABEL: Record<string, string> = {
   BANK_TRANSFER: 'Bank transfer',
   BALANCE: 'Balance',
   MANUAL: 'Manual',
+  MOMO: 'MoMo',
+  CARD: 'Thẻ cào',
+  CUSTOM: 'Nạp thủ công',
 };
 
 // Trường Json đa ngôn ngữ: { en: "...", ru: "..." } -> lấy theo locale, fallback en

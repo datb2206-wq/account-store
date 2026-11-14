@@ -111,6 +111,7 @@ function buildMenu({ pendingDeposits, stuckOrders }: Pick<ShellProps, 'pendingDe
       items: [
         { label: 'Ngôn ngữ', href: '/admin/translations', icon: GlobeIcon },
         { label: 'Tiền tệ', href: '/admin/currencies', icon: CoinIcon },
+        { label: 'Cổng nạp tiền', href: '/admin/payments', icon: WalletIcon },
         { label: 'Email (SMTP)', href: '/admin/email', icon: MailIcon },
         { label: 'Thông báo Telegram', href: '/admin/telegram', icon: SendIcon },
         { label: 'Giao diện', href: '/admin/theme', icon: ImageIcon },

@@ -3,7 +3,7 @@ import type { PaymentMethod, Prisma, TransactionStatus, TransactionType } from '
 
 export const TX_TYPES: TransactionType[] = ['DEPOSIT', 'PURCHASE', 'REFUND', 'ADJUSTMENT', 'BONUS', 'COMMISSION'];
 export const TX_STATUSES: TransactionStatus[] = ['PENDING', 'COMPLETED', 'REJECTED', 'EXPIRED'];
-export const TX_METHODS: PaymentMethod[] = ['BANK_TRANSFER', 'USDT_TRC20', 'USDT_BEP20', 'BALANCE', 'MANUAL'];
+export const TX_METHODS: PaymentMethod[] = ['BANK_TRANSFER', 'MOMO', 'CARD', 'CUSTOM', 'USDT_TRC20', 'USDT_BEP20', 'BALANCE', 'MANUAL'];
 // "USDT" = cả 2 mạng, dùng cho log đối soát TxID
 export type MethodFilter = PaymentMethod | 'USDT';
 

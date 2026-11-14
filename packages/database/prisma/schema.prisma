@@ -80,6 +80,9 @@ enum PaymentMethod {
   BANK_TRANSFER
   BALANCE // giao dịch nội bộ bằng số dư (mua hàng, hoàn tiền)
   MANUAL // admin điều chỉnh
+  MOMO // chuyển MoMo (khách báo đã chuyển, admin duyệt / webhook)
+  CUSTOM // phương thức nạp thủ công admin tự tạo (PayPal, Binance Pay…)
+  CARD // thẻ cào điện thoại qua đối tác đổi thẻ
 }
 
 // -------------------------------------------------------------
@@ -310,6 +313,12 @@ model Transaction {
   // Mã giao dịch do KHÁCH tự khai, chưa xác minh -> tách khỏi bankRef (unique, chỉ admin/webhook ghi)
   // để không ai "giữ chỗ" được mã ngân hàng của người khác.
   customerRef   String?
+
+  // ---- Thẻ cào ----
+  cardTelco     String?
+  cardSerial    String?
+  cardCode      String?           // mã thẻ ĐÃ MÃ HÓA (AES-256-GCM)
+  cardHash      String?           @unique // HMAC(telco:serial:code) -> 1 thẻ chỉ gửi được 1 lần
 
   orderId       String?
   order         Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)

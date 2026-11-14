@@ -4,7 +4,7 @@ import { Prisma, prisma, type PaymentMethod } from '@accszone/database';
 import { domainError } from './errors';
 import { ChainError, fetchUsdtTx, fromRawUnits, normalizeTxHash, sameAddress, toRawUnits, USDT_DECIMALS, type UsdtNetwork } from './chain';
 import { randomCode } from './codes';
-import { getConfig } from './config';
+import { CONFIG_SCHEMAS, getConfig, type ConfigValue } from './config';
 import { notifyDeposit } from './telegram';
 
 const MAX_PENDING_PER_USER = 5;
@@ -70,6 +70,56 @@ export async function createBankDeposit(userId: string, input: { accountIndex: n
           transferCode: `NAP${randomCode(6)}`,
           expiresAt,
           metadata: { bank: account },
+        },
+        select: { id: true },
+      });
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+    }
+  }
+  throw domainError(503, 'Could not generate a transfer code, please try again');
+}
+
+// ---------------------------------------------------------------- MOMO / NẠP THỦ CÔNG
+export type ManualMethod = ConfigValue<'payment.manual'>[number];
+
+export async function getManualMethods(): Promise<ManualMethod[]> {
+  const row = await prisma.systemConfig.findUnique({ where: { key: 'payment.manual' } });
+  const parsed = CONFIG_SCHEMAS['payment.manual'].safeParse(row?.value);
+  return parsed.success ? parsed.data : [];
+}
+
+// Giống chuyển khoản ngân hàng: mã nội dung NAPxxxxxx, khách chuyển rồi báo (mã GD / biên lai), admin duyệt.
+// Webhook ngân hàng cũng khớp được mã này nếu dịch vụ đọc biến động hỗ trợ ví MoMo.
+export async function createManualDeposit(userId: string, input: { methodId: string; amount: string }) {
+  const [methods, rates] = await Promise.all([getManualMethods(), getConfig('currency.rates')]);
+  const m = methods.find((x) => x.id === input.methodId && x.enabled);
+  if (!m) throw domainError(400, 'This payment method is not available');
+  const rate = m.currency === 'USD' ? 1 : rates[m.currency];
+  if (!rate) throw domainError(400, `Exchange rate for ${m.currency} is not configured`);
+
+  const { minAmountUsd, expiresAt } = await assertCanCreate(userId);
+  const original = new Prisma.Decimal(input.amount);
+  const usd = original.div(rate).toDecimalPlaces(6, Prisma.Decimal.ROUND_DOWN);
+  if (usd.lt(minAmountUsd)) {
+    const minLocal = new Prisma.Decimal(minAmountUsd).mul(rate).toDecimalPlaces(m.currency === 'USD' ? 2 : 0, Prisma.Decimal.ROUND_UP);
+    throw domainError(400, `Minimum deposit is $${minAmountUsd} (≈ ${minLocal.toNumber().toLocaleString('en-US')} ${m.currency})`);
+  }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await prisma.transaction.create({
+        data: {
+          userId,
+          type: 'DEPOSIT',
+          method: m.kind === 'momo' ? 'MOMO' : 'CUSTOM',
+          status: 'PENDING',
+          amount: usd.toFixed(6),
+          originalAmount: original.toFixed(6),
+          originalCurrency: m.currency,
+          exchangeRate: String(rate),
+          transferCode: `NAP${randomCode(6)}`,
+          expiresAt,
+          metadata: { manual: { id: m.id, name: m.name, accountNo: m.accountNo, accountName: m.accountName, instructions: m.instructions } },
         },
         select: { id: true },
       });
@@ -281,7 +331,7 @@ export async function rejectDeposit(id: string, reviewerId: string, note: string
 // Trả về khóa biên lai cũ (nếu bị thay) để nơi gọi xóa file.
 export async function claimDeposit(userId: string, id: string, proofKey: string | null, customerRef: string | null) {
   const t = await prisma.transaction.findFirst({
-    where: { id, userId, type: 'DEPOSIT', method: { in: ['BANK_TRANSFER', 'USDT_TRC20', 'USDT_BEP20'] } },
+    where: { id, userId, type: 'DEPOSIT', method: { in: ['BANK_TRANSFER', 'MOMO', 'CUSTOM', 'USDT_TRC20', 'USDT_BEP20'] } },
     select: { status: true, createdAt: true, claimedAt: true, proofImageUrl: true, customerRef: true },
   });
   if (!t) throw domainError(404, 'Deposit not found');

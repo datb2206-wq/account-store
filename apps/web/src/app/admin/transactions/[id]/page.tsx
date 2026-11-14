@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@accszone/database';
+import { CardCheckButton } from '@/components/admin/payments-form';
 import { ReviewPanel } from '@/components/admin/review-panel';
 import { Badge } from '@/components/badge';
 import { UsdtVerify } from '@/components/deposit/usdt-verify';
@@ -52,6 +53,12 @@ export default async function AdminTransactionDetailPage({ params }: { params: P
     ['Số dư trước → sau', t.balanceBefore && t.balanceAfter ? `${formatUsd(t.balanceBefore)} → ${formatUsd(t.balanceAfter)}` : '—'],
     ['Mã nội dung CK', t.transferCode ? <span key="c" className="font-mono">{t.transferCode}</span> : '—'],
     ['Mã GD ngân hàng', t.bankRef ?? '—'],
+    ...(t.method === 'CARD'
+      ? ([
+          ['Thẻ cào', <span key="card" className="font-mono text-xs">{t.cardTelco} · serial {t.cardSerial}</span>],
+          ['Mã GD đối tác', (t.metadata as { card?: { transId?: string; message?: string } } | null)?.card?.transId ?? '—'],
+        ] as [string, React.ReactNode][])
+      : []),
     ...(t.type === 'DEPOSIT'
       ? ([[isUsdt ? 'TxID khách khai' : 'Mã GD khách khai', t.customerRef ? (
           <span key="cr" className="font-mono text-xs">
@@ -147,7 +154,14 @@ export default async function AdminTransactionDetailPage({ params }: { params: P
                 <UsdtVerify endpoint={`/api/admin/transactions/${t.id}/verify`} network={t.network ?? 'TRC20'} txHash={t.txHash} confirmations={t.confirmations} required={required} />
               </section>
             )}
-            <ReviewPanel id={t.id} amount={t.amount.toString()} isBank={t.method === 'BANK_TRANSFER'} customerRef={t.customerRef} needsTxHash={isUsdt && !t.txHash} />
+            {t.method === 'CARD' && t.status === 'PENDING' && (
+              <section className="card space-y-2">
+                <h2 className="font-semibold">Thẻ cào đang chờ</h2>
+                <p className="text-xs text-zinc-500">Chưa nhận được kết quả từ đối tác (callback). Bấm để hỏi lại đối tác; thẻ đúng sẽ tự cộng tiền.</p>
+                <CardCheckButton id={t.id} />
+              </section>
+            )}
+            <ReviewPanel id={t.id} amount={t.amount.toString()} isBank={t.method === 'BANK_TRANSFER' || t.method === 'MOMO' || t.method === 'CUSTOM'} customerRef={t.customerRef} needsTxHash={isUsdt && !t.txHash} />
           </div>
         )}
       </div>

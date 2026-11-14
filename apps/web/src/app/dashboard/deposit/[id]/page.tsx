@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import QRCode from 'qrcode';
 import { prisma } from '@accszone/database';
+import { AutoRefresh } from '@/components/auto-refresh';
 import { Badge } from '@/components/badge';
+import { BlogContent } from '@/components/blog-content';
 import { CopyButton } from '@/components/copy-button';
 import { DepositClaim } from '@/components/deposit/deposit-claim';
 import { UsdtVerify } from '@/components/deposit/usdt-verify';
@@ -24,6 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 interface BankMeta {
   bank?: { bankName: string; accountNo: string; accountName: string; currency: string };
+  manual?: { name: string; accountNo: string; accountName: string; instructions: string };
 }
 
 function Row({ label, value, copy, highlight }: { label: string; value: React.ReactNode; copy?: string; highlight?: boolean }) {
@@ -54,6 +57,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
   const awaitingReview = t.status === 'PENDING' && !!t.claimedAt;
   const required = isUsdt ? (await getConfig(t.network === 'BEP20' ? 'usdt.bep20' : 'usdt.trc20')).minConfirmations : 0;
   const bank = (t.metadata as BankMeta | null)?.bank;
+  const manual = (t.metadata as BankMeta | null)?.manual;
   const exactUsdt = t.originalAmount?.toString() ?? '';
   // QR chỉ chứa địa chỉ ví (chuẩn chung mọi ví đọc được). Số tiền khách tự nhập theo số lẻ hiển thị bên cạnh.
   // Địa chỉ ví đã được kiểm tra định dạng ở cấu hình, SVG do thư viện sinh ra.
@@ -112,6 +116,49 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
             <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
           </section>
         </>
+      )}
+
+      {open && (t.method === 'MOMO' || t.method === 'CUSTOM') && manual && (
+        <>
+          <section className="card divide-y divide-zinc-100 p-0">
+            <Row label={d.pay.method} value={manual.name} />
+            <Row label={d.pay.account} value={<span className="font-mono">{manual.accountNo}</span>} copy={manual.accountNo} />
+            {manual.accountName && <Row label={d.pay.recipient} value={manual.accountName} />}
+            <Row label={tr.amount} value={formatOriginal(t.originalAmount, t.originalCurrency)} copy={Number(t.originalAmount).toString()} />
+            <Row label={tr.transferContent} value={<span className="font-mono">{t.transferCode}</span>} copy={t.transferCode ?? ''} highlight />
+          </section>
+          <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">{tr.important}</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              <li>{d.pay.noteContent}: <b className="font-mono">{t.transferCode}</b></li>
+              <li>{rich(tr.bankNote2, { amount: <b><Money value={t.amount} /></b> })}</li>
+            </ul>
+          </div>
+          {manual.instructions.trim() && (
+            <section className="card space-y-2">
+              <p className="font-semibold">{d.pay.instructions}</p>
+              <BlogContent text={manual.instructions} />
+            </section>
+          )}
+          <section className="card">
+            <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
+          </section>
+        </>
+      )}
+
+      {t.method === 'CARD' && (
+        <section className="card divide-y divide-zinc-100 p-0">
+          <Row label={d.pay.card} value={t.cardTelco ?? '—'} />
+          <Row label={d.pay.serial} value={<span className="font-mono">{t.cardSerial}</span>} />
+          <Row label={d.pay.declared} value={formatOriginal(t.originalAmount, t.originalCurrency)} />
+        </section>
+      )}
+      {t.method === 'CARD' && t.status === 'PENDING' && (
+        <div className="card border-blue-200 bg-blue-50 text-sm text-blue-900">
+          <AutoRefresh everyMs={8_000} />
+          <p className="font-semibold">{d.pay.cardPendingTitle}</p>
+          <p>{d.pay.cardPendingText}</p>
+        </div>
       )}
 
       {open && isUsdt && (

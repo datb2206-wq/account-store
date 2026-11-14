@@ -100,6 +100,7 @@ const ROUTE_RULES: Rule[] = [
   ['/admin/reports', 'orders.view'],
   ['/admin/users', 'users.view'],
   ['/admin/transactions', 'payments.view'],
+  ['/admin/payments', 'settings.edit'],
   ['/admin/coupons', 'coupons.view'],
   ['/admin/promotions', 'promotions.view'],
   ['/admin/affiliate', 'affiliate.view'],
@@ -140,6 +141,7 @@ const ROUTE_RULES: Rule[] = [
   ['/api/admin/orders/', 'orders.manage'],
   ['/api/admin/suppliers/', 'suppliers.sync'], // [id]/sync, [id]/publish; sửa/xóa [id] xử lý riêng bên dưới
   ['/api/admin/suppliers', 'suppliers.edit'],
+  ['/api/admin/payments', 'settings.edit'],
   ['/api/admin/transactions/export', 'payments.view'],
   ['/api/admin/transactions', 'payments.edit'],
   ['/api/admin/users', 'users.edit'],

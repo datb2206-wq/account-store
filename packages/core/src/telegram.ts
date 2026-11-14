@@ -105,7 +105,7 @@ export async function notifyOrder(ref: { id: string } | { code: string }, ip?: s
   });
 }
 
-const METHOD_LABEL: Record<string, string> = { USDT_TRC20: 'USDT TRC20', USDT_BEP20: 'USDT BEP20', BANK_TRANSFER: 'Ngân hàng', MANUAL: 'Admin cộng tay' };
+const METHOD_LABEL: Record<string, string> = { USDT_TRC20: 'USDT TRC20', USDT_BEP20: 'USDT BEP20', BANK_TRANSFER: 'Ngân hàng', MANUAL: 'Admin cộng tay', MOMO: 'MoMo', CUSTOM: 'Nạp thủ công', CARD: 'Thẻ cào' };
 
 export async function notifyDeposit(transactionId: string) {
   const t = await prisma.transaction

@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { BankIcon, CoinIcon } from '@/components/icons';
+import { BankIcon, CoinIcon, PhoneIcon, WalletIcon } from '@/components/icons';
 import { useI18n } from '@/i18n/client';
 import { fmt } from '@/i18n/config';
 import { translateError } from '@/i18n/errors';
@@ -16,8 +16,22 @@ export interface BankOption {
   rate: number; // số đơn vị tiền tệ / 1 USD
 }
 
+export interface CardOption {
+  telcos: { code: string; label: string; fee: number }[];
+  amounts: number[];
+  wrongValuePercent: number;
+  vndRate: number; // VND / 1 USD
+}
+
+export interface ManualOption {
+  id: string;
+  name: string;
+  currency: string;
+  rate: number;
+}
+
 type Network = 'TRC20' | 'BEP20';
-type Tab = 'bank' | 'usdt';
+type Tab = 'bank' | 'usdt' | 'card' | 'other';
 
 const NETWORK_LABEL: Record<Network, [string, string]> = { TRC20: ['TRC20', 'TRON'], BEP20: ['BEP20', 'BNB Smart Chain'] };
 
@@ -26,21 +40,49 @@ const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
 
 // Bước 1 của nạp tiền: chọn phương thức + số tiền -> tạo yêu cầu, chuyển sang trang chi tiết
 // (ví + QR / số tài khoản, gửi TxID hoặc biên lai). Cả 2 tab luôn hiện; phương thức chưa cấu hình thì báo chưa hỗ trợ.
-export function DepositForms({ banks, networks, minUsd }: { banks: BankOption[]; networks: Network[]; minUsd: number }) {
+export function DepositForms({
+  banks,
+  networks,
+  minUsd,
+  card = null,
+  manual = [],
+}: {
+  banks: BankOption[];
+  networks: Network[];
+  minUsd: number;
+  card?: CardOption | null;
+  manual?: ManualOption[];
+}) {
   const router = useRouter();
   const { d } = useI18n();
   const t = d.deposit;
+  const p = d.pay;
   const [tab, setTab] = useState<Tab>(banks.length || !networks.length ? 'bank' : 'usdt');
   const [network, setNetwork] = useState<Network | undefined>(networks[0]);
   const [bankIndex, setBankIndex] = useState(banks[0]?.index ?? 0);
   const [amount, setAmount] = useState('');
+  const [telco, setTelco] = useState(card?.telcos[0]?.code ?? '');
+  const [cardValue, setCardValue] = useState(card?.amounts[0] ?? 0);
+  const [serial, setSerial] = useState('');
+  const [code, setCode] = useState('');
+  const [methodId, setMethodId] = useState(manual[0]?.id ?? '');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const bank = banks.find((b) => b.index === bankIndex);
   const bankPreview = bank && Number(amount) > 0 ? usd.format(Number(amount) / bank.rate) : null;
-  const available = tab === 'bank' ? banks.length > 0 : networks.length > 0;
-  const steps = tab === 'bank' ? [t.bankStep1, t.bankStep2, t.bankStep3] : [t.usdtStep1, t.usdtStep2, t.usdtStep3];
+  const method = manual.find((m) => m.id === methodId);
+  const manualPreview = method && Number(amount) > 0 ? usd.format(Number(amount) / method.rate) : null;
+  const telcoInfo = card?.telcos.find((x) => x.code === telco);
+  const cardPreview = card && telcoInfo ? usd.format((cardValue * (100 - telcoInfo.fee)) / 100 / card.vndRate) : null;
+  const available = { bank: banks.length > 0, usdt: networks.length > 0, card: !!card, other: manual.length > 0 }[tab];
+  const steps = {
+    bank: [t.bankStep1, t.bankStep2, t.bankStep3],
+    usdt: [t.usdtStep1, t.usdtStep2, t.usdtStep3],
+    card: [p.cardStep1, p.cardStep2, p.cardStep3],
+    other: [p.manualStep1, p.manualStep2, p.manualStep3],
+  }[tab];
+  const canSubmit = tab === 'card' ? serial.trim().length >= 6 && code.trim().length >= 6 : Number(amount) > 0;
 
   function switchTo(next: Tab) {
     setTab(next);
@@ -52,10 +94,15 @@ export function DepositForms({ banks, networks, minUsd }: { banks: BankOption[];
     e.preventDefault();
     setPending(true);
     setError(null);
+    type R = { deposit: { id: string } };
     const res =
       tab === 'bank'
-        ? await apiRequest<{ deposit: { id: string } }>('/api/deposits/bank', 'POST', { accountIndex: bankIndex, amount })
-        : await apiRequest<{ deposit: { id: string } }>('/api/deposits/usdt', 'POST', { network, amount });
+        ? await apiRequest<R>('/api/deposits/bank', 'POST', { accountIndex: bankIndex, amount })
+        : tab === 'usdt'
+          ? await apiRequest<R>('/api/deposits/usdt', 'POST', { network, amount })
+          : tab === 'card'
+            ? await apiRequest<R>('/api/deposits/card', 'POST', { telco, amount: cardValue, serial, code })
+            : await apiRequest<R>('/api/deposits/manual', 'POST', { methodId, amount });
     if (!res.ok) {
       setPending(false);
       const message = res.data.error && !res.data.fields ? res.data.error : Object.values(res.data.fields ?? {})[0]?.[0];
@@ -65,14 +112,17 @@ export function DepositForms({ banks, networks, minUsd }: { banks: BankOption[];
     router.push(`/dashboard/deposit/${res.data.deposit.id}`);
   }
 
+  // Thẻ cào / ví điện tử chỉ hiện khi admin đã cấu hình
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'bank', label: t.tabBank, icon: <BankIcon size={17} /> },
     { key: 'usdt', label: t.tabCrypto, icon: <CoinIcon size={17} /> },
+    ...(card ? [{ key: 'card' as const, label: p.tabCard, icon: <PhoneIcon size={17} /> }] : []),
+    ...(manual.length ? [{ key: 'other' as const, label: p.tabOther, icon: <WalletIcon size={17} /> }] : []),
   ];
 
   return (
     <form onSubmit={submit} className="card space-y-5">
-      <div role="tablist" aria-label={t.title} className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1">
+      <div role="tablist" aria-label={t.title} className={`grid gap-1 rounded-xl bg-zinc-100 p-1 ${tabs.length > 2 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
         {tabs.map((it) => (
           <button
             key={it.key}
@@ -100,6 +150,61 @@ export function DepositForms({ banks, networks, minUsd }: { banks: BankOption[];
 
       {!available ? (
         <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{t.methodUnavailable}</p>
+      ) : tab === 'card' && card ? (
+        <>
+          <div>
+            <p className="label">{p.telco}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {card.telcos.map((x) => (
+                <button
+                  key={x.code}
+                  type="button"
+                  aria-pressed={telco === x.code}
+                  onClick={() => setTelco(x.code)}
+                  className={`rounded-lg border px-2 py-2 text-center text-sm font-semibold transition ${telco === x.code ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500' : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50'}`}
+                >
+                  {x.label}
+                  <span className="block text-[11px] font-normal text-zinc-500">-{x.fee}%</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label htmlFor="card-value" className="label">{p.cardValue}</label>
+            <select id="card-value" className="input" value={cardValue} onChange={(e) => setCardValue(Number(e.target.value))}>
+              {card.amounts.map((a) => <option key={a} value={a}>{a.toLocaleString('vi-VN')}đ</option>)}
+            </select>
+            {cardPreview && telcoInfo && <p className="mt-1 text-xs text-zinc-500">{rich(p.feeNote, { fee: telcoInfo.fee, amount: <b>{cardPreview}</b> })}</p>}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="card-serial" className="label">{p.serial}</label>
+              <input id="card-serial" className="input font-mono" autoComplete="off" value={serial} onChange={(e) => setSerial(e.target.value.replace(/\s/g, ''))} />
+            </div>
+            <div>
+              <label htmlFor="card-code" className="label">{p.code}</label>
+              <input id="card-code" className="input font-mono" autoComplete="off" value={code} onChange={(e) => setCode(e.target.value.replace(/\s/g, ''))} />
+            </div>
+          </div>
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">{fmt(p.wrongValue, { percent: 100 - card.wrongValuePercent })}</p>
+        </>
+      ) : tab === 'other' ? (
+        <>
+          <div>
+            <label htmlFor="manual-method" className="label">{p.method}</label>
+            <select id="manual-method" className="input" value={methodId} onChange={(e) => { setMethodId(e.target.value); setAmount(''); }}>
+              {manual.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.currency})</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="manual-amount" className="label">{fmt(t.amountIn, { currency: method?.currency ?? '' })}</label>
+            <input id="manual-amount" inputMode="decimal" className="input" placeholder={method ? fmt(t.minimumApprox, { n: Math.ceil(minUsd * method.rate).toLocaleString('en-US') }) : ''} value={amount} onChange={(e) => setAmount(e.target.value.replace(/[,\s]/g, ''))} />
+            <p className="mt-1 text-xs text-zinc-500">
+              {manualPreview ? <>{rich(t.receiveApprox, { amount: <b>{manualPreview}</b> })}</> : null}
+              {method && method.currency !== 'USD' && <>{manualPreview ? ' · ' : ''}{fmt(t.rate, { rate: method.rate.toLocaleString('en-US'), currency: method.currency })}</>}
+            </p>
+          </div>
+        </>
       ) : tab === 'usdt' ? (
         <>
           <div>
@@ -148,8 +253,8 @@ export function DepositForms({ banks, networks, minUsd }: { banks: BankOption[];
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {available && (
-        <button type="submit" className="btn-primary w-full py-2.5" disabled={pending || !(Number(amount) > 0)}>
-          {pending ? t.creating : t.continue}
+        <button type="submit" className="btn-primary w-full py-2.5" disabled={pending || !canSubmit}>
+          {pending ? t.creating : tab === 'card' ? p.submitCard : t.continue}
         </button>
       )}
     </form>

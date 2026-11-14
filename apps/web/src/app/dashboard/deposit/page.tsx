@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
-import { DepositForms, type BankOption } from '@/components/deposit/deposit-forms';
+import { DepositForms, type BankOption, type CardOption, type ManualOption } from '@/components/deposit/deposit-forms';
 import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { Pagination } from '@/components/pagination';
 import { requireUser } from '@/lib/auth';
-import { activeDepositBonuses, expireStaleDeposits, getConfig } from '@accszone/core';
+import { activeDepositBonuses, CARD_TELCO_LABEL, cardReady, expireStaleDeposits, getCardSettings, getConfig, getManualMethods } from '@accszone/core';
 import { formatOriginal } from '@/lib/format';
 import { rich } from '@/i18n/rich';
 import { getI18n } from '@/i18n/server';
@@ -27,7 +27,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
   const page = Math.max(1, Number.parseInt((await searchParams).page ?? '1', 10) || 1);
   await expireStaleDeposits();
 
-  const [bonuses, [accounts, rates, trc20, bep20, deposit, total, history]] = await Promise.all([activeDepositBonuses(), Promise.all([
+  const [bonuses, cardCfg, manualCfg, [accounts, rates, trc20, bep20, deposit, total, history]] = await Promise.all([activeDepositBonuses(), getCardSettings(), getManualMethods(), Promise.all([
     getConfig('bank.accounts'),
     getConfig('currency.rates'),
     getConfig('usdt.trc20'),
@@ -47,6 +47,20 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
   const banks: BankOption[] = accounts.flatMap((a, index) =>
     rates[a.currency] ? [{ index, bankName: a.bankName, currency: a.currency, rate: rates[a.currency]! }] : [],
   );
+  // Thẻ cào cần tỷ giá VND; phương thức thủ công cần tỷ giá của tiền tệ đó (USD luôn = 1)
+  const card: CardOption | null =
+    cardReady(cardCfg) && rates.VND
+      ? {
+          telcos: cardCfg.telcos.filter((x) => x.enabled).map((x) => ({ code: x.code, label: CARD_TELCO_LABEL[x.code], fee: x.fee })),
+          amounts: cardCfg.amounts,
+          wrongValuePercent: cardCfg.wrongValuePercent,
+          vndRate: rates.VND,
+        }
+      : null;
+  const manual: ManualOption[] = manualCfg.flatMap((m) => {
+    const rate = m.currency === 'USD' ? 1 : rates[m.currency];
+    return m.enabled && rate ? [{ id: m.id, name: m.name, currency: m.currency, rate }] : [];
+  });
   const networks = [trc20.enabled && trc20.wallet ? 'TRC20' : null, bep20.enabled && bep20.wallet ? 'BEP20' : null].filter(
     (n): n is 'TRC20' | 'BEP20' => n !== null,
   );
@@ -70,7 +84,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
       )}
 
       <div className="max-w-xl">
-        <DepositForms banks={banks} networks={networks} minUsd={deposit.minAmountUsd} />
+        <DepositForms banks={banks} networks={networks} minUsd={deposit.minAmountUsd} card={card} manual={manual} />
       </div>
 
       <section className="space-y-3">
