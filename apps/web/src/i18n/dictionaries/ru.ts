@@ -401,6 +401,16 @@ export const ru: Dictionary = {
     BALANCE: 'Баланс',
     MANUAL: 'Вручную',
   },
+  extras: {
+    leaderboardTitle: 'Лучшие покупатели',
+    periodWeek: 'На этой неделе',
+    periodMonth: 'В этом месяце',
+    periodAll: 'За всё время',
+    ordersCount: 'Заказов: {n}',
+    zalo: 'Написать в Zalo',
+    messenger: 'Написать в Messenger',
+    hotline: 'Позвонить',
+  },
   pages: {
     notFoundTitle: 'Страница не найдена',
     notFoundText: 'Страница не существует или была перемещена.',

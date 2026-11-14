@@ -401,6 +401,16 @@ export const id: Dictionary = {
     BALANCE: 'Saldo',
     MANUAL: 'Manual',
   },
+  extras: {
+    leaderboardTitle: 'Pembeli teratas',
+    periodWeek: 'Minggu ini',
+    periodMonth: 'Bulan ini',
+    periodAll: 'Sepanjang waktu',
+    ordersCount: '{n} pesanan',
+    zalo: 'Chat via Zalo',
+    messenger: 'Chat via Messenger',
+    hotline: 'Telepon hotline',
+  },
   pages: {
     notFoundTitle: 'Halaman tidak ditemukan',
     notFoundText: 'Halaman yang Anda cari tidak ada atau telah dipindahkan.',

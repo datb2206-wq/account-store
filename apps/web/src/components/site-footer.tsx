@@ -2,11 +2,12 @@ import Link from 'next/link';
 import { getI18n } from '@/i18n/server';
 import { contactHref } from '@/lib/contact';
 import { getSiteConfig } from '@/lib/site';
+import { getSiteExtras, publishedPages } from '@/lib/site-extras';
 import { ContactLink } from './contact-link';
 import { BoltIcon, ShieldIcon, WalletIcon } from './icons';
 
 export async function SiteFooter() {
-  const [site, { d }] = await Promise.all([getSiteConfig(), getI18n()]);
+  const [site, { d }, extras] = await Promise.all([getSiteConfig(), getI18n(), getSiteExtras()]);
   const f = d.footer;
   return (
     <footer className="mt-12 bg-zinc-950 text-zinc-400">
@@ -36,6 +37,9 @@ export async function SiteFooter() {
             <Link href="/dashboard/orders" className="hover:text-white">{f.myOrders}</Link>
             <Link href="/dashboard/deposit" className="hover:text-white">{f.topUp}</Link>
             <Link href="/blog" className="hover:text-white">{d.blog.title}</Link>
+            {publishedPages(extras).map((p) => (
+              <Link key={p.slug} href={`/pages/${p.slug}`} className="hover:text-white">{p.title}</Link>
+            ))}
             <ContactLink href={contactHref(site.resellerApiUrl)} className="hover:text-white">{d.header.resellerApi}</ContactLink>
             <ContactLink href={contactHref(site.supplierContact)} className="hover:text-white">{d.header.becomeSupplier}</ContactLink>
           </span>

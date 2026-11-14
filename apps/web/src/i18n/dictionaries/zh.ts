@@ -401,6 +401,16 @@ export const zh: Dictionary = {
     BALANCE: '余额',
     MANUAL: '手动',
   },
+  extras: {
+    leaderboardTitle: '购买排行榜',
+    periodWeek: '本周',
+    periodMonth: '本月',
+    periodAll: '全部时间',
+    ordersCount: '{n} 个订单',
+    zalo: 'Zalo 联系',
+    messenger: 'Messenger 联系',
+    hotline: '拨打热线',
+  },
   pages: {
     notFoundTitle: '页面未找到',
     notFoundText: '您访问的页面不存在或已被移动。',

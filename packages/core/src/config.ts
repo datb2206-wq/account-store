@@ -13,6 +13,15 @@ const network = (address: RegExp, label: string) =>
     minConfirmations: z.number().int().min(1).max(1000),
   });
 
+const HEX_COLOR = z.string().trim().regex(/^(#[0-9a-fA-F]{6})?$/, 'Màu dạng #RRGGBB');
+
+// Trang nội dung tĩnh /pages/{slug} do admin viết (Admin > Cài đặt website)
+export const CONTENT_PAGES = ['policy', 'terms', 'faq', 'contact'] as const;
+export type ContentPage = (typeof CONTENT_PAGES)[number];
+
+// Key có trang quản trị riêng (giữ bí mật, xóa cache…): trang Cấu hình chung không hiển thị / không ghi các key này
+export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras'] as const;
+
 export const CONFIG_SCHEMAS = {
   'usdt.trc20': network(TRON_ADDRESS, 'TRON'),
   'usdt.bep20': network(EVM_ADDRESS, 'BSC'),
@@ -122,6 +131,40 @@ export const CONFIG_SCHEMAS = {
     channelUrl: z.string().trim().max(200).default(''),
     resellerApiUrl: z.string().trim().max(200).default(''),
     maintenance: z.boolean(),
+  }),
+  // Admin > Cài đặt website: màu, popup, trang nội dung, mã theo dõi, nút liên hệ, bảng xếp hạng
+  'site.extras': z.object({
+    primaryColor: HEX_COLOR,
+    buyColor: HEX_COLOR,
+    popup: z.object({
+      enabled: z.boolean(),
+      title: z.string().trim().max(200),
+      body: z.string().trim().max(5000),
+      buttonText: z.string().trim().max(50),
+      buttonUrl: z.string().trim().max(500).refine((v) => v === '' || /^\/(?!\/)/.test(v) || /^https?:\/\//i.test(v), 'Link phải bắt đầu bằng "/" hoặc http(s)://'),
+      frequency: z.enum(['session', 'day', 'always']),
+    }),
+    pages: z.object(
+      Object.fromEntries(CONTENT_PAGES.map((slug) => [slug, z.object({ title: z.string().trim().max(120), body: z.string().max(50_000) })])) as Record<
+        ContentPage,
+        z.ZodObject<{ title: z.ZodString; body: z.ZodString }>
+      >,
+    ),
+    tracking: z.object({
+      gaId: z.string().trim().regex(/^(G-[A-Z0-9]{4,20})?$/i, 'Mã GA4 dạng G-XXXXXXX'),
+      fbPixelId: z.string().trim().regex(/^\d{0,20}$/, 'Pixel ID chỉ gồm số'),
+      bodyHtml: z.string().max(20_000),
+    }),
+    widgets: z.object({
+      zalo: z.string().trim().regex(/^(\d{8,15})?$/, 'Số Zalo chỉ gồm 8–15 chữ số'),
+      messenger: z.string().trim().regex(/^([A-Za-z0-9.]{3,80})?$/, 'Username trang Facebook (phần sau facebook.com/)'),
+      hotline: z.string().trim().regex(/^(\+?\d{6,15})?$/, 'Số điện thoại 6–15 chữ số'),
+    }),
+    leaderboard: z.object({
+      enabled: z.boolean(),
+      period: z.enum(['week', 'month', 'all']),
+      size: z.number().int().min(3).max(20),
+    }),
   }),
 } as const;
 

@@ -45,3 +45,5 @@ export const BriefcaseIcon = (p: IconProps) => <Svg {...p}><rect x="3" y="7" wid
 export const StoreIcon = (p: IconProps) => <Svg {...p}><path d="M4 10v10h16V10" /><path d="M3 10 5 4h14l2 6a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0Z" /><path d="M10 20v-5h4v5" /></Svg>;
 export const CodeIcon = (p: IconProps) => <Svg {...p}><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" /></Svg>;
 export const ArrowRightIcon = (p: IconProps) => <Svg {...p}><path d="M5 12h14M13 6l6 6-6 6" /></Svg>;
+export const PhoneIcon = (p: IconProps) => <Svg {...p}><path d="M5 3h3.5l1.8 4.5-2.3 1.4a11 11 0 0 0 7.1 7.1l1.4-2.3L21 15.5V19a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2Z" /></Svg>;
+export const TrophyIcon = (p: IconProps) => <Svg {...p}><path d="M8 4h8v6a4 4 0 0 1-8 0V4Z" /><path d="M8 6H4.5a3 3 0 0 0 3.5 4M16 6h3.5a3 3 0 0 1-3.5 4M12 14v4M8 21h8M9.5 18h5" /></Svg>;

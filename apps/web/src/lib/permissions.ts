@@ -128,6 +128,7 @@ const ROUTE_RULES: Rule[] = [
   ['/api/admin/stock/', 'stock.reveal'], // /api/admin/stock/[id]/reveal
   ['/api/admin/stock', 'products.edit'],
   ['/api/admin/config', 'settings.edit'],
+  ['/api/admin/site-extras', 'settings.edit'],
   ['/api/admin/translations', 'settings.edit'],
   ['/api/admin/theme', 'settings.edit'],
   ['/api/admin/currencies', 'settings.edit'],

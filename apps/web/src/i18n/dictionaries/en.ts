@@ -406,6 +406,16 @@ export const en = {
     MANUAL: 'Manual',
   } as Record<string, string>,
   // Lỗi từ API (server trả tiếng Anh) -> dịch ở client bằng translateError() trong i18n/errors.ts
+  extras: {
+    leaderboardTitle: 'Top buyers',
+    periodWeek: 'This week',
+    periodMonth: 'This month',
+    periodAll: 'All time',
+    ordersCount: '{n} orders',
+    zalo: 'Chat on Zalo',
+    messenger: 'Chat on Messenger',
+    hotline: 'Call hotline',
+  },
   pages: {
     notFoundTitle: 'Page not found',
     notFoundText: 'The page you are looking for does not exist or has been moved.',

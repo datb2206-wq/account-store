@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { prisma } from '@accszone/database';
 import { ConfigForm } from '@/components/admin/config-form';
 import { requireStaff } from '@/lib/auth';
-import { CONFIG_SCHEMAS } from '@accszone/core';
+import { CONFIG_SCHEMAS, DEDICATED_CONFIG_KEYS } from '@accszone/core';
 
 export const metadata: Metadata = { title: 'Cấu hình' };
 
@@ -18,7 +18,7 @@ const HELP: Record<string, string> = {
 export default async function AdminSettingsPage() {
   await requireStaff();
 
-  const rows = await prisma.systemConfig.findMany();
+  const rows = await prisma.systemConfig.findMany({ where: { key: { notIn: [...DEDICATED_CONFIG_KEYS] } } });
   const byKey = new Map(rows.map((r) => [r.key, r]));
   const host = (await headers()).get('host') ?? 'your-domain.com';
   const env = {
@@ -48,8 +48,8 @@ export default async function AdminSettingsPage() {
       </section>
 
       <div className="grid items-start gap-6 xl:grid-cols-2">
-        {/* Tỷ giá & hiển thị tiền tệ có trang riêng: Admin > Tiền tệ */}
-        {Object.keys(CONFIG_SCHEMAS).filter((key) => !key.startsWith('currency.')).map((key) => (
+        {/* Key có trang riêng (Tiền tệ, Bảo mật, Email, Telegram…) không hiện ở đây: tránh lộ mật khẩu / token ra trình duyệt */}
+        {Object.keys(CONFIG_SCHEMAS).filter((key) => !(DEDICATED_CONFIG_KEYS as readonly string[]).includes(key)).map((key) => (
           <ConfigForm
             key={key}
             configKey={key}

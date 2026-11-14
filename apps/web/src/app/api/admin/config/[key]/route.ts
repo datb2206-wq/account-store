@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma, type Prisma } from '@accszone/database';
 import { adminRoute, badRequest, notFound } from '@/lib/admin-route';
 import { writeAudit } from '@/lib/audit';
-import { CONFIG_SCHEMAS, isConfigKey } from '@accszone/core';
+import { CONFIG_SCHEMAS, DEDICATED_CONFIG_KEYS, isConfigKey } from '@accszone/core';
 import { getClientIp, readJson } from '@/lib/http';
 
 type Ctx = { params: Promise<{ key: string }> };
@@ -11,6 +11,8 @@ export const PUT = adminRoute<Ctx>(
   async (req, { params }, user) => {
     const { key } = await params;
     if (!isConfigKey(key)) throw notFound('Key cấu hình không tồn tại');
+    // Các key này lưu qua trang riêng (giữ mật khẩu cũ khi để trống, che bí mật trong nhật ký, xóa cache)
+    if ((DEDICATED_CONFIG_KEYS as readonly string[]).includes(key)) throw badRequest('Cấu hình này chỉnh ở trang riêng của nó trong Admin');
 
     const body = (await readJson(req)) as { value?: unknown } | null;
     const parsed = CONFIG_SCHEMAS[key].safeParse(body?.value);

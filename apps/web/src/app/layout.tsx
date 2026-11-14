@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { SiteChrome } from '@/components/site-chrome';
+import { StorefrontOnly } from '@/components/storefront-only';
 import { I18nProvider } from '@/i18n/client';
 import { LOCALE_META } from '@/i18n/config';
 import { getI18n } from '@/i18n/server';
@@ -41,7 +43,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: TRANSLATE_GUARD }} />
       </head>
       <body className="min-h-screen bg-zinc-50 text-zinc-900 antialiased">
-        <I18nProvider locale={locale} dictionary={d} fx={fx}>{children}</I18nProvider>
+        <I18nProvider locale={locale} dictionary={d} fx={fx}>
+          {children}
+          {/* Màu, popup, nút liên hệ, mã theo dõi (Admin > Cài đặt website): không áp dụng trong /admin */}
+          <StorefrontOnly><SiteChrome /></StorefrontOnly>
+        </I18nProvider>
       </body>
     </html>
   );

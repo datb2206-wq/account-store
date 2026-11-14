@@ -4,6 +4,7 @@ import { prisma } from '@accszone/database';
 import { BoltIcon, BoxIcon, CloseIcon, FireIcon, ShieldIcon } from '@/components/icons';
 import { BuyButton } from '@/components/shop/buy-button';
 import { CategoryIcon } from '@/components/shop/category-icon';
+import { Leaderboard } from '@/components/shop/leaderboard';
 import { SiteSupport } from '@/components/shop/site-support';
 import { MaintenanceScreen } from '@/components/maintenance-screen';
 import { SiteFooter } from '@/components/site-footer';
@@ -18,6 +19,7 @@ import { descendantIds, flattenTree } from '@/lib/category-tree';
 import { formatUsd, localized } from '@/lib/format';
 import { blockedByMaintenance, getSiteConfig } from '@/lib/site';
 import { getSiteAssets } from '@/lib/site-assets';
+import { getSiteExtras } from '@/lib/site-extras';
 import { buildHref } from '@/lib/url';
 
 const SORTS = {
@@ -61,7 +63,7 @@ export default async function ShopPage({
 }: {
   searchParams: Promise<{ category?: string; q?: string; sort?: string; instock?: string }>;
 }) {
-  const [user, { locale, d, fx }, assets] = await Promise.all([getCurrentUser(), getI18n(), getSiteAssets()]);
+  const [user, { locale, d, fx }, assets, extras] = await Promise.all([getCurrentUser(), getI18n(), getSiteAssets(), getSiteExtras()]);
   if (await blockedByMaintenance(user)) return <MaintenanceScreen />;
   const t = d.shop;
   const params = await searchParams;
@@ -275,6 +277,8 @@ export default async function ShopPage({
             </section>
           );
         })}
+
+        {extras.leaderboard.enabled && <Leaderboard config={extras.leaderboard} d={d} />}
 
         {/* Cam kết */}
         <div className="grid gap-3 sm:grid-cols-3">
