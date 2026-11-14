@@ -138,6 +138,10 @@ export const CONFIG_SCHEMAS = {
   }),
   // Dịch tên / mô tả sản phẩm bằng Claude (Anthropic API). apiKey là bí mật: không gửi ra trình duyệt.
   translate: z.object({
+    // azure = Microsoft Translator (gói F0 miễn phí 2 triệu ký tự / tháng); claude = Anthropic API (trả phí)
+    provider: z.enum(['azure', 'claude']).default('azure'),
+    azureKey: z.string().trim().max(300).default(''),
+    azureRegion: z.string().trim().regex(/^[a-z0-9]{0,40}$/, 'Region dạng southeastasia, eastasia, global…').default(''),
     apiKey: z.string().trim().max(300),
     model: z.string().trim().regex(/^claude-[a-z0-9.-]{3,60}$/, 'Model dạng claude-...'),
     targets: z.array(z.enum(['id', 'ru', 'zh'])).max(3),

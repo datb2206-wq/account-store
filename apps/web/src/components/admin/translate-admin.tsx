@@ -15,9 +15,9 @@ const MODELS = [
   ['claude-haiku-5-5', 'Claude Haiku 5.5 (rẻ nhất, ~40 lần)'],
 ] as const;
 
-export function TranslateSettingsForm({ initial, hasKey }: { initial: Omit<TranslateSettings, 'apiKey'>; hasKey: boolean }) {
+export function TranslateSettingsForm({ initial, hasKey, hasAzureKey }: { initial: Omit<TranslateSettings, 'apiKey' | 'azureKey'>; hasKey: boolean; hasAzureKey: boolean }) {
   const router = useRouter();
-  const [f, setF] = useState({ ...initial, apiKey: '' });
+  const [f, setF] = useState({ ...initial, apiKey: '', azureKey: '' });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -31,13 +31,41 @@ export function TranslateSettingsForm({ initial, hasKey }: { initial: Omit<Trans
     setPending(false);
     if (!res.ok) return setError(res.data.error ?? 'Lưu thất bại');
     setSuccess('Đã lưu cấu hình dịch.');
-    setF((s) => ({ ...s, apiKey: '' }));
+    setF((s) => ({ ...s, apiKey: '', azureKey: '' }));
     router.refresh();
   }
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2 text-sm">
+        <span className="block font-medium text-zinc-700">Dịch bằng</span>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2"><input type="radio" checked={f.provider === 'azure'} onChange={() => setF((s) => ({ ...s, provider: 'azure' }))} />Microsoft Azure Translator <span className="rounded bg-emerald-50 px-1.5 text-xs font-medium text-emerald-700">miễn phí 2 triệu ký tự/tháng</span></label>
+          <label className="flex items-center gap-2"><input type="radio" checked={f.provider === 'claude'} onChange={() => setF((s) => ({ ...s, provider: 'claude' }))} />Claude AI (trả phí, dịch tự nhiên hơn)</label>
+        </div>
+      </div>
+
+      {f.provider === 'azure' && (
+        <div className="space-y-3">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-zinc-700">Key Azure Translator (KEY 1)</span>
+              <input className="input font-mono" type="password" autoComplete="new-password" placeholder={hasAzureKey ? '•••••••• (để trống = giữ nguyên)' : ''} value={f.azureKey} onChange={(e) => setF((s) => ({ ...s, azureKey: e.target.value.trim() }))} />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-zinc-700">Location / Region</span>
+              <input className="input font-mono" placeholder="VD southeastasia" value={f.azureRegion} onChange={(e) => setF((s) => ({ ...s, azureRegion: e.target.value.trim().toLowerCase() }))} />
+            </label>
+          </div>
+          <ol className="list-decimal space-y-0.5 rounded-lg bg-zinc-50 py-3 pr-3 pl-8 text-xs text-zinc-600">
+            <li>Đăng ký tài khoản miễn phí ở portal.azure.com (cần thẻ Visa/Mastercard để xác minh, không bị trừ tiền khi dùng gói Free).</li>
+            <li>Tìm &quot;Translator&quot; → Create → Pricing tier chọn <b>Free F0</b>, Region chọn <b>Southeast Asia</b> → Review + create.</li>
+            <li>Mở resource vừa tạo → <b>Keys and Endpoint</b> → copy <b>KEY 1</b> và <b>Location/Region</b> dán vào 2 ô trên.</li>
+          </ol>
+        </div>
+      )}
+
+      <div className={`grid gap-4 sm:grid-cols-2 ${f.provider === 'claude' ? '' : 'hidden'}`}>
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-zinc-700">API key Anthropic</span>
           <input className="input font-mono" type="password" autoComplete="new-password" placeholder={hasKey ? '•••••••• (để trống = giữ nguyên)' : 'sk-ant-...'} value={f.apiKey} onChange={(e) => setF((s) => ({ ...s, apiKey: e.target.value.trim() }))} />
@@ -60,7 +88,7 @@ export function TranslateSettingsForm({ initial, hasKey }: { initial: Omit<Trans
         </div>
       </div>
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-        <label className="flex items-center gap-2"><input type="checkbox" checked={f.description} onChange={(e) => setF((s) => ({ ...s, description: e.target.checked }))} />Dịch cả mô tả (tốn hơn khoảng 5–10 lần so với chỉ dịch tên)</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={f.description} onChange={(e) => setF((s) => ({ ...s, description: e.target.checked }))} />Dịch cả mô tả (dài hơn tên khoảng 5–10 lần: tốn hạn mức / chi phí hơn)</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.autoNew} onChange={(e) => setF((s) => ({ ...s, autoNew: e.target.checked }))} />Tự dịch sản phẩm mới / chưa có bản dịch (worker kiểm tra mỗi phút)</label>
       </div>
       <FormAlert error={error} success={success} />

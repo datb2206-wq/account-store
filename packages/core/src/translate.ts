@@ -1,4 +1,4 @@
-// Dịch tên / mô tả sản phẩm sang ngôn ngữ khác bằng Claude (Anthropic API).
+// Dịch tên / mô tả sản phẩm sang ngôn ngữ khác: Microsoft Azure Translator (mặc định, có gói miễn phí) hoặc Claude (Anthropic API).
 // Admin tạo 1 "lượt dịch" (danh sách sản phẩm + ngôn ngữ) -> lưu ở SystemConfig 'translate.job'.
 // Worker mỗi phút chạy processTranslations(): dịch tiếp từng nhóm ~40 giây rồi dừng, lần sau làm tiếp (tắt máy không mất tiến độ).
 // Chỉ ghi vào ngôn ngữ đích ({ en, id, ru, zh }), không bao giờ sửa bản tiếng Anh gốc.
@@ -12,7 +12,30 @@ import { domainError } from './errors';
 export type TranslateSettings = ConfigValue<'translate'>;
 export type TranslateLocale = TranslateSettings['targets'][number];
 
-export const TRANSLATE_DEFAULTS: TranslateSettings = { apiKey: '', model: 'claude-opus-5-5', targets: ['id'], description: false, autoNew: false };
+export const TRANSLATE_DEFAULTS: TranslateSettings = {
+  provider: 'azure',
+  azureKey: '',
+  azureRegion: '',
+  apiKey: '',
+  model: 'claude-opus-5-5',
+  targets: ['id'],
+  description: false,
+  autoNew: false,
+};
+
+// Đã có key cho nhà cung cấp đang chọn chưa
+export const translateReady = (s: TranslateSettings) => (s.provider === 'azure' ? !!s.azureKey : !!s.apiKey);
+
+// Mã ngôn ngữ của Azure Translator
+const AZURE_LANG: Record<TranslateLocale, string> = { id: 'id', ru: 'ru', zh: 'zh-Hans' };
+// AZURE_TRANSLATOR_ENDPOINT chỉ dùng khi thử nghiệm với máy chủ giả lập
+const AZURE_URL = `${process.env.AZURE_TRANSLATOR_ENDPOINT || 'https://api.cognitive.microsofttranslator.com'}/translate?api-version=3.0&from=en`;
+// Giới hạn 1 request Azure: 1.000 đoạn, 50.000 ký tự -> chừa biên an toàn
+const AZURE_MAX_CHARS = 45_000;
+const AZURE_MAX_TEXTS = 500;
+
+// Lỗi không nên thử lại (sai key, hết hạn mức miễn phí, sai region): dừng lượt dịch, hiện lỗi cho admin
+class FatalTranslateError extends Error {}
 
 export const TRANSLATE_LANG: Record<TranslateLocale, string> = {
   id: 'Indonesian (Bahasa Indonesia)',
@@ -62,7 +85,7 @@ async function saveJob(job: TranslateJob) {
 
 export async function startTranslateJob(input: { productIds: string[]; locales: TranslateLocale[]; description: boolean; overwrite: boolean }) {
   const s = await getTranslateSettings();
-  if (!s.apiKey) throw domainError(400, 'Chưa nhập API key Anthropic (Admin > Dịch sản phẩm)');
+  if (!translateReady(s)) throw domainError(400, 'Chưa nhập key dịch (Admin > Dịch sản phẩm > Cấu hình)');
   if (!input.locales.length) throw domainError(400, 'Chọn ít nhất 1 ngôn ngữ');
   if (!input.productIds.length) throw domainError(400, 'Không có sản phẩm nào để dịch');
   const current = await getTranslateJob();
@@ -109,6 +132,53 @@ Rules:
 
 type Item = { id: string; name: string; description: string };
 
+async function azureTranslate(s: TranslateSettings, texts: string[], locale: TranslateLocale): Promise<string[]> {
+  const out: string[] = [];
+  let i = 0;
+  while (i < texts.length) {
+    // Gom đoạn đến giới hạn ký tự / số đoạn của 1 request
+    const chunk: string[] = [];
+    let chars = 0;
+    while (i < texts.length && chunk.length < AZURE_MAX_TEXTS && (chunk.length === 0 || chars + texts[i]!.length <= AZURE_MAX_CHARS)) {
+      chunk.push(texts[i]!);
+      chars += texts[i]!.length;
+      i++;
+    }
+    const res = await fetch(`${AZURE_URL}&to=${AZURE_LANG[locale]}`, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': s.azureKey,
+        ...(s.azureRegion && s.azureRegion !== 'global' && { 'Ocp-Apim-Subscription-Region': s.azureRegion }),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(chunk.map((Text) => ({ Text }))),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => '')).slice(0, 300);
+      // 401 sai key / sai region, 403 hết hạn mức miễn phí tháng này -> dừng hẳn
+      if (res.status === 401 || res.status === 403) throw new FatalTranslateError(`Azure ${res.status}: ${detail}`);
+      throw new Error(`Azure ${res.status}: ${detail}`);
+    }
+    const data = (await res.json()) as { translations?: { text: string }[] }[];
+    if (!Array.isArray(data) || data.length !== chunk.length) throw new Error('Azure trả về kết quả không khớp');
+    out.push(...data.map((d) => d.translations?.[0]?.text ?? ''));
+  }
+  return out;
+}
+
+async function translateBatchAzure(s: TranslateSettings, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
+  // Gửi 1 lượt: tên trước, mô tả (nếu có) sau
+  const descIdx = items.map((it, k) => (it.description.trim() ? k : -1)).filter((k) => k >= 0);
+  const texts = [...items.map((it) => it.name), ...descIdx.map((k) => items[k]!.description)];
+  const result = await azureTranslate(s, texts, locale);
+  const map = new Map<string, Item>(items.map((it, k) => [it.id, { id: it.id, name: result[k] ?? '', description: '' }]));
+  descIdx.forEach((k, j) => {
+    map.get(items[k]!.id)!.description = result[items.length + j] ?? '';
+  });
+  return map;
+}
+
 async function translateBatch(client: Anthropic, model: string, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
   const response = await client.beta.messages.parse({
     model,
@@ -133,7 +203,7 @@ async function translateBatch(client: Anthropic, model: string, items: Item[], l
 type Log = { info: (m: string) => void; warn: (m: string) => void };
 
 // Dịch 1 nhóm sản phẩm sang 1 ngôn ngữ. Trả về số sản phẩm đã ghi.
-async function translateProducts(client: Anthropic, s: TranslateSettings, ids: string[], locale: TranslateLocale, opts: { description: boolean; overwrite: boolean }) {
+async function translateProducts(client: Anthropic | null, s: TranslateSettings, ids: string[], locale: TranslateLocale, opts: { description: boolean; overwrite: boolean }) {
   const products = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, description: true } });
   const todo = products.filter((p) => opts.overwrite || !asMap(p.name)[locale]?.trim());
   const items: Item[] = todo
@@ -144,7 +214,7 @@ async function translateProducts(client: Anthropic, s: TranslateSettings, ids: s
     })
     .filter((i) => i.name.trim());
   if (!items.length) return { written: 0, skipped: products.length };
-  const result = await translateBatch(client, s.model, items, locale);
+  const result = s.provider === 'azure' || !client ? await translateBatchAzure(s, items, locale) : await translateBatch(client, s.model, items, locale);
   let written = 0;
   for (const p of todo) {
     const t = result.get(p.id);
@@ -161,7 +231,7 @@ async function translateProducts(client: Anthropic, s: TranslateSettings, ids: s
   return { written, skipped: products.length - todo.length };
 }
 
-const isFatal = (err: unknown) => err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError || err instanceof Anthropic.NotFoundError || err instanceof Anthropic.BadRequestError;
+const isFatal = (err: unknown) => err instanceof FatalTranslateError || err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError || err instanceof Anthropic.NotFoundError || err instanceof Anthropic.BadRequestError;
 
 const errText = (err: unknown) => (err instanceof Anthropic.APIError ? `Anthropic ${err.status}: ${err.message}` : err instanceof Error ? err.message : String(err)).slice(0, 500);
 
@@ -180,8 +250,8 @@ export async function processTranslations(log: Log) {
 
 async function runTranslations(log: Log) {
   const s = await getTranslateSettings();
-  if (!s.apiKey) return { skipped: 'no api key' };
-  const client = new Anthropic({ apiKey: s.apiKey, maxRetries: 3 });
+  if (!translateReady(s)) return { skipped: 'no api key' };
+  const client = s.provider === 'claude' ? new Anthropic({ apiKey: s.apiKey, maxRetries: 3 }) : null;
   const started = Date.now();
   let job = await getTranslateJob();
 

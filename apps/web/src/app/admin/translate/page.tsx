@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getTranslateJob, getTranslateSettings } from '@accszone/core';
+import { getTranslateJob, getTranslateSettings, translateReady } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { LOCALE_LABEL, TranslateActions, TranslateSettingsForm } from '@/components/admin/translate-admin';
 import { PageHeader, Panel } from '@/components/admin/ui';
@@ -27,7 +27,8 @@ export default async function TranslatePage() {
       FROM products WHERE "isActive" = true`,
     workerOnline().catch(() => false),
   ]);
-  const { apiKey, ...publicSettings } = settings;
+  // Không gửi key ra trình duyệt
+  const { apiKey, azureKey, ...publicSettings } = settings;
   const running = job?.status === 'RUNNING';
   const pct = job ? Math.round((job.cursor / Math.max(1, job.productIds.length)) * 100) : 0;
   const cov = coverage[0] ?? { id: 0, ru: 0, zh: 0 };
@@ -36,11 +37,11 @@ export default async function TranslatePage() {
     <div className="space-y-5">
       <PageHeader title="Dịch sản phẩm" />
       <p className="text-sm text-zinc-500">
-        Tên / mô tả sản phẩm (thường là tiếng Anh từ web gốc) được AI dịch sang ngôn ngữ khách đang xem. Bản tiếng Anh gốc không bị đổi; đồng bộ từ nguồn API chỉ cập nhật tiếng Anh nên bản dịch được giữ. Muốn tự đổi tên theo ý: mở sản phẩm, sửa ô tên của từng ngôn ngữ.
+        Tên / mô tả sản phẩm (thường là tiếng Anh từ web gốc) được dịch tự động sang ngôn ngữ khách đang xem. Bản tiếng Anh gốc không bị đổi; đồng bộ từ nguồn API chỉ cập nhật tiếng Anh nên bản dịch được giữ. Muốn tự đổi tên theo ý: mở sản phẩm, sửa ô tên của từng ngôn ngữ.
       </p>
       {!online && <p className="rounded-lg bg-amber-50 px-4 py-2.5 text-sm text-amber-800">Worker đang không chạy: lượt dịch sẽ chỉ chạy khi bật worker.</p>}
 
-      <Panel title="Tiến độ" action={can(user, 'products.edit') && <TranslateActions running={running} canStart={!!apiKey && settings.targets.length > 0} />}>
+      <Panel title="Tiến độ" action={can(user, 'products.edit') && <TranslateActions running={running} canStart={translateReady(settings) && settings.targets.length > 0} />}>
         {running && <AutoRefresh everyMs={10_000} />}
         <div className="grid gap-3 sm:grid-cols-3">
           {(Object.keys(LOCALE_LABEL) as (keyof typeof LOCALE_LABEL)[]).map((l) => (
@@ -69,7 +70,7 @@ export default async function TranslatePage() {
 
       {can(user, 'settings.edit') && (
         <Panel title="Cấu hình">
-          <TranslateSettingsForm initial={publicSettings} hasKey={!!apiKey} />
+          <TranslateSettingsForm initial={publicSettings} hasKey={!!apiKey} hasAzureKey={!!azureKey} />
         </Panel>
       )}
     </div>
