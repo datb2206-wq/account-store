@@ -5,10 +5,11 @@
 //   sweep-reseller-orders mỗi 1 phút -> đơn RESELLER còn PENDING: kiểm tra lại web gốc / hoàn tiền sau 24h
 //   update-fx-rates  mỗi FX_UPDATE_HOURS giờ (chỉ khi đặt FX_RATES_URL) -> cập nhật tỷ giá currency.rates
 //   run-automations  mỗi 5 phút  -> công việc tự động admin tạo (dọn dữ liệu cũ)
+//   send-email-campaigns mỗi 1 phút -> gửi tiếp 1 đợt email chiến dịch
 //   fulfill-order    theo sự kiện -> web đẩy vào ngay khi khách mua hàng RESELLER
 import { Queue, Worker, type Job } from 'bullmq';
 import { prisma } from '@accszone/database';
-import { AUTOMATION_EVERY_MS, decrypt, expireStaleDeposits, fulfillResellerOrder, getAdapter, notifyLowBalance, runDueAutomations, scanUsdtDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
+import { AUTOMATION_EVERY_MS, decrypt, expireStaleDeposits, fulfillResellerOrder, getAdapter, notifyLowBalance, processEmailCampaigns, runDueAutomations, scanUsdtDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
 import {
   FULFILL_JOB_OPTIONS,
   fulfillJobId,
@@ -111,6 +112,9 @@ async function processJob(job: Job) {
       return { queued: ids.length };
     }
 
+    case JOBS.emailCampaigns:
+      return processEmailCampaigns(log('email'));
+
     case JOBS.automations:
       return runDueAutomations(log('auto'));
 
@@ -129,6 +133,7 @@ async function main() {
   await queue.upsertJobScheduler(JOBS.scanUsdt, { every: 60_000 }, { name: JOBS.scanUsdt });
   await queue.upsertJobScheduler(JOBS.syncSuppliers, { every: SYNC_MINUTES * 60_000 }, { name: JOBS.syncSuppliers });
   await queue.upsertJobScheduler(JOBS.sweepOrders, { every: 60_000 }, { name: JOBS.sweepOrders });
+  await queue.upsertJobScheduler(JOBS.emailCampaigns, { every: 60_000 }, { name: JOBS.emailCampaigns });
   await queue.upsertJobScheduler(JOBS.automations, { every: AUTOMATION_EVERY_MS }, { name: JOBS.automations });
   if (FX_RATES_URL) {
     await queue.upsertJobScheduler(JOBS.updateFx, { every: FX_UPDATE_HOURS * 3600_000 }, { name: JOBS.updateFx });

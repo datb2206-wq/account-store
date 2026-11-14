@@ -49,6 +49,21 @@ export const CONFIG_SCHEMAS = {
       onRegister: z.boolean(),
     }),
   }),
+  // Email (Admin > Email): SMTP + mẫu email gửi khách. Mẫu dùng biến {username}, {code}... (xem core/email.ts)
+  email: z.object({
+    enabled: z.boolean(),
+    host: z.string().trim().max(200),
+    port: z.number().int().min(1).max(65535),
+    secure: z.enum(['tls', 'ssl', 'none']), // tls = STARTTLS (587), ssl = 465
+    user: z.string().trim().max(200),
+    pass: z.string().max(500),
+    fromEmail: z.string().trim().max(200),
+    fromName: z.string().trim().max(100),
+    templates: z.object({
+      order: z.object({ enabled: z.boolean(), subject: z.string().max(300), body: z.string().max(20_000) }),
+      loginAlert: z.object({ enabled: z.boolean(), subject: z.string().max(300), body: z.string().max(20_000) }),
+    }),
+  }),
   // Thông báo Telegram (Admin > Thông báo Telegram). Mẫu tin dùng biến {username}, {amount}... (xem core/telegram.ts)
   telegram: z.object({
     enabled: z.boolean(),

@@ -1,12 +1,12 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
-import { notifyOrder } from '@accszone/core';
+import { emailOrder, notifyOrder } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { getCurrentUser } from '@/lib/auth';
 import { getClientIp, isSameOrigin, jsonError, readJson, tooManyRequests } from '@/lib/http';
 import { blockedIpResponse } from '@/lib/ip-block';
 import { purchase, PurchaseError } from '@/lib/purchase';
 import { rateLimit } from '@/lib/rate-limit';
-import { blockedByMaintenance, MAINTENANCE_ERROR } from '@/lib/site';
+import { blockedByMaintenance, getSiteUrl, MAINTENANCE_ERROR } from '@/lib/site';
 import { fieldErrors, IDEMPOTENCY_KEY_RE, orderSchema } from '@/lib/validation';
 
 // Mua hàng. Header bắt buộc: Idempotency-Key (gửi lại đúng key khi retry -> nhận lại đúng đơn cũ)
@@ -34,7 +34,9 @@ export async function POST(req: NextRequest) {
     const { balance } = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { balance: true } });
     if (!result.replayed) {
       const ip = getClientIp(req);
-      after(() => notifyOrder({ code: result.order.code }, ip)); // Telegram, gửi sau khi đã trả kết quả
+      const siteUrl = await getSiteUrl();
+      // Telegram + email xác nhận đơn, gửi sau khi đã trả kết quả
+      after(() => Promise.all([notifyOrder({ code: result.order.code }, ip), emailOrder({ code: result.order.code }, siteUrl)]));
     }
     return NextResponse.json(
       { ...result, balance: balance.toString() },

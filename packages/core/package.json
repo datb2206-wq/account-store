@@ -14,10 +14,12 @@
   },
   "dependencies": {
     "@accszone/database": "workspace:*",
+    "nodemailer": "6.9.16",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^20.17.10",
+    "@types/nodemailer": "6.4.17",
     "typescript": "^5.7.2"
   }
 }

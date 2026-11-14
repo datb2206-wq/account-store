@@ -109,6 +109,9 @@ importers:
       '@accszone/database':
         specifier: workspace:*
         version: link:../database
+      nodemailer:
+        specifier: 6.9.16
+        version: 6.9.16
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -116,6 +119,9 @@ importers:
       '@types/node':
         specifier: ^20.17.10
         version: 20.19.43
+      '@types/nodemailer':
+        specifier: 6.4.17
+        version: 6.4.17
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -724,6 +730,9 @@ packages:
   '@types/node@20.19.43':
     resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
 
+  '@types/nodemailer@6.4.17':
+    resolution: {integrity: sha512-I9CCaIp6DTldEg7vyUTZi8+9Vo0hi1/T8gv3C89yk1rSAAzoKQ8H8ki/jBYJSFoH/BisgLP8tkZMlQ91CIquww==}
+
   '@types/qrcode@1.5.6':
     resolution: {integrity: sha512-te7NQcV2BOvdj2b1hCAHzAoMNuj65kNBMz0KBaxM6c3VGBOhU0dURQKOtH8CFNI/dsKkwlv32p26qYQTWoB5bw==}
 
@@ -1058,6 +1067,10 @@ packages:
   node-gyp-build-optional-packages@5.2.2:
     resolution: {integrity: sha512-s+w+rBWnpTMwSFbaE0UXsRlg7hU4FjekKU4eyAih5T8nJuNZT1nNsskXpxmeqSK9UzkBl6UgRlnKc8hz8IEqOw==}
     hasBin: true
+
+  nodemailer@6.9.16:
+    resolution: {integrity: sha512-psAuZdTIRN08HKVd/E8ObdV6NO7NTBY3KsC30F7M4H1OnmLCUNaS56FpYxyb26zWLSyYF9Ozch9KYHhHegsiOQ==}
+    engines: {node: '>=6.0.0'}
 
   nypm@0.6.12:
     resolution: {integrity: sha512-4AhWntz+ds/P5kz1rN25yGegTPYsO5ffOy+8S0TeuXKZrgjlmgcEBLA1xubzcP/dWX4zYfNybv4TQERlL9Z0LQ==}
@@ -1666,6 +1679,10 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/nodemailer@6.4.17':
+    dependencies:
+      '@types/node': 20.19.43
+
   '@types/qrcode@1.5.6':
     dependencies:
       '@types/node': 20.19.43
@@ -1992,6 +2009,8 @@ snapshots:
     dependencies:
       detect-libc: 2.1.2
     optional: true
+
+  nodemailer@6.9.16: {}
 
   nypm@0.6.12:
     dependencies:

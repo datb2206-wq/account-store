@@ -110,6 +110,7 @@ model User {
 
   lastLoginAt   DateTime?
   lastLoginIp   String?
+  emailOptOut   Boolean   @default(false) // khách bấm "hủy nhận tin" trong email chiến dịch
   registerIp    String?   // IP lúc đăng ký: giới hạn số tài khoản / IP (Admin > Bảo mật)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -526,4 +527,30 @@ model AutomationTask {
   updatedAt   DateTime  @updatedAt
 
   @@map("automation_tasks")
+}
+
+// Chiến dịch email hàng loạt (Admin > Email Campaigns). Worker gửi dần theo đợt, nhớ vị trí bằng cursor (id user cuối đã gửi).
+// recipients: "all" = mọi thành viên đang hoạt động chưa hủy nhận tin; "list" = danh sách email trong emails
+model EmailCampaign {
+  id         String   @id @default(cuid())
+  name       String
+  subject    String
+  body       String   // HTML
+  recipients String   @default("all")
+  emails     String[]
+  cc         String   @default("")
+  bcc        String   @default("")
+  status     String   @default("SENDING") // SENDING | PAUSED | DONE
+  total      Int      @default(0)
+  sent       Int      @default(0)
+  failed     Int      @default(0)
+  cursor     String?
+  siteUrl    String   @default("") // gốc URL web lúc tạo chiến dịch -> link hủy nhận tin trong email
+  lastError  String?
+  createdById String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status])
+  @@map("email_campaigns")
 }

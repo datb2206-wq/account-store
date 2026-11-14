@@ -5,6 +5,8 @@ export * from './codes';
 export * from './config';
 export * from './crypto';
 export * from './deposits';
+export * from './email';
+export * from './email-campaigns';
 export * from './errors';
 export * from './fx';
 export * from './stock';

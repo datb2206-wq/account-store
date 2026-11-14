@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
+import { emailLoginAlert } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { writeAudit } from '@/lib/audit';
 import { createSession, setAuthCookies } from '@/lib/auth';
@@ -62,6 +63,8 @@ export async function POST(req: NextRequest) {
 
   const { passwordHash: _, status: __, ...publicUser } = user;
   const res = NextResponse.json({ user: publicUser });
+  // Email cảnh báo đăng nhập (nếu admin bật), gửi sau khi đã trả kết quả
+  after(() => emailLoginAlert(user, ip, userAgent ?? ''));
   const sid = randomUUID();
   await claimSession(user.id, user.role, sid);
   setAuthCookies(res, await createSession(user, sid));
