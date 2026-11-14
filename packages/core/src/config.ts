@@ -49,6 +49,15 @@ export const CONFIG_SCHEMAS = {
       onRegister: z.boolean(),
     }),
   }),
+  // Affiliate (Admin > Affiliate Program): hoa hồng giới thiệu
+  affiliate: z.object({
+    enabled: z.boolean(),
+    percent: z.number().min(0).max(50), // % hoa hồng trên số tiền đơn hàng thực trả của người được giới thiệu
+    minWithdraw: z.number().min(0).max(100_000), // USD
+    allowBalance: z.boolean(), // cho rút vào số dư mua hàng (tức thì)
+    allowBank: z.boolean(), // cho rút về ngân hàng (admin duyệt, chuyển tay)
+    cookieDays: z.number().int().min(1).max(365), // link giới thiệu có hiệu lực bao nhiêu ngày
+  }),
   // Email (Admin > Email): SMTP + mẫu email gửi khách. Mẫu dùng biến {username}, {code}... (xem core/email.ts)
   email: z.object({
     enabled: z.boolean(),

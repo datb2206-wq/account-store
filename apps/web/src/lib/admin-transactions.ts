@@ -1,7 +1,7 @@
 // Bộ lọc giao dịch dùng chung cho trang Admin > Giao dịch và file CSV xuất ra (cùng điều kiện -> cùng kết quả).
 import type { PaymentMethod, Prisma, TransactionStatus, TransactionType } from '@accszone/database';
 
-export const TX_TYPES: TransactionType[] = ['DEPOSIT', 'PURCHASE', 'REFUND', 'ADJUSTMENT', 'BONUS'];
+export const TX_TYPES: TransactionType[] = ['DEPOSIT', 'PURCHASE', 'REFUND', 'ADJUSTMENT', 'BONUS', 'COMMISSION'];
 export const TX_STATUSES: TransactionStatus[] = ['PENDING', 'COMPLETED', 'REJECTED', 'EXPIRED'];
 export const TX_METHODS: PaymentMethod[] = ['BANK_TRANSFER', 'USDT_TRC20', 'USDT_BEP20', 'BALANCE', 'MANUAL'];
 // "USDT" = cả 2 mạng, dùng cho log đối soát TxID

@@ -47,6 +47,7 @@ export const PERMISSION_GROUPS = [
   { group: 'Nạp tiền', items: [['payments.view', 'Xem lịch sử nạp tiền, giao dịch'], ['payments.edit', 'Duyệt / từ chối nạp tiền']] },
   { group: 'Mã giảm giá', items: [['coupons.view', 'Xem mã giảm giá'], ['coupons.edit', 'Thêm, sửa, xóa mã giảm giá']] },
   { group: 'Khuyến mãi nạp', items: [['promotions.view', 'Xem mốc khuyến mãi nạp'], ['promotions.edit', 'Thêm, sửa, xóa mốc khuyến mãi']] },
+  { group: 'Affiliate', items: [['affiliate.view', 'Xem hoa hồng & lệnh rút'], ['affiliate.edit', 'Cấu hình Affiliate, duyệt / từ chối lệnh rút']] },
   { group: 'Email Marketing', items: [['emails.view', 'Xem chiến dịch email'], ['emails.edit', 'Tạo, dừng, xóa chiến dịch email']] },
   { group: 'Bài viết', items: [['blog.view', 'Xem bài viết & chuyên mục'], ['blog.edit', 'Viết, sửa, xóa bài viết & chuyên mục']] },
   { group: 'Phân quyền', items: [['roles.manage', 'Quản lý vai trò & gán quyền cho nhân viên (quyền rất cao)']] },
@@ -59,7 +60,7 @@ export const isPermission = (p: string): p is Permission => (ALL_PERMISSIONS as 
 
 // Trước đây chỉ SUPER_ADMIN làm được -> nhân viên chưa gán vai trò vẫn không có
 const SUPER_ONLY: Permission[] = [
-  'stock.reveal', 'suppliers.edit', 'orders.refund', 'automations.edit', 'emails.edit', 'users.edit', 'users.balance',
+  'stock.reveal', 'suppliers.edit', 'orders.refund', 'automations.edit', 'emails.edit', 'affiliate.edit', 'users.edit', 'users.balance',
   'coupons.edit', 'promotions.edit', 'roles.manage', 'settings.edit',
 ];
 
@@ -100,6 +101,7 @@ const ROUTE_RULES: Rule[] = [
   ['/admin/transactions', 'payments.view'],
   ['/admin/coupons', 'coupons.view'],
   ['/admin/promotions', 'promotions.view'],
+  ['/admin/affiliate', 'affiliate.view'],
   ['/admin/email-campaigns/new', 'emails.edit'],
   ['/admin/email-campaigns', 'emails.view'],
   ['/admin/email', 'settings.edit'],
@@ -117,6 +119,7 @@ const ROUTE_RULES: Rule[] = [
   ['/api/admin/automations', 'automations.edit'],
   ['/api/admin/blocked-ips', 'security.edit'],
   ['/api/admin/security', 'settings.edit'],
+  ['/api/admin/affiliate', 'affiliate.edit'],
   ['/api/admin/email-campaigns', 'emails.edit'],
   ['/api/admin/email', 'settings.edit'],
   ['/api/admin/blog', 'blog.edit'],

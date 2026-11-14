@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { NextResponse, type NextRequest } from 'next/server';
+import { attachReferrer, REF_COOKIE } from '@accszone/core';
 import { prisma, type Prisma } from '@accszone/database';
 import { writeAudit } from '@/lib/audit';
 import { createSession, setAuthCookies } from '@/lib/auth';
@@ -57,6 +58,9 @@ export async function POST(req: NextRequest) {
     }
     throw err;
   }
+
+  // Người giới thiệu (cookie từ link /r/MÃ). Lỗi ở đây không được chặn đăng ký.
+  await attachReferrer(user.id, req.cookies.get(REF_COOKIE)?.value).catch(() => null);
 
   // Nhật ký hoạt động (Admin > Lịch sử). Lỗi ghi log không được chặn việc đăng ký.
   await writeAudit({ actorId: user.id, action: 'auth.register', entity: 'User', entityId: user.id, after: { userAgent: req.headers.get('user-agent') }, ip }).catch(() => null);

@@ -18,6 +18,7 @@ const TYPE_LABEL: Record<TransactionType, string> = {
   REFUND: 'Hoàn tiền',
   ADJUSTMENT: 'Admin cộng / trừ',
   BONUS: 'Khuyến mãi nạp tiền',
+  COMMISSION: 'Rút hoa hồng giới thiệu',
 };
 
 export default async function BalanceLogsPage({ searchParams }: { searchParams: Promise<Partial<Record<string, string>>> }) {

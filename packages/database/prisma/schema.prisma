@@ -64,6 +64,7 @@ enum TransactionType {
   REFUND // hoàn tiền
   ADJUSTMENT // admin cộng/trừ tay
   BONUS // tiền thưởng khuyến mãi nạp tiền
+  COMMISSION // chuyển hoa hồng giới thiệu vào số dư
 }
 
 enum TransactionStatus {
@@ -110,6 +111,12 @@ model User {
 
   lastLoginAt   DateTime?
   lastLoginIp   String?
+  // Affiliate: mã giới thiệu riêng, người đã giới thiệu mình, số dư hoa hồng (tách khỏi số dư mua hàng)
+  referralCode  String?   @unique
+  referredById  String?
+  referredBy    User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals     User[]    @relation("Referrals")
+  commissionBalance Decimal @default(0) @db.Decimal(18, 6)
   emailOptOut   Boolean   @default(false) // khách bấm "hủy nhận tin" trong email chiến dịch
   registerIp    String?   // IP lúc đăng ký: giới hạn số tài khoản / IP (Admin > Bảo mật)
   createdAt     DateTime   @default(now())
@@ -122,6 +129,7 @@ model User {
 
   @@index([role])
   @@index([registerIp])
+  @@index([referredById])
   @@map("users")
 }
 
@@ -553,4 +561,41 @@ model EmailCampaign {
 
   @@index([status])
   @@map("email_campaigns")
+}
+
+// Hoa hồng: 1 dòng / đơn hàng của người được giới thiệu. REVERSED = đơn bị hoàn tiền, đã trừ lại hoa hồng.
+model AffiliateCommission {
+  id          String   @id @default(cuid())
+  referrerId  String   // người nhận hoa hồng
+  buyerId     String   // người được giới thiệu (người mua)
+  orderId     String   @unique
+  orderAmount Decimal  @db.Decimal(18, 6)
+  percent     Decimal  @db.Decimal(6, 3)
+  amount      Decimal  @db.Decimal(18, 6)
+  status      String   @default("CREDITED") // CREDITED | REVERSED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([referrerId, createdAt(sort: Desc)])
+  @@map("affiliate_commissions")
+}
+
+// Rút hoa hồng. method "balance" = chuyển vào số dư (hoàn tất ngay); "bank" = admin duyệt rồi chuyển khoản tay.
+model AffiliateWithdrawal {
+  id          String    @id @default(cuid())
+  userId      String
+  amount      Decimal   @db.Decimal(18, 6)
+  method      String    // balance | bank
+  bankName    String    @default("")
+  accountNo   String    @default("")
+  accountName String    @default("")
+  status      String    @default("PENDING") // PENDING | COMPLETED | REJECTED
+  note        String    @default("")
+  reviewedById String?
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("affiliate_withdrawals")
 }

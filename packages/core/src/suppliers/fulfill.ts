@@ -5,6 +5,7 @@ import { Prisma, prisma } from '@accszone/database';
 import { contentHash, decrypt, encrypt } from '../crypto';
 import { domainError } from '../errors';
 import { pickRandomStock } from '../stock';
+import { creditCommission, reverseCommission } from '../affiliate';
 import { notifyRefund } from '../telegram';
 import { getAdapter } from './adapters';
 import { SupplierTransientError, type SupplierOrderResult } from './generic-adapter';
@@ -59,6 +60,7 @@ export async function refundOrder(orderId: string, internalReason: string, exter
   if (!refunded) return false;
   await audit('order.refund', orderId, { reason: internalReason });
   await notifyRefund(orderId, refunded, internalReason);
+  await reverseCommission(orderId);
   return true;
 }
 
@@ -116,6 +118,7 @@ async function deliver(orderId: string, externalOrderId: string | null, rawItems
         after: { externalOrderId, received: rawItems.length, outcome },
       },
     });
+    await creditCommission({ id: orderId }); // hoa hồng giới thiệu tính trên phần thực giao
   }
   return outcome;
 }
@@ -167,6 +170,7 @@ export async function manualRefundOrder(input: { orderId: string; amount?: strin
     },
   });
   await notifyRefund(input.orderId, result.amount, `Admin hoàn tay: ${input.reason}`);
+  if (result.full) await reverseCommission(input.orderId);
   return result;
 }
 

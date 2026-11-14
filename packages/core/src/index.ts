@@ -1,4 +1,5 @@
 // Logic nghiệp vụ dùng chung cho apps/web và apps/worker (chỉ chạy phía server).
+export * from './affiliate';
 export * from './automations';
 export * from './chain';
 export * from './codes';

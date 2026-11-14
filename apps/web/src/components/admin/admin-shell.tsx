@@ -80,6 +80,13 @@ function buildMenu({ pendingDeposits, stuckOrders }: Pick<ShellProps, 'pendingDe
             { label: 'Tất cả giao dịch', href: '/admin/transactions' },
           ],
         },
+        {
+          label: 'Affiliate Program', href: '/admin/affiliate', icon: UsersIcon,
+          children: [
+            { label: 'Cấu hình & hoa hồng', href: '/admin/affiliate' },
+            { label: 'Lệnh rút tiền', href: '/admin/affiliate/withdrawals' },
+          ],
+        },
         { label: 'Email Campaigns', href: '/admin/email-campaigns', icon: MegaphoneIcon },
         { label: 'Mã giảm giá', href: '/admin/coupons', icon: GiftIcon },
         { label: 'Khuyến mãi nạp tiền', href: '/admin/promotions', icon: SparklesIcon },

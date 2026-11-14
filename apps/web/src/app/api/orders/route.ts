@@ -1,5 +1,5 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
-import { emailOrder, notifyOrder } from '@accszone/core';
+import { creditCommission, emailOrder, notifyOrder } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { getCurrentUser } from '@/lib/auth';
 import { getClientIp, isSameOrigin, jsonError, readJson, tooManyRequests } from '@/lib/http';
@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
       const ip = getClientIp(req);
       const siteUrl = await getSiteUrl();
       // Telegram + email xác nhận đơn, gửi sau khi đã trả kết quả
-      after(() => Promise.all([notifyOrder({ code: result.order.code }, ip), emailOrder({ code: result.order.code }, siteUrl)]));
+      // + hoa hồng giới thiệu (chỉ cộng khi đơn đã COMPLETED; đơn nguồn API cộng lúc giao)
+      after(() => Promise.all([notifyOrder({ code: result.order.code }, ip), emailOrder({ code: result.order.code }, siteUrl), creditCommission({ code: result.order.code })]));
     }
     return NextResponse.json(
       { ...result, balance: balance.toString() },

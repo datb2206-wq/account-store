@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { getAffiliateSettings } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
 import { LocalTime } from '@/components/local-time';
@@ -20,6 +21,7 @@ export default async function DashboardPage() {
   const user = await requireUser();
   const { locale, d } = await getI18n();
   const t = d.dashboard;
+  const affiliateOn = (await getAffiliateSettings()).enabled;
 
   const [completed, recentOrders, recentTxs] = await Promise.all([
     prisma.order.aggregate({
@@ -51,9 +53,12 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 className="text-2xl font-semibold">{fmt(t.hi, { name: user.username ?? user.email.split('@')[0] ?? '' })}</h1>
         <p className="text-sm text-zinc-500">{rich(t.memberSince, { date: <LocalTime value={user.createdAt} /> })}</p>
+      </div>
+        {affiliateOn && <Link href="/dashboard/affiliate" className="btn-ghost border border-zinc-200">🎁 {d.affiliate.menu}</Link>}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
