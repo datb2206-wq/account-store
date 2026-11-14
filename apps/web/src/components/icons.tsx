@@ -36,6 +36,7 @@ export const GlobeIcon = (p: IconProps) => <Svg {...p}><circle cx="12" cy="12" r
 export const GamepadIcon = (p: IconProps) => <Svg {...p}><path d="M6 8h12a4 4 0 0 1 4 4v1.5a3.5 3.5 0 0 1-6.3 2.1L14.5 14h-5l-1.2 1.6A3.5 3.5 0 0 1 2 13.5V12a4 4 0 0 1 4-4Z" /><path d="M7 11v3M5.5 12.5h3M16 11.5h.01M18 13h.01" /></Svg>;
 export const SparklesIcon = (p: IconProps) => <Svg {...p}><path d="M10 3.5 11.8 8.2 16.5 10l-4.7 1.8L10 16.5l-1.8-4.7L3.5 10l4.7-1.8L10 3.5Z" /><path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9L18 14Z" /></Svg>;
 export const KeyIcon = (p: IconProps) => <Svg {...p}><circle cx="7.5" cy="15.5" r="4.5" /><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2" /></Svg>;
+export const ImageIcon = (p: IconProps) => <Svg {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="9.5" r="1.5" /><path d="m21 16-5-5-9 9" /></Svg>;
 export const LogoutIcon = (p: IconProps) => <Svg {...p}><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></Svg>;
 export const ReceiptIcon = (p: IconProps) => <Svg {...p}><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2V3Z" /><path d="M9 8h6M9 12h6" /></Svg>;
 // Header / thanh thông báo

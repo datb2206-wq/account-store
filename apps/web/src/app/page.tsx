@@ -17,6 +17,7 @@ import { cached, SHOP_STOCK_CACHE } from '@/lib/cache';
 import { descendantIds, flattenTree } from '@/lib/category-tree';
 import { formatUsd, localized } from '@/lib/format';
 import { blockedByMaintenance, getSiteConfig } from '@/lib/site';
+import { getSiteAssets } from '@/lib/site-assets';
 import { buildHref } from '@/lib/url';
 
 const SORTS = {
@@ -60,7 +61,7 @@ export default async function ShopPage({
 }: {
   searchParams: Promise<{ category?: string; q?: string; sort?: string; instock?: string }>;
 }) {
-  const [user, { locale, d, fx }] = await Promise.all([getCurrentUser(), getI18n()]);
+  const [user, { locale, d, fx }, assets] = await Promise.all([getCurrentUser(), getI18n(), getSiteAssets()]);
   if (await blockedByMaintenance(user)) return <MaintenanceScreen />;
   const t = d.shop;
   const params = await searchParams;
@@ -133,6 +134,11 @@ export default async function ShopPage({
       <SiteHeader user={user} q={q} category={selected?.slug} />
 
       <main className="site-container space-y-6 py-6 sm:py-8">
+        {/* Banner (Admin > Giao diện): chỉ ở trang tổng, không hiện khi đang tìm kiếm / xem 1 danh mục */}
+        {assets.banner && !q && !selected && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={assets.banner} alt={t.title} fetchPriority="high" className="block max-h-[400px] w-full rounded-xl object-cover" />
+        )}
         {/* ---------- TIÊU ĐỀ + THỐNG KÊ ---------- */}
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 sm:text-[26px]">{selected ? localized(selected.name, locale) : t.title}</h1>
@@ -222,7 +228,7 @@ export default async function ShopPage({
                     <li key={p.id} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2.5 rounded-lg bg-white p-3 ${COLS}`}>
                       <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
                         <span className="hidden sm:block">
-                          <CategoryIcon name={categoryName} slug={category.slug} iconUrl={category.iconUrl} size="lg" />
+                          <CategoryIcon name={categoryName} slug={category.slug} iconUrl={category.iconUrl} fallbackUrl={assets.productDefault} size="lg" />
                         </span>
                         <div className="min-w-0">
                           <p className="text-sm leading-6 font-medium text-zinc-900">

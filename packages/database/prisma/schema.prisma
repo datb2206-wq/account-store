@@ -463,3 +463,19 @@ model BlogPost {
   @@index([isPublished, createdAt(sort: Desc)])
   @@map("blog_posts")
 }
+
+// -------------------------------------------------------------
+//  GIAO DIỆN
+// -------------------------------------------------------------
+
+// Ảnh giao diện admin tải lên (logo, favicon, banner...). Lưu thẳng trong DB vì máy chủ dạng serverless
+// (Vercel) không giữ file ghi ra ổ đĩa. Ảnh nhỏ (giới hạn ở web), phục vụ qua /api/assets/[key] có cache.
+model SiteAsset {
+  key       String   @id // logo | logoDark | favicon | ogImage | banner | productDefault | avatar
+  data      Bytes
+  mime      String
+  size      Int
+  updatedAt DateTime @updatedAt
+
+  @@map("site_assets")
+}

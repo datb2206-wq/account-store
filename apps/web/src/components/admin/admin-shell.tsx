@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BoxIcon, CartIcon, ChevronIcon, ClockIcon, CloseIcon, GiftIcon, GlobeIcon, GridIcon, KeyIcon, LogoutIcon, MailIcon, ReceiptIcon, SparklesIcon, UsersIcon, WalletIcon,
+  BoxIcon, CartIcon, ChevronIcon, ClockIcon, CloseIcon, GiftIcon, GlobeIcon, GridIcon, ImageIcon, KeyIcon, LogoutIcon, MailIcon, ReceiptIcon, SparklesIcon, UsersIcon, WalletIcon,
 } from '@/components/icons';
 
 type Leaf = { label: string; href: string; badge?: number; badgeTone?: 'amber' | 'red' };
@@ -17,6 +17,8 @@ export interface ShellProps {
   role: string;
   pendingDeposits: number;
   stuckOrders: number;
+  logoDarkUrl?: string;
+  avatarUrl?: string;
   children: React.ReactNode;
 }
 
@@ -83,6 +85,7 @@ function buildMenu({ role, pendingDeposits, stuckOrders }: Pick<ShellProps, 'rol
           title: 'Cài đặt hệ thống',
           items: [
             { label: 'Ngôn ngữ', href: '/admin/translations', icon: GlobeIcon },
+            { label: 'Giao diện', href: '/admin/theme', icon: ImageIcon },
             { label: 'Cài đặt', href: '/admin/settings', icon: KeyIcon },
           ],
         }]
@@ -109,7 +112,7 @@ function Count({ n, tone = 'amber' }: { n?: number; tone?: 'amber' | 'red' }) {
   return <span className={`ml-auto rounded-full px-1.5 text-[10px] leading-4 font-semibold text-white ${tone === 'red' ? 'bg-red-500' : 'bg-amber-500'}`}>{n}</span>;
 }
 
-export function AdminShell({ siteName, email, role, pendingDeposits, stuckOrders, children }: ShellProps) {
+export function AdminShell({ siteName, email, role, pendingDeposits, stuckOrders, logoDarkUrl, avatarUrl, children }: ShellProps) {
   const pathname = usePathname();
   const menu = buildMenu({ role, pendingDeposits, stuckOrders });
   const active = activeHref(pathname, menu);
@@ -137,8 +140,15 @@ export function AdminShell({ siteName, email, role, pendingDeposits, stuckOrders
         } ${collapsed ? 'lg:hidden' : ''}`}
       >
         <Link href="/admin" className="flex h-16 shrink-0 items-center gap-2 border-b border-white/10 px-5 text-lg font-bold text-white">
-          <span className="grid size-8 place-items-center rounded-lg bg-indigo-500 text-sm">{siteName.slice(0, 1).toUpperCase()}</span>
-          <span className="truncate">{siteName}</span>
+          {logoDarkUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoDarkUrl} alt={siteName} className="h-9 w-auto max-w-full object-contain" />
+          ) : (
+            <>
+              <span className="grid size-8 place-items-center rounded-lg bg-indigo-500 text-sm">{siteName.slice(0, 1).toUpperCase()}</span>
+              <span className="truncate">{siteName}</span>
+            </>
+          )}
         </Link>
 
         <nav className="flex-1 overflow-y-auto px-3 py-4">
@@ -220,7 +230,12 @@ export function AdminShell({ siteName, email, role, pendingDeposits, stuckOrders
             </Link>
             <div className="mx-1 hidden h-8 w-px bg-zinc-200 sm:block" />
             <div className="flex items-center gap-2">
-              <span className="grid size-9 place-items-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">{email.slice(0, 1).toUpperCase()}</span>
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="size-9 rounded-full object-cover" />
+              ) : (
+                <span className="grid size-9 place-items-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">{email.slice(0, 1).toUpperCase()}</span>
+              )}
               <div className="hidden leading-tight md:block">
                 <p className="max-w-48 truncate text-sm font-medium text-zinc-800">{email}</p>
                 <p className="text-[11px] text-zinc-400">{role === 'SUPER_ADMIN' ? 'Super Admin' : 'Nhân viên'}</p>

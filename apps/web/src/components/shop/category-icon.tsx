@@ -9,7 +9,8 @@ import {
 //   1. iconUrl admin đặt (Admin > Danh mục)
 //   2. logo thương hiệu, nhận diện từ tên/slug
 //   3. biểu tượng chung theo loại (toàn cầu cho proxy, hộp quà cho gift card…)
-//   4. huy hiệu chữ cái với màu cố định theo slug
+//   4. ảnh sản phẩm mặc định (Admin > Giao diện), nếu nơi gọi truyền fallbackUrl
+//   5. huy hiệu chữ cái với màu cố định theo slug
 const GLYPHS: Record<CategoryGlyph, (p: { size?: number }) => React.ReactNode> = {
   users: UsersIcon, camera: CameraIcon, hash: HashIcon, music: MusicIcon, play: PlayIcon,
   mail: MailIcon, send: SendIcon, chat: ChatIcon, gift: GiftIcon, globe: GlobeIcon,
@@ -47,7 +48,7 @@ export function GlyphBadge({ glyph, color, size = 'md' }: { glyph: CategoryGlyph
   );
 }
 
-export function CategoryIcon({ name, slug, iconUrl, size = 'md' }: { name: string; slug: string; iconUrl?: string | null; size?: keyof typeof SIZES }) {
+export function CategoryIcon({ name, slug, iconUrl, fallbackUrl, size = 'md' }: { name: string; slug: string; iconUrl?: string | null; fallbackUrl?: string | null; size?: keyof typeof SIZES }) {
   const { box, glyph: glyphSize } = SIZES[size];
   if (iconUrl) {
     // eslint-disable-next-line @next/next/no-img-element
@@ -68,6 +69,10 @@ export function CategoryIcon({ name, slug, iconUrl, size = 'md' }: { name: strin
   }
   const { glyph, color } = classifyCategory(slug, name);
   if (glyph) return <GlyphBadge glyph={glyph} color={color ?? colorFor(slug)!} size={size} />;
+  if (fallbackUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={fallbackUrl} alt="" className={`${box} shrink-0 object-cover`} loading="lazy" />;
+  }
   return (
     <span className={`${box} ${color ?? colorFor(slug)} inline-flex shrink-0 items-center justify-center font-bold text-white`} aria-hidden>
       {initials(name)}

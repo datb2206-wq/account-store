@@ -2,10 +2,11 @@ import { prisma } from '@accszone/database';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { requireStaff } from '@/lib/auth';
 import { getSiteConfig } from '@/lib/site';
+import { getSiteAssets } from '@/lib/site-assets';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireStaff();
-  const site = await getSiteConfig();
+  const [site, assets] = await Promise.all([getSiteConfig(), getSiteAssets()]);
   const [pendingDeposits, stuckOrders] = await Promise.all([
     prisma.transaction.count({ where: { type: 'DEPOSIT', status: 'PENDING' } }),
     // Đơn RESELLER PENDING quá 5 phút (cùng ngưỡng với bộ lọc "kẹt" ở trang Đơn hàng)
@@ -13,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ]);
 
   return (
-    <AdminShell siteName={site.name} email={user.email} role={user.role} pendingDeposits={pendingDeposits} stuckOrders={stuckOrders}>
+    <AdminShell siteName={site.name} email={user.email} role={user.role} pendingDeposits={pendingDeposits} stuckOrders={stuckOrders} logoDarkUrl={assets.logoDark} avatarUrl={assets.avatar}>
       {children}
     </AdminShell>
   );

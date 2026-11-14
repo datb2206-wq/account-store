@@ -5,6 +5,7 @@ import { contactHref } from '@/lib/contact';
 import { formatUsd } from '@/lib/format';
 import { getCategoryMenu } from '@/lib/category-menu';
 import { getSiteConfig } from '@/lib/site';
+import { getSiteAssets } from '@/lib/site-assets';
 import { buildHref } from '@/lib/url';
 import { AnnouncementBar } from './announcement-bar';
 import { ContactLink } from './contact-link';
@@ -36,7 +37,7 @@ function SearchForm({ q, placeholder, label, className = '' }: { q: string; plac
 // q: từ khóa đang tìm (trang chủ truyền vào để ô tìm kiếm giữ nguyên nội dung)
 // category: slug danh mục đang chọn, để tô sáng tab tương ứng
 export async function SiteHeader({ user, q = '', category }: { user: CurrentUser | null; q?: string; category?: string }) {
-  const [site, { locale, d }] = await Promise.all([getSiteConfig(), getI18n()]);
+  const [site, { locale, d }, assets] = await Promise.all([getSiteConfig(), getI18n(), getSiteAssets()]);
   const menu = await getCategoryMenu(locale);
   const h = d.header;
   const action = 'hidden h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold whitespace-nowrap transition xl:inline-flex';
@@ -48,7 +49,7 @@ export async function SiteHeader({ user, q = '', category }: { user: CurrentUser
       {/* Điện thoại: header không dính để 3 hàng không che mất nội dung. Mega menu định vị theo thẻ này */}
       <header className="relative top-0 z-30 border-b border-zinc-200 bg-white md:sticky">
         <div className="site-container flex h-16 items-center gap-3 md:h-[78px] lg:gap-5">
-          <Logo name={site.name} logoUrl={site.logoUrl} compact />
+          <Logo name={site.name} logoUrl={assets.logo ?? site.logoUrl} compact />
           <SearchForm q={q} placeholder={h.searchPlaceholder} label={h.search} className="hidden min-w-0 flex-1 md:flex" />
 
           <div className="ml-auto flex shrink-0 items-center gap-2">

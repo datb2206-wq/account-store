@@ -3,16 +3,26 @@ import { I18nProvider } from '@/i18n/client';
 import { LOCALE_META } from '@/i18n/config';
 import { getI18n } from '@/i18n/server';
 import { getSiteConfig, getSiteUrl } from '@/lib/site';
+import { getSiteAssets } from '@/lib/site-assets';
 import './globals.css';
 
 // Tên website lấy từ Admin > Cấu hình > site.general
 export async function generateMetadata(): Promise<Metadata> {
-  const [{ name }, { locale, d }, url] = await Promise.all([getSiteConfig(), getI18n(), getSiteUrl()]);
+  const [{ name }, { locale, d }, url, assets] = await Promise.all([getSiteConfig(), getI18n(), getSiteUrl(), getSiteAssets()]);
   return {
     metadataBase: new URL(url),
     title: { default: name, template: `%s · ${name}` },
     description: d.meta.description,
-    openGraph: { type: 'website', siteName: name, title: name, description: d.meta.description, locale: LOCALE_META[locale].htmlLang.replace('-', '_') },
+    openGraph: {
+      type: 'website',
+      siteName: name,
+      title: name,
+      description: d.meta.description,
+      locale: LOCALE_META[locale].htmlLang.replace('-', '_'),
+      ...(assets.ogImage && { images: [{ url: assets.ogImage, width: 1200, height: 630 }] }),
+    },
+    // Favicon admin tải lên (Admin > Giao diện), không có thì dùng public/icon.svg
+    icons: assets.favicon ? { icon: assets.favicon, shortcut: assets.favicon, apple: assets.favicon } : { icon: '/icon.svg' },
   };
 }
 
