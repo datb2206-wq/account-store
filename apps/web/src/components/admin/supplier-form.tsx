@@ -135,7 +135,7 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
             <input id="sp-url" className="input font-mono text-xs" placeholder="VD: https://domain.com/api" value={values.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} />
           </FormField>
           <FormField label={isEdit ? 'API key' : 'API key *'} htmlFor="sp-key" error={fields.apiKey} hint={isEdit ? 'Để trống = giữ key hiện tại. Key được lưu mã hóa.' : 'Lấy ở trang API của web nguồn. Key được lưu mã hóa.'}>
-            <input id="sp-key" type="password" autoComplete="off" className="input font-mono text-xs" value={values.apiKey} onChange={(e) => set('apiKey', e.target.value)} />
+            <input id="sp-key" name="supplier-api-key" type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" className="input font-mono text-xs" value={values.apiKey} onChange={(e) => set('apiKey', e.target.value)} />
           </FormField>
           <FormField label="Tên gợi nhớ" htmlFor="sp-name" error={fields.name} hint="Để trống = dùng tên miền">
             <input id="sp-name" className="input" placeholder="VD: AccsZone" value={values.name} onChange={(e) => set('name', e.target.value)} />
