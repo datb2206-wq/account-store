@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { Prisma, prisma } from '@accszone/database';
 import { OrderItems, PendingOrderActions, RefundPanel } from '@/components/admin/order-actions';
 import { Badge } from '@/components/badge';
+import { can } from '@/lib/permissions';
 import { requireStaff } from '@/lib/auth';
 import { formatDate, formatUsd, localized } from '@/lib/format';
 
@@ -42,7 +43,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
     .reduce((sum, t) => sum.add(t.amount), new Prisma.Decimal(0));
   const remaining = order.totalAmount.sub(refunded);
   const isReseller = order.product.source === 'RESELLER';
-  const isSuper = admin.role === 'SUPER_ADMIN';
+  const isSuper = can(admin, 'orders.refund');
   const canRefund = isSuper && (order.status === 'PENDING' || order.status === 'COMPLETED') && remaining.gt(0);
 
   const fields: [string, React.ReactNode][] = [
@@ -84,7 +85,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
 
           <OrderItems
             orderId={order.id}
-            canReveal={isSuper}
+            canReveal={can(admin, 'stock.reveal')}
             canReplace={!isReseller && order.status === 'COMPLETED'}
             items={order.stockItems.map((i) => ({ id: i.id, status: i.status, soldAt: formatDate(i.soldAt) }))}
           />
@@ -138,7 +139,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           {canRefund && <RefundPanel orderId={order.id} remaining={remaining.toString()} pendingOnlyFull={order.status === 'PENDING'} />}
           {!canRefund && order.status !== 'PENDING' && (
             <div className="card text-sm text-zinc-500">
-              {order.status === 'REFUNDED' ? 'Đơn đã được hoàn tiền toàn bộ.' : isSuper ? 'Không còn thao tác nào.' : 'Chỉ SUPER_ADMIN được hoàn tiền.'}
+              {order.status === 'REFUNDED' ? 'Đơn đã được hoàn tiền toàn bộ.' : isSuper ? 'Không còn thao tác nào.' : 'Bạn không có quyền hoàn tiền.'}
             </div>
           )}
         </div>

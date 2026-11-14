@@ -5,6 +5,7 @@ import { AdjustBalanceButton } from '@/components/admin/adjust-balance';
 import { Badge } from '@/components/badge';
 import { Pagination } from '@/components/pagination';
 import { StatCard } from '@/components/stat-card';
+import { can } from '@/lib/permissions';
 import { requireStaff } from '@/lib/auth';
 import { parseTxFilters, TX_METHODS, TX_STATUSES, TX_TYPES, txQuery, txWhere } from '@/lib/admin-transactions';
 import { explorerTxUrl, shortHash } from '@/lib/chain-links';
@@ -66,7 +67,7 @@ export default async function AdminTransactionsPage({
           <a href={buildHref('/api/admin/transactions/export', filters)} className="btn-ghost border border-zinc-200" title="Xuất CSV đúng theo bộ lọc đang xem (tối đa 50.000 dòng)">
             Xuất CSV
           </a>
-          {admin.role === 'SUPER_ADMIN' && <AdjustBalanceButton />}
+          {can(admin, 'users.balance') && <AdjustBalanceButton />}
         </div>
       </div>
 

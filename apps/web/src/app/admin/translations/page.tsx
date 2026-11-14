@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { TranslationEditor, type TranslationRow } from '@/components/admin/translation-editor';
 import { requireStaff } from '@/lib/auth';
 import { LOCALE_META, LOCALES } from '@/i18n/config';
@@ -9,8 +8,7 @@ import { flatten, getOverrides } from '@/lib/i18n-overrides';
 export const metadata: Metadata = { title: 'Bản dịch' };
 
 export default async function AdminTranslationsPage() {
-  const user = await requireStaff();
-  if (user.role !== 'SUPER_ADMIN') redirect('/admin');
+  await requireStaff();
 
   const flat = Object.fromEntries(LOCALES.map((l) => [l, flatten(getDictionary(l))]));
   const rows: TranslationRow[] = Object.keys(flat.en!).map((key) => ({

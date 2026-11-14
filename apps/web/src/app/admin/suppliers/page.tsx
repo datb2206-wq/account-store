@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@accszone/database';
 import { PageHeader, Panel } from '@/components/admin/ui';
 import { Badge } from '@/components/badge';
+import { can } from '@/lib/permissions';
 import { requireStaff } from '@/lib/auth';
 import { formatDate } from '@/lib/format';
 import { workerOnline } from '@/lib/queue';
@@ -37,7 +38,7 @@ export default async function AdminSuppliersPage() {
     <div className="space-y-5">
       <PageHeader title="Kết nối API" count={suppliers.length}>
         <Badge value={online ? 'Worker đang chạy' : 'Worker KHÔNG chạy'} tone={online ? 'green' : 'red'} />
-        {user.role === 'SUPER_ADMIN' && (
+        {can(user, 'suppliers.edit') && (
           <Link href="/admin/suppliers/new" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">+ Thêm API cần kết nối</Link>
         )}
       </PageHeader>
@@ -52,7 +53,7 @@ export default async function AdminSuppliersPage() {
               <tr>
                 <td colSpan={8} className="py-10 text-center text-zinc-500">
                   Chưa có kết nối API nào.{' '}
-                  {user.role === 'SUPER_ADMIN' && <Link href="/admin/suppliers/new" className="font-medium text-blue-600 hover:underline">Thêm kết nối đầu tiên</Link>}
+                  {can(user, 'suppliers.edit') && <Link href="/admin/suppliers/new" className="font-medium text-blue-600 hover:underline">Thêm kết nối đầu tiên</Link>}
                 </td>
               </tr>
             )}

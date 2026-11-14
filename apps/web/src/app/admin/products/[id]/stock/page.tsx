@@ -6,6 +6,7 @@ import { BatchActions, StockTable } from '@/components/admin/stock-actions';
 import { StockImport } from '@/components/admin/stock-import';
 import { Pagination } from '@/components/pagination';
 import { StatCard } from '@/components/stat-card';
+import { can } from '@/lib/permissions';
 import { requireStaff } from '@/lib/auth';
 import { formatDate } from '@/lib/format';
 import { buildHref } from '@/lib/url';
@@ -143,7 +144,7 @@ export default async function ProductStockPage({
 
         <StockTable
           productId={id}
-          canReveal={user.role === 'SUPER_ADMIN'}
+          canReveal={can(user, 'stock.reveal')}
           items={items.map((i) => ({
             id: i.id,
             status: i.status,

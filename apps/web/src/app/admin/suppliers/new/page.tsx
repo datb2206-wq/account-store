@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SupplierForm } from '@/components/admin/supplier-form';
 import { SupplierNotes } from '@/components/admin/supplier-notes';
 import { Panel } from '@/components/admin/ui';
+import { can } from '@/lib/permissions';
 import { requireStaff } from '@/lib/auth';
 
 export const metadata: Metadata = { title: 'Thêm API cần kết nối' };
@@ -19,7 +20,7 @@ export default async function NewSupplierPage() {
 
       <div className="grid items-start gap-5 xl:grid-cols-[1fr_400px]">
         <Panel title="Nhập thông tin API cần kết nối">
-          {user.role === 'SUPER_ADMIN' ? <SupplierForm /> : <p className="text-sm text-zinc-500">Chỉ SUPER_ADMIN được thêm kết nối API.</p>}
+          {can(user, 'suppliers.edit') ? <SupplierForm /> : <p className="text-sm text-zinc-500">Bạn không có quyền thêm kết nối API.</p>}
         </Panel>
         <SupplierNotes />
       </div>

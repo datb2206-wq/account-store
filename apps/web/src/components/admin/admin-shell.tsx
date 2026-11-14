@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BoxIcon, CartIcon, ChevronIcon, ClockIcon, CloseIcon, GiftIcon, GlobeIcon, GridIcon, ImageIcon, KeyIcon, LogoutIcon, MailIcon, ReceiptIcon, SparklesIcon, UsersIcon, WalletIcon,
+  BoxIcon, CartIcon, ChevronIcon, ClockIcon, CloseIcon, GiftIcon, GlobeIcon, GridIcon, ImageIcon, KeyIcon, LogoutIcon, MailIcon, ReceiptIcon, ShieldIcon, SparklesIcon, UsersIcon, WalletIcon,
 } from '@/components/icons';
+import { requiredPermission } from '@/lib/permissions';
 
 type Leaf = { label: string; href: string; badge?: number; badgeTone?: 'amber' | 'red' };
 type Item = Leaf & { icon: React.ComponentType<{ size?: number; className?: string }>; children?: Leaf[] };
@@ -17,13 +18,16 @@ export interface ShellProps {
   role: string;
   pendingDeposits: number;
   stuckOrders: number;
+  // Quyền thực tế của người đang đăng nhập (đã tính Super Admin / vai trò): menu ẩn mục không có quyền
+  permissions: string[];
+  roleName?: string;
   logoDarkUrl?: string;
   avatarUrl?: string;
   children: React.ReactNode;
 }
 
-function buildMenu({ role, pendingDeposits, stuckOrders }: Pick<ShellProps, 'role' | 'pendingDeposits' | 'stuckOrders'>): Section[] {
-  const superAdmin = role === 'SUPER_ADMIN';
+// Toàn bộ menu; filterMenu() bỏ những mục người đang đăng nhập không có quyền
+function buildMenu({ pendingDeposits, stuckOrders }: Pick<ShellProps, 'pendingDeposits' | 'stuckOrders'>): Section[] {
   return [
     { title: 'Main', items: [{ label: 'Dashboard', href: '/admin', icon: GridIcon }] },
     {
@@ -59,6 +63,7 @@ function buildMenu({ role, pendingDeposits, stuckOrders }: Pick<ShellProps, 'rol
       title: 'Quản lý',
       items: [
         { label: 'Thành viên', href: '/admin/users', icon: UsersIcon },
+        { label: 'Admin Role', href: '/admin/roles', icon: ShieldIcon },
         {
           label: 'Nạp tiền', href: '/admin/transactions', icon: WalletIcon, badge: pendingDeposits, badgeTone: 'amber',
           children: [
@@ -80,16 +85,14 @@ function buildMenu({ role, pendingDeposits, stuckOrders }: Pick<ShellProps, 'rol
         },
       ],
     },
-    ...(superAdmin
-      ? [{
-          title: 'Cài đặt hệ thống',
-          items: [
-            { label: 'Ngôn ngữ', href: '/admin/translations', icon: GlobeIcon },
-            { label: 'Giao diện', href: '/admin/theme', icon: ImageIcon },
-            { label: 'Cài đặt', href: '/admin/settings', icon: KeyIcon },
-          ],
-        }]
-      : []),
+    {
+      title: 'Cài đặt hệ thống',
+      items: [
+        { label: 'Ngôn ngữ', href: '/admin/translations', icon: GlobeIcon },
+        { label: 'Giao diện', href: '/admin/theme', icon: ImageIcon },
+        { label: 'Cài đặt', href: '/admin/settings', icon: KeyIcon },
+      ],
+    },
   ];
 }
 
@@ -112,9 +115,28 @@ function Count({ n, tone = 'amber' }: { n?: number; tone?: 'amber' | 'red' }) {
   return <span className={`ml-auto rounded-full px-1.5 text-[10px] leading-4 font-semibold text-white ${tone === 'red' ? 'bg-red-500' : 'bg-amber-500'}`}>{n}</span>;
 }
 
-export function AdminShell({ siteName, email, role, pendingDeposits, stuckOrders, logoDarkUrl, avatarUrl, children }: ShellProps) {
+// Bỏ mục / mục con không có quyền; mục cha còn lại 0 mục con thì bỏ luôn
+function filterMenu(menu: Section[], role: string, permissions: string[]): Section[] {
+  const visible = (href: string) => {
+    if (role === 'SUPER_ADMIN') return true;
+    const perm = requiredPermission(pathOf(href));
+    return perm === null || (perm !== 'deny' && permissions.includes(perm));
+  };
+  return menu
+    .map((s) => ({
+      ...s,
+      items: s.items.flatMap((i) => {
+        if (!i.children) return visible(i.href) ? [i] : [];
+        const children = i.children.filter((c) => visible(c.href));
+        return children.length ? [{ ...i, href: children[0]!.href, children }] : [];
+      }),
+    }))
+    .filter((s) => s.items.length > 0);
+}
+
+export function AdminShell({ siteName, email, role, pendingDeposits, stuckOrders, permissions, roleName, logoDarkUrl, avatarUrl, children }: ShellProps) {
   const pathname = usePathname();
-  const menu = buildMenu({ role, pendingDeposits, stuckOrders });
+  const menu = filterMenu(buildMenu({ pendingDeposits, stuckOrders }), role, permissions);
   const active = activeHref(pathname, menu);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -238,7 +260,7 @@ export function AdminShell({ siteName, email, role, pendingDeposits, stuckOrders
               )}
               <div className="hidden leading-tight md:block">
                 <p className="max-w-48 truncate text-sm font-medium text-zinc-800">{email}</p>
-                <p className="text-[11px] text-zinc-400">{role === 'SUPER_ADMIN' ? 'Super Admin' : 'Nhân viên'}</p>
+                <p className="text-[11px] text-zinc-400">{role === 'SUPER_ADMIN' ? 'Super Admin' : (roleName ?? 'Nhân viên')}</p>
               </div>
             </div>
             <button type="button" onClick={logout} title="Đăng xuất" aria-label="Đăng xuất" className="rounded-lg p-2 text-zinc-500 hover:bg-red-50 hover:text-red-600">

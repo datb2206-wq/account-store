@@ -104,6 +104,10 @@ model User {
   apiKeyHash    String?    @unique
   twoFactorSecret String?  // mã hóa trước khi lưu
 
+  // Vai trò quản trị (Admin > Admin Role). Chỉ áp dụng cho STAFF: null = quyền nhân viên mặc định
+  adminRoleId   String?
+  adminRole     AdminRole? @relation(fields: [adminRoleId], references: [id], onDelete: SetNull)
+
   lastLoginAt   DateTime?
   lastLoginIp   String?
   createdAt     DateTime   @default(now())
@@ -490,4 +494,18 @@ model UploadedFile {
   createdAt DateTime @default(now())
 
   @@map("uploaded_files")
+}
+
+// Vai trò quản trị: tập quyền (VD "orders.view") gán cho nhân viên. Danh sách quyền ở apps/web/src/lib/permissions.ts
+model AdminRole {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  permissions String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+
+  @@map("admin_roles")
 }

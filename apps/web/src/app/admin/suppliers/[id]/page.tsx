@@ -8,6 +8,7 @@ import { SupplierNotes } from '@/components/admin/supplier-notes';
 import { Panel } from '@/components/admin/ui';
 import { Badge } from '@/components/badge';
 import { StatCard } from '@/components/stat-card';
+import { can } from '@/lib/permissions';
 import { requireStaff } from '@/lib/auth';
 import { formatDate, formatUsd } from '@/lib/format';
 import { workerOnline } from '@/lib/queue';
@@ -137,7 +138,7 @@ export default async function AdminSupplierDetailPage({ params }: { params: Prom
           </p>
       </div>
 
-      {user.role === 'SUPER_ADMIN' && (
+      {can(user, 'suppliers.edit') && (
         <div className="grid items-start gap-5 xl:grid-cols-[1fr_400px]">
           <Panel title="Cài đặt kết nối API">
             <SupplierForm

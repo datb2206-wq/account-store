@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import { DomainError } from '@accszone/core';
 import type { Prisma } from '@accszone/database';
 import { getCurrentUser, STAFF_ROLES, type CurrentUser } from './auth';
+import { canAccess } from './permissions';
 import { blockedByMaintenance, MAINTENANCE_ERROR } from './site';
 import { isSameOrigin, jsonError, readJson } from './http';
 import { fieldErrors } from './validation';
@@ -42,10 +43,11 @@ function guardedRoute<C extends RouteContext>(handler: Handler<C>, access: Acces
 
     const user = await getCurrentUser();
     if (!user) return jsonError(401, 'Unauthorized');
+    // API admin: quyền theo đường dẫn + method (lib/permissions.ts). superAdminOnly cũ đều ứng với quyền
+    // mà nhân viên chưa gán vai trò không có, nên hành vi cũ được giữ nguyên.
     const allowed =
       access === 'user' ||
-      (access === 'staff' && STAFF_ROLES.includes(user.role)) ||
-      (access === 'superAdmin' && user.role === 'SUPER_ADMIN');
+      (STAFF_ROLES.includes(user.role) && canAccess(user, req.nextUrl.pathname, req.method));
     if (!allowed) return jsonError(403, 'Bạn không có quyền thực hiện thao tác này');
     if (access === 'user' && (await blockedByMaintenance(user))) return jsonError(503, MAINTENANCE_ERROR);
 

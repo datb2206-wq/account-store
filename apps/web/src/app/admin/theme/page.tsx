@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { ThemeSlot } from '@/components/admin/theme-slot';
 import { PageHeader, Panel } from '@/components/admin/ui';
 import { requireStaff } from '@/lib/auth';
@@ -14,8 +13,7 @@ const GROUPS: { title: string; keys: AssetKey[] }[] = [
 ];
 
 export default async function AdminThemePage() {
-  const user = await requireStaff();
-  if (user.role !== 'SUPER_ADMIN') redirect('/admin');
+  await requireStaff();
   const assets = await getSiteAssets();
 
   return (

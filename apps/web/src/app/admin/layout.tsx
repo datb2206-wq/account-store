@@ -3,6 +3,7 @@ import { AdminShell } from '@/components/admin/admin-shell';
 import { requireStaff } from '@/lib/auth';
 import { getSiteConfig } from '@/lib/site';
 import { getSiteAssets } from '@/lib/site-assets';
+import { ALL_PERMISSIONS, can } from '@/lib/permissions';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireStaff();
@@ -14,7 +15,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ]);
 
   return (
-    <AdminShell siteName={site.name} email={user.email} role={user.role} pendingDeposits={pendingDeposits} stuckOrders={stuckOrders} logoDarkUrl={assets.logoDark} avatarUrl={assets.avatar}>
+    <AdminShell siteName={site.name} email={user.email} role={user.role} pendingDeposits={pendingDeposits} stuckOrders={stuckOrders} permissions={ALL_PERMISSIONS.filter((p) => can(user, p))}
+      roleName={user.adminRole?.name}
+      logoDarkUrl={assets.logoDark} avatarUrl={assets.avatar}>
       {children}
     </AdminShell>
   );

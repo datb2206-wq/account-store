@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma, type Prisma, type Role, type UserStatus } from '@accszone/database';
+import { UserRoleButton } from '@/components/admin/user-role-button';
 import { UserStatusButton } from '@/components/admin/user-status-button';
 import { FilterBar, MiniStat, Panel } from '@/components/admin/ui';
 import { Badge } from '@/components/badge';
@@ -9,6 +10,7 @@ import { LocalTime } from '@/components/local-time';
 import { Pagination } from '@/components/pagination';
 import { requireStaff } from '@/lib/auth';
 import { formatUsd } from '@/lib/format';
+import { can } from '@/lib/permissions';
 import { buildHref } from '@/lib/url';
 
 export const metadata: Metadata = { title: 'Thành viên' };
@@ -18,19 +20,21 @@ const PAGE_SIZE = 20;
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; role?: string; status?: string; sort?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; role?: string; adminRole?: string; status?: string; sort?: string; page?: string }>;
 }) {
   const admin = await requireStaff();
   const params = await searchParams;
   const q = params.q?.trim() ?? '';
   const role = (['USER', 'STAFF', 'SUPER_ADMIN'] as Role[]).find((r) => r === params.role);
   const status = (['ACTIVE', 'BANNED', 'PENDING_VERIFY'] as UserStatus[]).find((x) => x === params.status);
+  const adminRole = params.adminRole?.trim() || undefined;
   const sort = params.sort === 'balance' ? 'balance' : undefined;
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1);
 
   const where: Prisma.UserWhereInput = {
     role,
     status,
+    adminRoleId: adminRole,
     OR: q ? [{ email: { contains: q, mode: 'insensitive' } }, { username: { contains: q, mode: 'insensitive' } }, { id: q }] : undefined,
   };
 
@@ -51,6 +55,8 @@ export default async function AdminUsersPage({
         createdAt: true,
         lastLoginAt: true,
         lastLoginIp: true,
+        adminRoleId: true,
+        adminRole: { select: { name: true } },
       },
     }),
     prisma.user.count(),
@@ -58,6 +64,8 @@ export default async function AdminUsersPage({
     prisma.user.count({ where: { role: { not: 'USER' } } }),
     prisma.user.count({ where: { status: 'BANNED' } }),
   ]);
+  const canAssign = can(admin, 'roles.manage');
+  const adminRoles = canAssign ? await prisma.adminRole.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }) : [];
   // Tổng tiền đã nạp (giao dịch nạp hoàn tất) của các thành viên đang hiện
   const deposits = await prisma.transaction.groupBy({
     by: ['userId'],
@@ -65,7 +73,7 @@ export default async function AdminUsersPage({
     _sum: { amount: true },
   });
   const depositOf = new Map(deposits.map((d) => [d.userId, d._sum.amount]));
-  const filters = { q: q || undefined, role, status, sort };
+  const filters = { q: q || undefined, role, adminRole, status, sort };
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
@@ -118,7 +126,10 @@ export default async function AdminUsersPage({
                       <p className="font-medium text-indigo-600">{u.email}</p>
                       <p className="text-xs text-zinc-400">{u.username ?? u.id}</p>
                     </td>
-                    <td><Badge value={u.role} /></td>
+                    <td>
+                      <Badge value={u.role} />
+                      {u.adminRole && <p className="mt-0.5 text-xs text-violet-700">{u.adminRole.name}</p>}
+                    </td>
                     <td><Badge value={u.status} /></td>
                     <td className="text-right font-semibold text-blue-700 tabular-nums">{formatUsd(u.balance)}</td>
                     <td className="text-right text-emerald-600 tabular-nums">{formatUsd(depositOf.get(u.id))}</td>
@@ -130,7 +141,10 @@ export default async function AdminUsersPage({
                     <td className="text-right whitespace-nowrap">
                       <Link href={buildHref('/admin/balance-logs', { q: u.email })} className="mr-2 text-xs font-medium text-indigo-600 hover:underline">Số dư</Link>
                       <Link href={buildHref('/admin/activity', { q: u.email })} className="mr-2 text-xs font-medium text-indigo-600 hover:underline">Nhật ký</Link>
-                      {admin.role === 'SUPER_ADMIN' && u.role !== 'SUPER_ADMIN' && <UserStatusButton id={u.id} email={u.email} banned={u.status === 'BANNED'} />}
+                      {canAssign && u.role !== 'SUPER_ADMIN' && u.id !== admin.id && (
+                        <UserRoleButton id={u.id} email={u.email} role={u.role === 'STAFF' ? 'STAFF' : 'USER'} adminRoleId={u.adminRoleId} roles={adminRoles} />
+                      )}
+                      {can(admin, 'users.edit') && u.role !== 'SUPER_ADMIN' && (u.role !== 'STAFF' || admin.role === 'SUPER_ADMIN') && <UserStatusButton id={u.id} email={u.email} banned={u.status === 'BANNED'} />}
                     </td>
                   </tr>
                 ))}

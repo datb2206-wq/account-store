@@ -1,10 +1,11 @@
 // Chỉ dùng phía server (Route Handler / Server Component).
 import { randomUUID } from 'node:crypto';
 import { cache } from 'react';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { NextResponse } from 'next/server';
 import { prisma, type Role } from '@accszone/database';
+import { ADMIN_LANDING_PAGES, canAccess } from './permissions';
 import { getRedis } from './redis';
 import {
   ACCESS_COOKIE,
@@ -93,6 +94,7 @@ const userSelect = {
   currency: true,
   createdAt: true,
   lastLoginAt: true,
+  adminRole: { select: { id: true, name: true, permissions: true } },
 } as const;
 
 // cache(): nhiều Server Component cùng gọi trong 1 request chỉ query DB 1 lần.
@@ -118,8 +120,16 @@ export async function requireUser() {
 
 export const STAFF_ROLES: Role[] = ['STAFF', 'SUPER_ADMIN'];
 
+// Trang admin: phải là nhân viên VÀ có quyền với trang đang mở (lib/permissions.ts).
+// Middleware gắn header x-pathname cho mọi request /admin để biết trang đang mở.
 export async function requireStaff() {
   const user = await requireUser();
   if (!STAFF_ROLES.includes(user.role)) redirect('/dashboard');
+  const pathname = (await headers()).get('x-pathname');
+  if (pathname && !canAccess(user, pathname)) {
+    // Vào /admin mà không có quyền Dashboard -> chuyển tới trang đầu tiên được phép, thay vì báo lỗi
+    const landing = pathname === '/admin' ? ADMIN_LANDING_PAGES.find((p) => canAccess(user, p)) : undefined;
+    redirect(landing ?? '/admin/forbidden');
+  }
   return user;
 }

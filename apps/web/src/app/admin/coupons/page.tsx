@@ -3,6 +3,7 @@ import { prisma } from '@accszone/database';
 import { ActionButton, QuickForm } from '@/components/admin/quick-form';
 import { PageHeader, Panel } from '@/components/admin/ui';
 import { LocalTime } from '@/components/local-time';
+import { can } from '@/lib/permissions';
 import { requireStaff } from '@/lib/auth';
 import { formatUsd, localized } from '@/lib/format';
 
@@ -17,7 +18,7 @@ export default async function CouponsPage() {
   ]);
   const productName = new Map(products.map((p) => [p.id, localized(p.name)]));
   const discountOf = new Map(discounts.map((d) => [d.couponId, d._sum.discountAmount]));
-  const superAdmin = admin.role === 'SUPER_ADMIN';
+  const superAdmin = can(admin, 'coupons.edit');
   const now = new Date();
 
   return (

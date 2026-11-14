@@ -15,6 +15,7 @@ export const PATCH = adminRoute<Ctx>(
     const target = await prisma.user.findUnique({ where: { id }, select: { status: true, role: true } });
     if (!target) throw notFound('Không tìm thấy người dùng');
     if (id === user.id || target.role === 'SUPER_ADMIN') throw badRequest('Không thể khóa tài khoản Super Admin');
+    if (target.role === 'STAFF' && user.role !== 'SUPER_ADMIN') throw badRequest('Chỉ Super Admin được khóa tài khoản nhân viên');
 
     await prisma.user.update({ where: { id }, data: { status } });
     await writeAudit({

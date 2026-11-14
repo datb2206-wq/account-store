@@ -4,6 +4,7 @@ import { ActionButton, QuickForm } from '@/components/admin/quick-form';
 import { MiniStat, PageHeader, Panel } from '@/components/admin/ui';
 import { GiftIcon, WalletIcon } from '@/components/icons';
 import { LocalTime } from '@/components/local-time';
+import { can } from '@/lib/permissions';
 import { requireStaff } from '@/lib/auth';
 import { formatUsd } from '@/lib/format';
 
@@ -15,7 +16,7 @@ export default async function DepositPromotionsPage() {
     prisma.depositBonus.findMany({ orderBy: { minAmount: 'asc' } }),
     prisma.transaction.aggregate({ where: { type: 'BONUS', status: 'COMPLETED' }, _sum: { amount: true }, _count: true }),
   ]);
-  const superAdmin = admin.role === 'SUPER_ADMIN';
+  const superAdmin = can(admin, 'promotions.edit');
 
   return (
     <div className="space-y-5">

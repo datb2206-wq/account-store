@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
 import { prisma } from '@accszone/database';
 import { ConfigForm } from '@/components/admin/config-form';
 import { requireStaff } from '@/lib/auth';
@@ -17,8 +16,7 @@ const HELP: Record<string, string> = {
 };
 
 export default async function AdminSettingsPage() {
-  const user = await requireStaff();
-  if (user.role !== 'SUPER_ADMIN') redirect('/admin');
+  await requireStaff();
 
   const rows = await prisma.systemConfig.findMany();
   const byKey = new Map(rows.map((r) => [r.key, r]));

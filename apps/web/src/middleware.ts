@@ -23,6 +23,12 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith('/admin') && session.role === 'USER') {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
+  if (pathname.startsWith('/admin')) {
+    // requireStaff() đọc header này để kiểm tra quyền theo trang đang mở (lib/permissions.ts)
+    const headers = new Headers(req.headers);
+    headers.set('x-pathname', pathname);
+    return NextResponse.next({ request: { headers } });
+  }
   return NextResponse.next();
 }
 
