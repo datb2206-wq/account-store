@@ -42,10 +42,14 @@ export default async function AdminSettingsPage() {
           Webhook ngân hàng (Casso/SePay…): <code className="font-mono">POST https://{host}/api/webhooks/bank</code> với header{' '}
           <code>x-webhook-secret</code>.
         </p>
+        <p className="text-zinc-500">
+          Tỷ giá (dùng quy đổi tiền nạp ngân hàng và giá Via79) nằm ở trang <a href="/admin/currencies" className="text-indigo-600 hover:underline">Tiền tệ</a>.
+        </p>
       </section>
 
       <div className="grid items-start gap-6 xl:grid-cols-2">
-        {Object.keys(CONFIG_SCHEMAS).map((key) => (
+        {/* Tỷ giá & hiển thị tiền tệ có trang riêng: Admin > Tiền tệ */}
+        {Object.keys(CONFIG_SCHEMAS).filter((key) => !key.startsWith('currency.')).map((key) => (
           <ConfigForm
             key={key}
             configKey={key}

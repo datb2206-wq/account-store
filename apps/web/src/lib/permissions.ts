@@ -48,7 +48,7 @@ export const PERMISSION_GROUPS = [
   { group: 'Khuyến mãi nạp', items: [['promotions.view', 'Xem mốc khuyến mãi nạp'], ['promotions.edit', 'Thêm, sửa, xóa mốc khuyến mãi']] },
   { group: 'Bài viết', items: [['blog.view', 'Xem bài viết & chuyên mục'], ['blog.edit', 'Viết, sửa, xóa bài viết & chuyên mục']] },
   { group: 'Phân quyền', items: [['roles.manage', 'Quản lý vai trò & gán quyền cho nhân viên (quyền rất cao)']] },
-  { group: 'Cài đặt', items: [['settings.edit', 'Cài đặt, ngôn ngữ, giao diện website']] },
+  { group: 'Cài đặt', items: [['settings.edit', 'Cài đặt, ngôn ngữ, tiền tệ, giao diện website']] },
 ] as const;
 
 export type Permission = (typeof PERMISSION_GROUPS)[number]['items'][number][0];
@@ -102,6 +102,7 @@ const ROUTE_RULES: Rule[] = [
   ['/admin/settings', 'settings.edit'],
   ['/admin/translations', 'settings.edit'],
   ['/admin/theme', 'settings.edit'],
+  ['/admin/currencies', 'settings.edit'],
 
   // ---- API ----
   ['/api/admin/adjustments', 'users.balance'],
@@ -114,6 +115,7 @@ const ROUTE_RULES: Rule[] = [
   ['/api/admin/config', 'settings.edit'],
   ['/api/admin/translations', 'settings.edit'],
   ['/api/admin/theme', 'settings.edit'],
+  ['/api/admin/currencies', 'settings.edit'],
   ['/api/admin/coupons', 'coupons.edit'],
   ['/api/admin/deposit-bonuses', 'promotions.edit'],
   ['/api/admin/orders/', 'orders.manage'],

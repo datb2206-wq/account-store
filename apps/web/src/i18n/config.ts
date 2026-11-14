@@ -52,21 +52,21 @@ export function plural(locale: Locale, n: number, forms: Plural) {
   return fmt(forms[category] ?? forms.other, { n: n.toLocaleString('en-US') });
 }
 
-// Tiền tệ hiển thị tham khảo theo ngôn ngữ. Số dư & thanh toán luôn tính bằng USD;
-// giá quy đổi chỉ hiện thêm dạng "≈", tỷ giá lấy từ Admin > Cấu hình > currency.rates.
+// Tiền tệ hiển thị tham khảo mặc định theo ngôn ngữ (khi khách chưa chọn và admin để "Tự động").
+// Số dư & thanh toán luôn tính bằng USD; giá quy đổi chỉ hiện thêm dạng "≈". Tỷ giá: Admin > Tiền tệ.
 export const LOCALE_CURRENCY: Record<Locale, string> = { en: 'USD', id: 'IDR', ru: 'RUB', zh: 'CNY' };
 
-export type Fx = { currency: string; rate: number } | null;
+// decimals: số chữ số lẻ admin đặt cho tiền đó (Admin > Tiền tệ)
+export type Fx = { currency: string; rate: number; decimals?: number } | null;
 
 const fxFormatters = new Map<string, Intl.NumberFormat>();
 
 export function formatFx(usd: number | string, fx: Fx, locale: Locale): string | null {
   if (!fx) return null;
-  const key = `${locale}:${fx.currency}`;
+  const digits = fx.decimals ?? (fx.currency === 'IDR' ? 0 : 2);
+  const key = `${locale}:${fx.currency}:${digits}`;
   let f = fxFormatters.get(key);
   if (!f) {
-    // Rupiah không dùng số lẻ; các loại khác 2 chữ số
-    const digits = fx.currency === 'IDR' ? 0 : 2;
     f = new Intl.NumberFormat(LOCALE_META[locale].htmlLang, { style: 'currency', currency: fx.currency, minimumFractionDigits: 0, maximumFractionDigits: digits });
     fxFormatters.set(key, f);
   }

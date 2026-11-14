@@ -33,6 +33,21 @@ export const CONFIG_SCHEMAS = {
   'currency.rates': z
     .record(z.string().regex(/^[A-Z]{3}$/), z.number().positive())
     .refine((r) => r.USD === 1, 'Tỷ giá USD phải bằng 1'),
+  // Hiển thị tiền tệ cho khách (Admin > Tiền tệ). Tỷ giá vẫn nằm ở currency.rates.
+  // defaultCurrency: "AUTO" = theo ngôn ngữ khách chọn; mã tiền tệ = mặc định quy đổi sang tiền đó (khách vẫn đổi được)
+  'currency.display': z.object({
+    defaultCurrency: z.string().trim().toUpperCase().regex(/^([A-Z]{3}|AUTO)$/, 'Mã tiền tệ gồm 3 chữ cái'),
+    currencies: z
+      .array(
+        z.object({
+          code: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, 'Mã tiền tệ gồm 3 chữ cái'),
+          name: z.string().trim().min(1).max(50),
+          decimals: z.number().int().min(0).max(8),
+          enabled: z.boolean(),
+        }),
+      )
+      .max(50),
+  }),
   'site.general': z.object({
     name: z.string().trim().min(1),
     // Ảnh logo riêng (SVG/PNG nền trong suốt, cao ~64px): file trong apps/web/public ("/logo.svg")
