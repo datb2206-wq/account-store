@@ -19,6 +19,7 @@ const TYPE_LABEL: Record<TransactionType, string> = {
   ADJUSTMENT: 'Admin cộng / trừ',
   BONUS: 'Khuyến mãi nạp tiền',
   COMMISSION: 'Rút hoa hồng giới thiệu',
+  SELLER: 'CTV rút tiền bán hàng',
 };
 
 export default async function BalanceLogsPage({ searchParams }: { searchParams: Promise<Partial<Record<string, string>>> }) {

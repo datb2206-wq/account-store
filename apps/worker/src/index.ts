@@ -9,7 +9,7 @@
 //   fulfill-order    theo sự kiện -> web đẩy vào ngay khi khách mua hàng RESELLER
 import { Queue, Worker, type Job } from 'bullmq';
 import { prisma } from '@accszone/database';
-import { AUTOMATION_EVERY_MS, decrypt, expireStaleDeposits, fulfillResellerOrder, getAdapter, notifyLowBalance, processEmailCampaigns, runDueAutomations, scanUsdtDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
+import { AUTOMATION_EVERY_MS, backfillSellerEarnings, decrypt, expireStaleDeposits, fulfillResellerOrder, getAdapter, notifyLowBalance, processEmailCampaigns, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
 import {
   FULFILL_JOB_OPTIONS,
   fulfillJobId,
@@ -115,8 +115,14 @@ async function processJob(job: Job) {
     case JOBS.emailCampaigns:
       return processEmailCampaigns(log('email'));
 
-    case JOBS.automations:
+    case JOBS.automations: {
+      // CTV: tiền bán hàng hết thời gian giữ -> vào số dư người bán
+      const backfilled = await backfillSellerEarnings();
+      if (backfilled) log('ctv').info(`backfilled ${backfilled} seller earnings`);
+      const released = await releaseSellerEarnings();
+      if (released) log('ctv').info(`released ${released} seller earnings`);
       return runDueAutomations(log('auto'));
+    }
 
     case JOBS.updateFx:
       if (!FX_RATES_URL) return { skipped: true };

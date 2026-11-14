@@ -65,6 +65,7 @@ enum TransactionType {
   ADJUSTMENT // admin cộng/trừ tay
   BONUS // tiền thưởng khuyến mãi nạp tiền
   COMMISSION // chuyển hoa hồng giới thiệu vào số dư
+  SELLER // CTV chuyển tiền bán hàng vào số dư mua hàng
 }
 
 enum TransactionStatus {
@@ -126,6 +127,7 @@ model User {
   updatedAt     DateTime   @updatedAt
 
   orders        Order[]
+  seller        Seller?
   transactions  Transaction[]         @relation("UserTransactions")
   reviewedTxs   Transaction[]         @relation("ReviewedTransactions")
   auditLogs     AuditLog[]
@@ -193,9 +195,15 @@ model Product {
 
   stockItems   StockItem[]
   orders       Order[]
+  // CTV: sản phẩm do người bán ngoài đăng, phải được admin duyệt mới hiện
+  sellerId     String?
+  seller       Seller?         @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  approval     ProductApproval @default(APPROVED)
+  rejectReason String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
+  @@index([sellerId])
   @@unique([supplierId, externalId])
   @@index([categoryId, isActive, sortOrder])
   @@map("products")
@@ -609,4 +617,82 @@ model AffiliateWithdrawal {
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
   @@map("affiliate_withdrawals")
+}
+
+// -------------------------------------------------------------
+//  CTV (người bán ngoài đăng bán hàng trên web)
+// -------------------------------------------------------------
+enum SellerStatus {
+  PENDING // đã đăng ký, chờ admin duyệt
+  ACTIVE
+  SUSPENDED // tạm khóa: sản phẩm bị ẩn, không rút tiền
+  REJECTED
+}
+
+enum ProductApproval {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+model Seller {
+  id                String       @id @default(cuid())
+  userId            String       @unique
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopName          String
+  contact           String       @default("") // Telegram / Zalo để admin liên hệ
+  intro             String       @default("") // giới thiệu hàng sẽ bán (lúc đăng ký)
+  status            SellerStatus @default(PENDING)
+  commissionPercent Decimal?     @db.Decimal(5, 2) // phí sàn riêng cho CTV này; null = mặc định
+  balance           Decimal      @default(0) @db.Decimal(18, 6) // tiền bán hàng có thể rút (có thể âm khi đơn bị hoàn sau khi đã rút)
+  adminNote         String       @default("")
+  approvedAt        DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  products    Product[]
+  earnings    SellerEarning[]
+  withdrawals SellerWithdrawal[]
+
+  @@index([status])
+  @@map("sellers")
+}
+
+// Tiền CTV nhận từ 1 đơn: (tiền thực thu − hoàn) × (100 − phí sàn)%. HOLD đến releaseAt rồi mới vào số dư.
+model SellerEarning {
+  id          String   @id @default(cuid())
+  sellerId    String
+  seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  orderId     String   @unique
+  orderAmount Decimal  @db.Decimal(18, 6)
+  feePercent  Decimal  @db.Decimal(5, 2)
+  amount      Decimal  @db.Decimal(18, 6)
+  status      String   @default("HOLD") // HOLD | AVAILABLE | REVERSED
+  releaseAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([sellerId, createdAt(sort: Desc)])
+  @@index([status, releaseAt])
+  @@map("seller_earnings")
+}
+
+model SellerWithdrawal {
+  id           String    @id @default(cuid())
+  sellerId     String
+  seller       Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  amount       Decimal   @db.Decimal(18, 6)
+  method       String // balance | bank
+  bankName     String    @default("")
+  accountNo    String    @default("")
+  accountName  String    @default("")
+  status       String    @default("PENDING") // PENDING | COMPLETED | REJECTED
+  note         String    @default("")
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([sellerId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("seller_withdrawals")
 }

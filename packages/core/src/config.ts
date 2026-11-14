@@ -20,7 +20,7 @@ export const CONTENT_PAGES = ['policy', 'terms', 'faq', 'contact'] as const;
 export type ContentPage = (typeof CONTENT_PAGES)[number];
 
 // Key có trang quản trị riêng (giữ bí mật, xóa cache…): trang Cấu hình chung không hiển thị / không ghi các key này
-export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual'] as const;
+export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual', 'ctv'] as const;
 
 // Nhà mạng thẻ cào theo chuẩn API chargingws/v2 của các web đổi thẻ
 export const CARD_TELCOS = ['VIETTEL', 'VINAPHONE', 'MOBIFONE', 'VIETNAMOBILE', 'ZING', 'GATE', 'VCOIN', 'GARENA'] as const;
@@ -135,6 +135,17 @@ export const CONFIG_SCHEMAS = {
     channelUrl: z.string().trim().max(200).default(''),
     resellerApiUrl: z.string().trim().max(200).default(''),
     maintenance: z.boolean(),
+  }),
+  // CTV: người bán ngoài đăng sản phẩm, web giữ phí sàn, phần còn lại cộng cho người bán
+  ctv: z.object({
+    enabled: z.boolean(),
+    allowApply: z.boolean(), // khách tự đăng ký làm CTV (admin vẫn duyệt)
+    commissionPercent: z.number().min(0).max(90), // phí sàn mặc định
+    holdHours: z.number().int().min(0).max(24 * 60), // "Cộng tiền người bán": 0 = ngay khi bán, >0 = sau N giờ (thời gian bảo hành)
+    autoApproveProducts: z.boolean(),
+    minWithdraw: z.number().min(0).max(100_000),
+    allowBalance: z.boolean(),
+    allowBank: z.boolean(),
   }),
   // Thẻ cào: gửi thẻ sang đối tác đổi thẻ (API chargingws/v2), đối tác gọi callback báo kết quả
   'payment.card': z.object({

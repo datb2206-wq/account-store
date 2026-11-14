@@ -37,7 +37,7 @@ export default async function AdminProductsPage({
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { category: { select: { name: true } } },
+      include: { category: { select: { name: true } }, seller: { select: { shopName: true } } },
     }),
     prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { id: true, parentId: true, name: true } }),
   ]);
@@ -102,6 +102,8 @@ export default async function AdminProductsPage({
                   <td className="space-x-1">
                     <Badge value={p.isActive ? 'Đang bán' : 'Đã ẩn'} tone={p.isActive ? 'green' : 'gray'} />
                     {p.source === 'RESELLER' && <Badge value="RESELLER" tone="blue" />}
+                    {p.seller && <Badge value={`CTV · ${p.seller.shopName}`} tone="blue" />}
+                    {p.approval !== 'APPROVED' && <Badge value={p.approval === 'PENDING' ? 'Chờ duyệt' : 'Bị từ chối'} tone="gray" />}
                   </td>
                   <td className="space-x-3 text-right text-sm font-medium whitespace-nowrap">
                     <Link href={`/admin/products/${p.id}`} className="text-blue-600 hover:underline">Sửa</Link>

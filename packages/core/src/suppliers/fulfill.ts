@@ -6,6 +6,7 @@ import { contentHash, decrypt, encrypt } from '../crypto';
 import { domainError } from '../errors';
 import { pickRandomStock } from '../stock';
 import { creditCommission, reverseCommission } from '../affiliate';
+import { syncSellerEarning } from '../sellers';
 import { notifyRefund } from '../telegram';
 import { getAdapter } from './adapters';
 import { SupplierTransientError, type SupplierOrderResult } from './generic-adapter';
@@ -61,6 +62,7 @@ export async function refundOrder(orderId: string, internalReason: string, exter
   await audit('order.refund', orderId, { reason: internalReason });
   await notifyRefund(orderId, refunded, internalReason);
   await reverseCommission(orderId);
+  await syncSellerEarning(orderId);
   return true;
 }
 
@@ -171,6 +173,7 @@ export async function manualRefundOrder(input: { orderId: string; amount?: strin
   });
   await notifyRefund(input.orderId, result.amount, `Admin hoàn tay: ${input.reason}`);
   if (result.full) await reverseCommission(input.orderId);
+  await syncSellerEarning(input.orderId); // CTV: tính lại tiền bán hàng theo phần còn thực thu
   return result;
 }
 

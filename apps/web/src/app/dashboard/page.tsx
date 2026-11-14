@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getAffiliateSettings } from '@accszone/core';
+import { getAffiliateSettings, getCtvSettings } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
 import { LocalTime } from '@/components/local-time';
@@ -22,6 +22,9 @@ export default async function DashboardPage() {
   const { locale, d } = await getI18n();
   const t = d.dashboard;
   const affiliateOn = (await getAffiliateSettings()).enabled;
+  // Kênh CTV: hiện khi đang mở đăng ký, hoặc user đã là CTV
+  const ctv = await getCtvSettings();
+  const sellerOn = ctv.enabled && (ctv.allowApply || !!(await prisma.seller.findUnique({ where: { userId: user.id }, select: { id: true } })));
 
   const [completed, recentOrders, recentTxs] = await Promise.all([
     prisma.order.aggregate({
@@ -58,7 +61,10 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-semibold">{fmt(t.hi, { name: user.username ?? user.email.split('@')[0] ?? '' })}</h1>
         <p className="text-sm text-zinc-500">{rich(t.memberSince, { date: <LocalTime value={user.createdAt} /> })}</p>
       </div>
-        {affiliateOn && <Link href="/dashboard/affiliate" className="btn-ghost border border-zinc-200">🎁 {d.affiliate.menu}</Link>}
+        <div className="flex flex-wrap gap-2">
+          {affiliateOn && <Link href="/dashboard/affiliate" className="btn-ghost border border-zinc-200">🎁 {d.affiliate.menu}</Link>}
+          {sellerOn && <Link href="/dashboard/seller" className="btn-ghost border border-zinc-200">🏪 {d.seller.menu}</Link>}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

@@ -87,6 +87,14 @@ function buildMenu({ pendingDeposits, stuckOrders }: Pick<ShellProps, 'pendingDe
           ],
         },
         {
+          label: 'CTV (người bán)', href: '/admin/ctv', icon: StoreIcon,
+          children: [
+            { label: 'Cấu hình & CTV', href: '/admin/ctv' },
+            { label: 'Sản phẩm chờ duyệt', href: '/admin/ctv/products' },
+            { label: 'Lệnh rút tiền', href: '/admin/ctv/withdrawals' },
+          ],
+        },
+        {
           label: 'Affiliate Program', href: '/admin/affiliate', icon: UsersIcon,
           children: [
             { label: 'Cấu hình & hoa hồng', href: '/admin/affiliate' },

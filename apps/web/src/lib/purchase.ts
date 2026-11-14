@@ -1,6 +1,6 @@
 // Luồng mua hàng bằng số dư. Chỉ dùng phía server.
 import { prisma, type Prisma } from '@accszone/database';
-import { decrypt, fulfillResellerOrder, newOrderCode, pickRandomStock } from '@accszone/core';
+import { decrypt, fulfillResellerOrder, getCtvSettings, newOrderCode, pickRandomStock, sellerFee } from '@accszone/core';
 import { invalidateCache, SHOP_STOCK_CACHE } from './cache';
 import { consumeCoupon, CouponError, evaluateCoupon } from './coupons';
 import { localized } from './format';
@@ -128,11 +128,18 @@ async function runPurchase(tx: Prisma.TransactionClient, input: PurchaseInput, k
       supplierId: true,
       supplier: { select: { isActive: true } },
       category: { select: { isActive: true } },
+      approval: true,
+      seller: { select: { status: true, commissionPercent: true } },
     },
   });
-  if (!product || !product.isActive || !product.category.isActive) {
+  // Sản phẩm CTV: phải được duyệt và CTV đang hoạt động
+  if (!product || !product.isActive || !product.category.isActive || product.approval !== 'APPROVED' || (product.seller && product.seller.status !== 'ACTIVE')) {
     throw new PurchaseError(404, 'This product is not available');
   }
+  // Giá vốn của hàng CTV = phần trả cho CTV (lãi của web = phí sàn)
+  const unitCost = product.seller
+    ? product.price.mul(sellerFee(product.seller, await getCtvSettings()).neg().add(100)).div(100).toDecimalPlaces(6)
+    : product.costPrice;
   const reseller = product.source === 'RESELLER';
   if (reseller && (!product.supplier?.isActive || !product.externalId)) {
     throw new PurchaseError(400, 'This product is temporarily unavailable');
@@ -157,7 +164,7 @@ async function runPurchase(tx: Prisma.TransactionClient, input: PurchaseInput, k
       productId,
       quantity,
       unitPrice: product.price,
-      unitCost: product.costPrice,
+      unitCost,
       totalAmount: total,
       status: 'PENDING',
       idempotencyKey: key,
