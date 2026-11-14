@@ -3,10 +3,9 @@ import { prisma } from '@accszone/database';
 import { jsonError } from './http';
 import { rateLimit, resetRateLimit } from './rate-limit';
 import { getRedis } from './redis';
+import { getSecurity } from './security';
 
-// Đăng nhập sai AUTO_BLOCK_ATTEMPTS lần trong 15 phút từ cùng 1 IP -> tự chặn IP đó AUTO_BLOCK_HOURS giờ
-export const AUTO_BLOCK_ATTEMPTS = 5;
-const AUTO_BLOCK_HOURS = 24;
+// Đăng nhập sai N lần trong 15 phút từ cùng 1 IP -> tự chặn IP đó M giờ (N, M: Admin > Bảo mật; mặc định 5 lần / 24 giờ)
 const CACHE_SEC = 60;
 const cacheKey = (ip: string) => `ipblock:${ip}`;
 
@@ -38,12 +37,14 @@ export async function clearIpBlockCache(ip: string) {
 /** Gọi khi đăng nhập sai mật khẩu. Trả về true nếu IP vừa bị tự động chặn. */
 export async function recordFailedLogin(ip: string) {
   if (!ip || ip === 'unknown') return false;
-  const r = await rateLimit(`loginfail:ip:${ip}`, AUTO_BLOCK_ATTEMPTS - 1, 15 * 60);
+  const { loginFailIpLimit: limit, autoBlockHours: hours } = await getSecurity();
+  const r = await rateLimit(`loginfail:ip:${ip}`, limit - 1, 15 * 60);
   if (r.ok) return false;
+  const expiresAt = new Date(Date.now() + hours * 3_600_000);
   await prisma.blockedIp.upsert({
     where: { ip },
-    create: { ip, reason: 'Đăng nhập thất bại quá nhiều lần', attempts: AUTO_BLOCK_ATTEMPTS, expiresAt: new Date(Date.now() + AUTO_BLOCK_HOURS * 3_600_000) },
-    update: { reason: 'Đăng nhập thất bại quá nhiều lần', attempts: { increment: AUTO_BLOCK_ATTEMPTS }, expiresAt: new Date(Date.now() + AUTO_BLOCK_HOURS * 3_600_000) },
+    create: { ip, reason: 'Đăng nhập thất bại quá nhiều lần', attempts: limit, expiresAt },
+    update: { reason: 'Đăng nhập thất bại quá nhiều lần', attempts: { increment: limit }, expiresAt },
   });
   await Promise.all([clearIpBlockCache(ip), resetRateLimit(`loginfail:ip:${ip}`)]);
   return true;

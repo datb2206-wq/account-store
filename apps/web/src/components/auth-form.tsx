@@ -2,16 +2,20 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useI18n } from '@/i18n/client';
 import { translateError } from '@/i18n/errors';
+import { Turnstile, type TurnstileHandle } from './turnstile';
 
 type Field = 'email' | 'password' | 'username' | 'confirmPassword';
 type FieldErrors = Partial<Record<Field, string[]>>;
 
-export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next: string | null }) {
+// captchaSiteKey: có khi admin bật Captcha cho form này (Admin > Bảo mật)
+export function AuthForm({ mode, next, captchaSiteKey }: { mode: 'login' | 'register'; next: string | null; captchaSiteKey?: string }) {
   const router = useRouter();
-  const { d } = useI18n();
+  const { d, locale } = useI18n();
+  const captcha = useRef<TurnstileHandle>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const t = d.auth;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,15 +33,21 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next: str
       return;
     }
 
+    if (captchaSiteKey && !captchaToken) {
+      setError(d.errors.captchaRequired);
+      return;
+    }
+
     setPending(true);
     try {
       const res = await fetch(`/api/auth/${mode}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(captchaToken ? { ...body, captchaToken } : body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        captcha.current?.reset(); // token đã dùng -> lấy token mới
         setError(data.error ? translateError(data.error, d) : t.genericError);
         // Lỗi từng ô cũng là tiếng Anh từ server -> dịch luôn
         setFields(
@@ -89,6 +99,8 @@ export function AuthForm({ mode, next }: { mode: 'login' | 'register'; next: str
           errors={fields.confirmPassword}
         />
       )}
+
+      {captchaSiteKey && <Turnstile ref={captcha} siteKey={captchaSiteKey} onToken={setCaptchaToken} language={locale} />}
 
       <button type="submit" className="btn-primary w-full" disabled={pending}>
         {pending ? <span key="w">{t.wait}</span> : <span key="s">{isRegister ? t.createAccount : t.signIn}</span>}

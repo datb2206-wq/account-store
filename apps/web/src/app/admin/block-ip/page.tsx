@@ -6,7 +6,7 @@ import { FilterBar, PageHeader, Panel } from '@/components/admin/ui';
 import { LocalTime } from '@/components/local-time';
 import { Pagination } from '@/components/pagination';
 import { requireStaff } from '@/lib/auth';
-import { AUTO_BLOCK_ATTEMPTS } from '@/lib/ip-block';
+import { getSecurity } from '@/lib/security';
 import { buildHref } from '@/lib/url';
 
 export const metadata: Metadata = { title: 'Block IP' };
@@ -24,6 +24,7 @@ export default async function BlockIpPage({ searchParams }: { searchParams: Prom
     prisma.blockedIp.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
   ]);
   const now = new Date();
+  const security = await getSecurity();
 
   return (
     <div className="space-y-5">
@@ -41,7 +42,7 @@ export default async function BlockIpPage({ searchParams }: { searchParams: Prom
           ]}
         />
         <p className="mt-3 text-xs text-zinc-400">
-          IP bị chặn không đăng nhập, đăng ký, mua hàng hay tạo lệnh nạp được. Hệ thống tự chặn 24 giờ IP đăng nhập sai {AUTO_BLOCK_ATTEMPTS} lần trong 15 phút.
+          IP bị chặn không đăng nhập, đăng ký, mua hàng hay tạo lệnh nạp được. Hệ thống tự chặn {security.autoBlockHours} giờ IP đăng nhập sai {security.loginFailIpLimit} lần trong 15 phút (đổi ở <a href="/admin/security" className="text-indigo-600 hover:underline">Cài đặt bảo mật</a>).
         </p>
       </Panel>
 

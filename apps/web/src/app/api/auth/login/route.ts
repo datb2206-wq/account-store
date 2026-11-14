@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@accszone/database';
@@ -6,6 +7,8 @@ import { createSession, setAuthCookies } from '@/lib/auth';
 import { getClientIp, jsonError, readJson, tooManyRequests } from '@/lib/http';
 import { blockedIpResponse, recordFailedLogin } from '@/lib/ip-block';
 import { rateLimit, resetRateLimit } from '@/lib/rate-limit';
+import { CAPTCHA_ERROR, captchaActive, getSecurity, verifyCaptcha } from '@/lib/security';
+import { claimSession } from '@/lib/session-guard';
 import { fieldErrors, loginSchema } from '@/lib/validation';
 
 // Hash giả để so sánh khi email không tồn tại -> thời gian phản hồi như nhau,
@@ -20,14 +23,20 @@ export async function POST(req: NextRequest) {
   const ipLimit = await rateLimit(`login:ip:${ip}`, 30, 15 * 60);
   if (!ipLimit.ok) return tooManyRequests(ipLimit.retryAfter);
 
-  const parsed = loginSchema.safeParse(await readJson(req));
+  const raw = (await readJson(req)) as Record<string, unknown> | null;
+  const security = await getSecurity();
+  if (captchaActive(security, 'login') && !(await verifyCaptcha(security.captcha.secretKey, raw?.captchaToken, ip))) {
+    return jsonError(400, CAPTCHA_ERROR);
+  }
+  const parsed = loginSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonError(400, 'Please check the highlighted fields', { fields: fieldErrors(parsed.error) });
   }
   const { email, password } = parsed.data;
 
   const emailKey = `login:email:${email}`;
-  const emailLimit = await rateLimit(emailKey, 10, 15 * 60);
+  // Sai mật khẩu quá N lần vào 1 tài khoản -> tạm khóa đăng nhập tài khoản đó 15 phút (N: Admin > Bảo mật)
+  const emailLimit = await rateLimit(emailKey, security.loginFailAccountLimit, 15 * 60);
   if (!emailLimit.ok) return tooManyRequests(emailLimit.retryAfter);
 
   const user = await prisma.user.findUnique({
@@ -53,6 +62,8 @@ export async function POST(req: NextRequest) {
 
   const { passwordHash: _, status: __, ...publicUser } = user;
   const res = NextResponse.json({ user: publicUser });
-  setAuthCookies(res, await createSession(user));
+  const sid = randomUUID();
+  await claimSession(user.id, user.role, sid);
+  setAuthCookies(res, await createSession(user, sid));
   return res;
 }

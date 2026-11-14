@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma, type Prisma } from '@accszone/database';
@@ -6,6 +7,8 @@ import { createSession, setAuthCookies } from '@/lib/auth';
 import { getClientIp, jsonError, readJson, tooManyRequests } from '@/lib/http';
 import { blockedIpResponse } from '@/lib/ip-block';
 import { rateLimit } from '@/lib/rate-limit';
+import { CAPTCHA_ERROR, captchaActive, getSecurity, verifyCaptcha } from '@/lib/security';
+import { claimSession } from '@/lib/session-guard';
 import { fieldErrors, registerSchema } from '@/lib/validation';
 
 export async function POST(req: NextRequest) {
@@ -15,7 +18,16 @@ export async function POST(req: NextRequest) {
   const limit = await rateLimit(`register:ip:${ip}`, 5, 60 * 60);
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
 
-  const parsed = registerSchema.safeParse(await readJson(req));
+  const raw = (await readJson(req)) as Record<string, unknown> | null;
+  const security = await getSecurity();
+  if (captchaActive(security, 'register') && !(await verifyCaptcha(security.captcha.secretKey, raw?.captchaToken, ip))) {
+    return jsonError(400, CAPTCHA_ERROR);
+  }
+  // Giới hạn tổng số tài khoản đăng ký từ 1 IP (0 = không giới hạn)
+  if (security.maxAccountsPerIp > 0 && ip !== 'unknown' && (await prisma.user.count({ where: { registerIp: ip } })) >= security.maxAccountsPerIp) {
+    return jsonError(429, 'Too many accounts registered from this IP address');
+  }
+  const parsed = registerSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonError(400, 'Please check the highlighted fields', { fields: fieldErrors(parsed.error) });
   }
@@ -30,6 +42,7 @@ export async function POST(req: NextRequest) {
         passwordHash: await bcrypt.hash(password, 12),
         lastLoginAt: new Date(),
         lastLoginIp: ip,
+        registerIp: ip,
       },
       select: { id: true, email: true, username: true, role: true },
     });
@@ -49,6 +62,8 @@ export async function POST(req: NextRequest) {
   await writeAudit({ actorId: user.id, action: 'auth.register', entity: 'User', entityId: user.id, after: { userAgent: req.headers.get('user-agent') }, ip }).catch(() => null);
 
   const res = NextResponse.json({ user }, { status: 201 });
-  setAuthCookies(res, await createSession(user));
+  const sid = randomUUID();
+  await claimSession(user.id, user.role, sid);
+  setAuthCookies(res, await createSession(user, sid));
   return res;
 }

@@ -7,6 +7,7 @@ import type { NextResponse } from 'next/server';
 import { prisma, type Role } from '@accszone/database';
 import { ADMIN_LANDING_PAGES, canAccess } from './permissions';
 import { getRedis } from './redis';
+import { sessionStillValid } from './session-guard';
 import {
   ACCESS_COOKIE,
   ACCESS_TTL,
@@ -27,11 +28,12 @@ export interface SessionTokens {
 // (rotation). Token cũ bị đánh cắp sẽ không dùng lại được sau khi chủ thật đã refresh.
 const refreshKey = (jti: string) => `auth:rt:${jti}`;
 
-export async function createSession(user: { id: string; role: Role }): Promise<SessionTokens> {
+// sid: mã phiên đăng nhập. Bỏ trống = phiên mới (đăng nhập); refresh truyền sid cũ để giữ nguyên phiên.
+export async function createSession(user: { id: string; role: Role }, sid: string = randomUUID()): Promise<SessionTokens> {
   const jti = randomUUID();
   const [accessToken, refreshToken] = await Promise.all([
-    signAccessToken({ sub: user.id, role: user.role }),
-    signRefreshToken({ sub: user.id, jti }),
+    signAccessToken({ sub: user.id, role: user.role, sid }),
+    signRefreshToken({ sub: user.id, jti, sid }),
   ]);
   await getRedis().set(refreshKey(jti), user.id, 'EX', REFRESH_TTL);
   return { accessToken, refreshToken };
@@ -50,8 +52,10 @@ export async function rotateSession(refreshToken: string) {
     select: { id: true, role: true, status: true },
   });
   if (!user || user.status === 'BANNED') return null;
+  // Đã đăng nhập ở thiết bị khác (chế độ 1 thiết bị) -> không cấp token mới
+  if (!(await sessionStillValid(user.id, user.role, payload.sid))) return null;
 
-  return { user, tokens: await createSession(user) };
+  return { user, tokens: await createSession(user, payload.sid) };
 }
 
 export async function revokeSession(refreshToken: string) {
@@ -107,6 +111,7 @@ export const getCurrentUser = cache(async () => {
 
   const user = await prisma.user.findUnique({ where: { id: payload.sub }, select: userSelect });
   if (!user || user.status === 'BANNED') return null;
+  if (!(await sessionStillValid(user.id, user.role, payload.sid))) return null;
   return user;
 });
 

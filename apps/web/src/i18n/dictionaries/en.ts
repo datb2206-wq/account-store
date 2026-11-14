@@ -379,6 +379,8 @@ export const en = {
   },
   errors: {
     ipBlocked: 'Access from your IP address has been blocked. Please contact support.',
+    captchaRequired: 'Please complete the captcha verification.',
+    tooManyAccountsIp: 'Too many accounts have been registered from your network. Please contact support.',
     couponInvalid: 'Invalid coupon code',
     couponExpired: 'This coupon has expired',
     couponUsedUp: 'This coupon has been fully used',

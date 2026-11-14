@@ -49,7 +49,7 @@ export const PERMISSION_GROUPS = [
   { group: 'Khuyến mãi nạp', items: [['promotions.view', 'Xem mốc khuyến mãi nạp'], ['promotions.edit', 'Thêm, sửa, xóa mốc khuyến mãi']] },
   { group: 'Bài viết', items: [['blog.view', 'Xem bài viết & chuyên mục'], ['blog.edit', 'Viết, sửa, xóa bài viết & chuyên mục']] },
   { group: 'Phân quyền', items: [['roles.manage', 'Quản lý vai trò & gán quyền cho nhân viên (quyền rất cao)']] },
-  { group: 'Cài đặt', items: [['settings.edit', 'Cài đặt, ngôn ngữ, tiền tệ, giao diện website']] },
+  { group: 'Cài đặt', items: [['settings.edit', 'Cài đặt, bảo mật, ngôn ngữ, tiền tệ, giao diện website']] },
 ] as const;
 
 export type Permission = (typeof PERMISSION_GROUPS)[number]['items'][number][0];
@@ -87,6 +87,7 @@ const ROUTE_RULES: Rule[] = [
   ['/admin/balance-logs', 'logs.view'],
   ['/admin/automations', 'automations.view'],
   ['/admin/block-ip', 'security.view'],
+  ['/admin/security', 'settings.edit'],
   ['/admin/products/new', 'products.edit'],
   ['/admin/categories', 'products.view'],
   ['/admin/products', 'products.view'],
@@ -110,6 +111,7 @@ const ROUTE_RULES: Rule[] = [
   ['/api/admin/adjustments', 'users.balance'],
   ['/api/admin/automations', 'automations.edit'],
   ['/api/admin/blocked-ips', 'security.edit'],
+  ['/api/admin/security', 'settings.edit'],
   ['/api/admin/blog', 'blog.edit'],
   ['/api/admin/categories', 'products.edit'],
   ['/api/admin/products', 'products.edit'],

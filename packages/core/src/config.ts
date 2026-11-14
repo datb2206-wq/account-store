@@ -33,6 +33,22 @@ export const CONFIG_SCHEMAS = {
   'currency.rates': z
     .record(z.string().regex(/^[A-Z]{3}$/), z.number().positive())
     .refine((r) => r.USD === 1, 'Tỷ giá USD phải bằng 1'),
+  // Admin > Bảo mật. Thiếu key -> web dùng SECURITY_DEFAULTS (apps/web/src/lib/security.ts)
+  security: z.object({
+    loginFailIpLimit: z.number().int().min(1).max(100), // sai mật khẩu N lần / 15 phút từ 1 IP -> tự chặn IP
+    autoBlockHours: z.number().int().min(1).max(24 * 365),
+    loginFailAccountLimit: z.number().int().min(1).max(100), // sai N lần / 15 phút vào 1 tài khoản -> tạm khóa đăng nhập tài khoản đó
+    maxAccountsPerIp: z.number().int().min(0).max(10_000), // 0 = không giới hạn
+    singleSessionStaff: z.boolean(), // admin/nhân viên chỉ đăng nhập 1 thiết bị
+    singleSessionUser: z.boolean(), // khách chỉ đăng nhập 1 thiết bị
+    captcha: z.object({
+      enabled: z.boolean(),
+      siteKey: z.string().trim().max(200),
+      secretKey: z.string().trim().max(200),
+      onLogin: z.boolean(),
+      onRegister: z.boolean(),
+    }),
+  }),
   // Hiển thị tiền tệ cho khách (Admin > Tiền tệ). Tỷ giá vẫn nằm ở currency.rates.
   // defaultCurrency: "AUTO" = theo ngôn ngữ khách chọn; mã tiền tệ = mặc định quy đổi sang tiền đó (khách vẫn đổi được)
   'currency.display': z.object({

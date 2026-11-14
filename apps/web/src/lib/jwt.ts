@@ -9,14 +9,17 @@ export const REFRESH_TTL = 7 * 24 * 60 * 60; // 7 ngày
 
 const ISSUER = 'accszone';
 
+// sid: mã phiên đăng nhập (giữ nguyên qua các lần refresh) -> chế độ "chỉ 1 thiết bị" (lib/session-guard.ts)
 export interface AccessPayload {
   sub: string;
   role: Role;
+  sid?: string;
 }
 
 export interface RefreshPayload {
   sub: string;
   jti: string;
+  sid?: string;
 }
 
 function secret(name: 'JWT_ACCESS_SECRET' | 'JWT_REFRESH_SECRET') {
@@ -27,8 +30,8 @@ function secret(name: 'JWT_ACCESS_SECRET' | 'JWT_REFRESH_SECRET') {
   return new TextEncoder().encode(value);
 }
 
-export function signAccessToken({ sub, role }: AccessPayload) {
-  return new SignJWT({ role })
+export function signAccessToken({ sub, role, sid }: AccessPayload) {
+  return new SignJWT(sid ? { role, sid } : { role })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(sub)
     .setIssuer(ISSUER)
@@ -38,8 +41,8 @@ export function signAccessToken({ sub, role }: AccessPayload) {
     .sign(secret('JWT_ACCESS_SECRET'));
 }
 
-export function signRefreshToken({ sub, jti }: RefreshPayload) {
-  return new SignJWT({})
+export function signRefreshToken({ sub, jti, sid }: RefreshPayload) {
+  return new SignJWT(sid ? { sid } : {})
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(sub)
     .setJti(jti)
@@ -58,7 +61,7 @@ export async function verifyAccessToken(token: string): Promise<AccessPayload | 
       algorithms: ['HS256'],
     });
     if (typeof payload.sub !== 'string' || typeof payload.role !== 'string') return null;
-    return { sub: payload.sub, role: payload.role as Role };
+    return { sub: payload.sub, role: payload.role as Role, sid: typeof payload.sid === 'string' ? payload.sid : undefined };
   } catch {
     return null;
   }
@@ -72,7 +75,7 @@ export async function verifyRefreshToken(token: string): Promise<RefreshPayload 
       algorithms: ['HS256'],
     });
     if (typeof payload.sub !== 'string' || typeof payload.jti !== 'string') return null;
-    return { sub: payload.sub, jti: payload.jti };
+    return { sub: payload.sub, jti: payload.jti, sid: typeof payload.sid === 'string' ? payload.sid : undefined };
   } catch {
     return null;
   }

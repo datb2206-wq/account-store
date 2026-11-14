@@ -23,6 +23,8 @@ const PATTERNS: Array<[RegExp, ErrorKey]> = [
   [/^The site is under maintenance\.$/, 'maintenance'],
   [/^Insufficient balance$/, 'insufficientBalance'],
   [/^Access from your IP address has been blocked$/, 'ipBlocked'],
+  [/^Please complete the captcha$/, 'captchaRequired'],
+  [/^Too many accounts registered from this IP address$/, 'tooManyAccountsIp'],
   [/^Invalid coupon code$/, 'couponInvalid'],
   [/^This coupon has expired$/, 'couponExpired'],
   [/^This coupon has been fully used$/, 'couponUsedUp'],

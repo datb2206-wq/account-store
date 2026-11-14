@@ -43,7 +43,13 @@ function buildMenu({ pendingDeposits, stuckOrders }: Pick<ShellProps, 'pendingDe
       ],
     },
     { title: 'Tự động', items: [{ label: 'Tự động hóa', href: '/admin/automations', icon: BoltIcon }] },
-    { title: 'Bảo mật', items: [{ label: 'Block IP', href: '/admin/block-ip', icon: CloseIcon }] },
+    {
+      title: 'Bảo mật',
+      items: [
+        { label: 'Block IP', href: '/admin/block-ip', icon: CloseIcon },
+        { label: 'Cài đặt bảo mật', href: '/admin/security', icon: ShieldIcon },
+      ],
+    },
     {
       title: 'Dịch vụ',
       items: [

@@ -374,6 +374,8 @@ export const id: Dictionary = {
   },
   errors: {
     ipBlocked: 'Akses dari alamat IP Anda telah diblokir. Silakan hubungi dukungan.',
+    captchaRequired: 'Silakan selesaikan verifikasi captcha.',
+    tooManyAccountsIp: 'Terlalu banyak akun didaftarkan dari jaringan Anda. Silakan hubungi dukungan.',
     couponInvalid: 'Kode kupon tidak valid',
     couponExpired: 'Kupon ini sudah kedaluwarsa',
     couponUsedUp: 'Kupon ini sudah habis dipakai',

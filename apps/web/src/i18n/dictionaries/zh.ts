@@ -374,6 +374,8 @@ export const zh: Dictionary = {
   },
   errors: {
     ipBlocked: '您的 IP 地址已被封禁，请联系客服。',
+    captchaRequired: '请完成人机验证。',
+    tooManyAccountsIp: '您的网络已注册过多账户，请联系客服。',
     couponInvalid: '优惠码无效',
     couponExpired: '该优惠码已过期',
     couponUsedUp: '该优惠码已被用完',

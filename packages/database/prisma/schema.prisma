@@ -110,6 +110,7 @@ model User {
 
   lastLoginAt   DateTime?
   lastLoginIp   String?
+  registerIp    String?   // IP lúc đăng ký: giới hạn số tài khoản / IP (Admin > Bảo mật)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -119,6 +120,7 @@ model User {
   auditLogs     AuditLog[]
 
   @@index([role])
+  @@index([registerIp])
   @@map("users")
 }
 
