@@ -479,3 +479,15 @@ model SiteAsset {
 
   @@map("site_assets")
 }
+
+// File khách tải lên (ảnh biên lai chuyển khoản). Lưu trong DB vì máy chủ serverless không giữ file trên ổ đĩa.
+// key giữ định dạng cũ "proofs/<uuid>.<ext>" để các yêu cầu nạp đã có vẫn trỏ đúng.
+model UploadedFile {
+  key       String   @id
+  data      Bytes
+  mime      String
+  size      Int
+  createdAt DateTime @default(now())
+
+  @@map("uploaded_files")
+}

@@ -1,13 +1,14 @@
-// Lưu file người dùng tải lên (biên lai chuyển khoản) ra ổ đĩa, NGOÀI thư mục public:
-// file chỉ xem được qua route có kiểm tra quyền (/api/deposits/[id]/proof).
-// Docker: mount volume vào UPLOAD_DIR để không mất file khi cập nhật image.
+// Ảnh biên lai chuyển khoản khách tải lên. Lưu trong bảng uploaded_files (không ghi ra ổ đĩa:
+// Vercel/serverless không giữ file giữa các lần chạy). Chỉ xem được qua route có kiểm tra quyền
+// (/api/deposits/[id]/proof). File cũ từng lưu trên ổ đĩa (bản tự host trước đây) vẫn đọc được.
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { prisma } from '@accszone/database';
 
 export const MAX_PROOF_BYTES = 5 * 1024 * 1024;
 
-const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
+const LEGACY_DIR = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
 const KEY_RE = /^proofs\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
 const MIME = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' } as const;
 type Ext = keyof typeof MIME;
@@ -28,21 +29,22 @@ export async function saveProof(file: File): Promise<string> {
   const ext = sniff(buf);
   if (!ext) throw new UploadError('Upload a JPG, PNG or WebP image');
   const key = `proofs/${randomUUID()}.${ext}`;
-  await mkdir(path.join(UPLOAD_DIR, 'proofs'), { recursive: true });
-  await writeFile(path.join(UPLOAD_DIR, key), buf, { flag: 'wx' });
+  await prisma.uploadedFile.create({ data: { key, data: buf, mime: MIME[ext], size: buf.length } });
   return key;
 }
 
 export async function readProof(key: string) {
-  const m = KEY_RE.exec(key); // chặn path traversal: chỉ đọc đúng định dạng khóa do saveProof tạo
+  const m = KEY_RE.exec(key); // chỉ nhận đúng định dạng khóa do saveProof tạo (chặn path traversal ở nhánh đọc file cũ)
   if (!m) return null;
+  const row = await prisma.uploadedFile.findUnique({ where: { key }, select: { data: true, mime: true } });
+  if (row) return { data: Buffer.from(row.data), type: row.mime };
   try {
-    return { data: await readFile(path.join(UPLOAD_DIR, key)), type: MIME[m[1] as Ext] };
+    return { data: await readFile(path.join(LEGACY_DIR, key)), type: MIME[m[1] as Ext] };
   } catch {
     return null;
   }
 }
 
 export async function deleteProof(key: string | null | undefined) {
-  if (key && KEY_RE.test(key)) await unlink(path.join(UPLOAD_DIR, key)).catch(() => {});
+  if (key && KEY_RE.test(key)) await prisma.uploadedFile.deleteMany({ where: { key } }).catch(() => {});
 }
