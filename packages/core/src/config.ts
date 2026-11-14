@@ -20,7 +20,7 @@ export const CONTENT_PAGES = ['policy', 'terms', 'faq', 'contact'] as const;
 export type ContentPage = (typeof CONTENT_PAGES)[number];
 
 // Key có trang quản trị riêng (giữ bí mật, xóa cache…): trang Cấu hình chung không hiển thị / không ghi các key này
-export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual', 'ctv'] as const;
+export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual', 'ctv', 'translate'] as const;
 
 // Nhà mạng thẻ cào theo chuẩn API chargingws/v2 của các web đổi thẻ
 export const CARD_TELCOS = ['VIETTEL', 'VINAPHONE', 'MOBIFONE', 'VIETNAMOBILE', 'ZING', 'GATE', 'VCOIN', 'GARENA'] as const;
@@ -135,6 +135,14 @@ export const CONFIG_SCHEMAS = {
     channelUrl: z.string().trim().max(200).default(''),
     resellerApiUrl: z.string().trim().max(200).default(''),
     maintenance: z.boolean(),
+  }),
+  // Dịch tên / mô tả sản phẩm bằng Claude (Anthropic API). apiKey là bí mật: không gửi ra trình duyệt.
+  translate: z.object({
+    apiKey: z.string().trim().max(300),
+    model: z.string().trim().regex(/^claude-[a-z0-9.-]{3,60}$/, 'Model dạng claude-...'),
+    targets: z.array(z.enum(['id', 'ru', 'zh'])).max(3),
+    description: z.boolean(), // dịch cả mô tả (tốn hơn tên)
+    autoNew: z.boolean(), // sản phẩm mới đồng bộ từ nguồn API tự được dịch
   }),
   // CTV: người bán ngoài đăng sản phẩm, web giữ phí sàn, phần còn lại cộng cho người bán
   ctv: z.object({

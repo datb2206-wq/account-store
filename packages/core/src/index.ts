@@ -14,6 +14,7 @@ export * from './fx';
 export * from './sellers';
 export * from './stock';
 export * from './telegram';
+export * from './translate';
 export * from './usdt-scanner';
 export * from './suppliers/generic-adapter';
 export * from './suppliers/adapters';

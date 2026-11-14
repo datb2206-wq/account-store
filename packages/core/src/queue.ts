@@ -12,6 +12,7 @@ export const JOBS = {
   sweepOrders: 'sweep-reseller-orders', // định kỳ: nhặt đơn RESELLER còn PENDING (kiểm tra lại / hết hạn)
   updateFx: 'update-fx-rates', // định kỳ (nếu đặt FX_RATES_URL): cập nhật currency.rates
   automations: 'run-automations',
+  translations: 'process-translations', // mỗi phút: dịch tiếp tên / mô tả sản phẩm (Admin > Dịch sản phẩm)
   emailCampaigns: 'send-email-campaigns', // mỗi phút: gửi tiếp 1 đợt email chiến dịch // định kỳ: chạy công việc tự động (Admin > Tự động hóa)
 } as const;
 

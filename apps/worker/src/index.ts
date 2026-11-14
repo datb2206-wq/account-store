@@ -9,7 +9,7 @@
 //   fulfill-order    theo sự kiện -> web đẩy vào ngay khi khách mua hàng RESELLER
 import { Queue, Worker, type Job } from 'bullmq';
 import { prisma } from '@accszone/database';
-import { AUTOMATION_EVERY_MS, backfillSellerEarnings, decrypt, expireStaleDeposits, fulfillResellerOrder, getAdapter, notifyLowBalance, processEmailCampaigns, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
+import { AUTOMATION_EVERY_MS, backfillSellerEarnings, decrypt, expireStaleDeposits, fulfillResellerOrder, getAdapter, notifyLowBalance, processEmailCampaigns, processTranslations, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
 import {
   FULFILL_JOB_OPTIONS,
   fulfillJobId,
@@ -115,6 +115,9 @@ async function processJob(job: Job) {
     case JOBS.emailCampaigns:
       return processEmailCampaigns(log('email'));
 
+    case JOBS.translations:
+      return processTranslations(log('translate'));
+
     case JOBS.automations: {
       // CTV: tiền bán hàng hết thời gian giữ -> vào số dư người bán
       const backfilled = await backfillSellerEarnings();
@@ -140,6 +143,7 @@ async function main() {
   await queue.upsertJobScheduler(JOBS.syncSuppliers, { every: SYNC_MINUTES * 60_000 }, { name: JOBS.syncSuppliers });
   await queue.upsertJobScheduler(JOBS.sweepOrders, { every: 60_000 }, { name: JOBS.sweepOrders });
   await queue.upsertJobScheduler(JOBS.emailCampaigns, { every: 60_000 }, { name: JOBS.emailCampaigns });
+  await queue.upsertJobScheduler(JOBS.translations, { every: 60_000 }, { name: JOBS.translations });
   await queue.upsertJobScheduler(JOBS.automations, { every: AUTOMATION_EVERY_MS }, { name: JOBS.automations });
   if (FX_RATES_URL) {
     await queue.upsertJobScheduler(JOBS.updateFx, { every: FX_UPDATE_HOURS * 3600_000 }, { name: JOBS.updateFx });

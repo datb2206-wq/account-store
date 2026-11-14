@@ -92,6 +92,19 @@ export function ProductBulkBar({ total, filter, categories }: { total: number; f
   const n = everything ? total : selected.size;
   if (selected.size === 0) return null;
 
+  // Tạo lượt dịch cho các sản phẩm đã chọn (worker dịch dần, xem tiến độ ở Admin > Dịch sản phẩm)
+  async function translate() {
+    if (!window.confirm(`Dịch ${n.toLocaleString('en-US')} sản phẩm sang các ngôn ngữ đã bật?`)) return;
+    const overwrite = window.confirm('Dịch LẠI cả sản phẩm đã có bản dịch?\nOK = dịch lại (thay tên đã sửa) · Cancel = chỉ dịch sản phẩm chưa có bản dịch');
+    setPending(true);
+    const res = await apiRequest<{ total: number }>('/api/admin/translate/start', 'POST', { ...(everything ? { filter } : { ids: [...selected] }), overwrite });
+    setPending(false);
+    if (!res.ok) return window.alert(res.data.error ?? 'Không bắt đầu được');
+    if (window.confirm(`Đã tạo lượt dịch ${res.data.total} sản phẩm. Mở trang tiến độ?`)) router.push('/admin/translate');
+    setAll(false);
+    setEverything(false);
+  }
+
   async function run(action: Action) {
     if (action === 'category' && !categoryId) return window.alert('Chọn danh mục đích');
     let sortOrder: number | undefined;
@@ -132,6 +145,7 @@ export function ProductBulkBar({ total, filter, categories }: { total: number; f
       <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('feature')}>📌 Ghim</button>
       <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('unfeature')}>Bỏ ghim</button>
       <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('order')}>Đặt thứ tự</button>
+      <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={translate}>🌐 Dịch</button>
       <select className="input h-7 w-52 py-0 text-xs" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
         <option value="">Chuyển sang danh mục…</option>
         {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
