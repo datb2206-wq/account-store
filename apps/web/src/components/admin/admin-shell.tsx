@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BoxIcon, CartIcon, ChevronIcon, CoinIcon, ClockIcon, CloseIcon, GiftIcon, GlobeIcon, GridIcon, ImageIcon, KeyIcon, LogoutIcon, MailIcon, ReceiptIcon, ShieldIcon, SparklesIcon, UsersIcon, WalletIcon,
+  BoltIcon, BoxIcon, CartIcon, ChevronIcon, CoinIcon, ClockIcon, CloseIcon, GiftIcon, GlobeIcon, GridIcon, ImageIcon, KeyIcon, LogoutIcon, MailIcon, ReceiptIcon, ShieldIcon, SparklesIcon, UsersIcon, WalletIcon,
 } from '@/components/icons';
 import { requiredPermission } from '@/lib/permissions';
 
@@ -42,6 +42,7 @@ function buildMenu({ pendingDeposits, stuckOrders }: Pick<ShellProps, 'pendingDe
         },
       ],
     },
+    { title: 'Tự động', items: [{ label: 'Tự động hóa', href: '/admin/automations', icon: BoltIcon }] },
     { title: 'Bảo mật', items: [{ label: 'Block IP', href: '/admin/block-ip', icon: CloseIcon }] },
     {
       title: 'Dịch vụ',

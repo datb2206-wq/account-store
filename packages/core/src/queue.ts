@@ -11,6 +11,7 @@ export const JOBS = {
   fulfillOrder: 'fulfill-order', // đặt hàng sang web gốc cho 1 đơn RESELLER
   sweepOrders: 'sweep-reseller-orders', // định kỳ: nhặt đơn RESELLER còn PENDING (kiểm tra lại / hết hạn)
   updateFx: 'update-fx-rates', // định kỳ (nếu đặt FX_RATES_URL): cập nhật currency.rates
+  automations: 'run-automations', // định kỳ: chạy công việc tự động (Admin > Tự động hóa)
 } as const;
 
 export interface FulfillOrderData {

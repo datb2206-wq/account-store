@@ -10,6 +10,7 @@ import type { Role } from '@accszone/database';
 export const PERMISSION_GROUPS = [
   { group: 'Dashboard', items: [['dashboard.view', 'Xem thống kê tại Dashboard']] },
   { group: 'Nhật ký', items: [['logs.view', 'Xem nhật ký hoạt động & biến động số dư']] },
+  { group: 'Tự động hóa', items: [['automations.view', 'Xem công việc tự động'], ['automations.edit', 'Thêm, sửa, xóa, chạy công việc tự động']] },
   { group: 'Bảo mật', items: [['security.view', 'Xem danh sách IP bị chặn'], ['security.edit', 'Thêm, xóa IP bị chặn']] },
   {
     group: 'Sản phẩm',
@@ -57,7 +58,7 @@ export const isPermission = (p: string): p is Permission => (ALL_PERMISSIONS as 
 
 // Trước đây chỉ SUPER_ADMIN làm được -> nhân viên chưa gán vai trò vẫn không có
 const SUPER_ONLY: Permission[] = [
-  'stock.reveal', 'suppliers.edit', 'orders.refund', 'users.edit', 'users.balance',
+  'stock.reveal', 'suppliers.edit', 'orders.refund', 'automations.edit', 'users.edit', 'users.balance',
   'coupons.edit', 'promotions.edit', 'roles.manage', 'settings.edit',
 ];
 
@@ -84,6 +85,7 @@ const ROUTE_RULES: Rule[] = [
   ['/admin', 'dashboard.view', undefined, true],
   ['/admin/activity', 'logs.view'],
   ['/admin/balance-logs', 'logs.view'],
+  ['/admin/automations', 'automations.view'],
   ['/admin/block-ip', 'security.view'],
   ['/admin/products/new', 'products.edit'],
   ['/admin/categories', 'products.view'],
@@ -106,6 +108,7 @@ const ROUTE_RULES: Rule[] = [
 
   // ---- API ----
   ['/api/admin/adjustments', 'users.balance'],
+  ['/api/admin/automations', 'automations.edit'],
   ['/api/admin/blocked-ips', 'security.edit'],
   ['/api/admin/blog', 'blog.edit'],
   ['/api/admin/categories', 'products.edit'],

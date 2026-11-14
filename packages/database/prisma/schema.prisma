@@ -509,3 +509,19 @@ model AdminRole {
 
   @@map("admin_roles")
 }
+
+// Công việc tự động (Admin > Tự động hóa): worker chạy định kỳ, dọn dữ liệu cũ hơn olderThanSec giây.
+// type: "sold_stock" | "invalid_stock" | "audit_logs" | "stale_deposits" (xem packages/core/src/automations.ts)
+model AutomationTask {
+  id          String    @id @default(cuid())
+  name        String
+  type        String
+  olderThanSec Int
+  isActive    Boolean   @default(true)
+  lastRunAt   DateTime?
+  lastResult  String?   // VD "Đã xóa 120 tài khoản" hoặc lỗi
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("automation_tasks")
+}
