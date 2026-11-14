@@ -97,6 +97,7 @@ const ROUTE_RULES: Rule[] = [
   ['/admin/suppliers/new', 'suppliers.edit'],
   ['/admin/suppliers', 'suppliers.view'],
   ['/admin/orders', 'orders.view'],
+  ['/admin/reports', 'orders.view'],
   ['/admin/users', 'users.view'],
   ['/admin/transactions', 'payments.view'],
   ['/admin/coupons', 'coupons.view'],
@@ -125,6 +126,7 @@ const ROUTE_RULES: Rule[] = [
   ['/api/admin/blog', 'blog.edit'],
   ['/api/admin/categories', 'products.edit'],
   ['/api/admin/products', 'products.edit'],
+  ['/api/admin/stock/move', 'products.edit'],
   ['/api/admin/stock/', 'stock.reveal'], // /api/admin/stock/[id]/reveal
   ['/api/admin/stock', 'products.edit'],
   ['/api/admin/config', 'settings.edit'],

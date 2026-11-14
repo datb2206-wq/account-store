@@ -55,11 +55,25 @@ export default async function AdminOrdersPage({
       take: PAGE_SIZE,
       include: {
         user: { select: { email: true } },
-        product: { select: { name: true, source: true } },
+        product: { select: { name: true, source: true, costPrice: true } },
         supplier: { select: { name: true } },
       },
     }),
   ]);
+
+  // Lãi từng đơn hoàn tất = tiền thực thu (trừ phần đã hoàn) − giá vốn lúc mua × số lượng
+  const refundRows = await prisma.transaction.groupBy({
+    by: ['orderId'],
+    where: { orderId: { in: orders.filter((o) => o.status === 'COMPLETED').map((o) => o.id) }, type: 'REFUND', status: 'COMPLETED' },
+    _sum: { amount: true },
+  });
+  const refunded = new Map(refundRows.map((r) => [r.orderId, r._sum.amount]));
+  const profitOf = (o: (typeof orders)[number]) => {
+    if (o.status !== 'COMPLETED') return null;
+    const cost = o.unitCost ?? o.product.costPrice;
+    if (!cost) return null;
+    return o.totalAmount.sub(refunded.get(o.id) ?? 0).sub(cost.mul(o.quantity));
+  };
 
   const filters = { q, status, source, stuck: stuck ? '1' : undefined };
 
@@ -102,11 +116,11 @@ export default async function AdminOrdersPage({
       <div className="card overflow-x-auto p-0">
         <table className="table">
           <thead>
-            <tr><th>Thời gian</th><th>Mã đơn</th><th>Khách</th><th>Sản phẩm</th><th>Tổng</th><th>Nguồn</th><th>Trạng thái</th><th /></tr>
+            <tr><th>Thời gian</th><th>Mã đơn</th><th>Khách</th><th>Sản phẩm</th><th>Tổng</th><th>Lãi</th><th>Nguồn</th><th>Trạng thái</th><th /></tr>
           </thead>
           <tbody>
             {orders.length === 0 && (
-              <tr><td colSpan={8} className="py-10 text-center text-zinc-500">Không có đơn hàng nào.</td></tr>
+              <tr><td colSpan={9} className="py-10 text-center text-zinc-500">Không có đơn hàng nào.</td></tr>
             )}
             {orders.map((o) => {
               const isStuck = o.status === 'PENDING' && o.supplierId && o.createdAt < stuckBefore;
@@ -117,6 +131,13 @@ export default async function AdminOrdersPage({
                   <td className="max-w-48 truncate">{o.user.email}</td>
                   <td>{localized(o.product.name)} <span className="text-zinc-400">× {o.quantity}</span></td>
                   <td className="tabular-nums">{formatUsd(o.totalAmount)}</td>
+                  <td className="tabular-nums">
+                    {(() => {
+                      const profit = profitOf(o);
+                      if (!profit) return <span className="text-zinc-300">—</span>;
+                      return <span className={profit.isNegative() ? 'text-red-600' : 'text-emerald-600'}>{formatUsd(profit)}</span>;
+                    })()}
+                  </td>
                   <td>
                     {o.product.source === 'RESELLER' ? (
                       <span className="text-xs">

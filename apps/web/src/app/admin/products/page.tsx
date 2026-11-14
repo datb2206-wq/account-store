@@ -1,9 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { prisma, type Prisma } from '@accszone/database';
+import { prisma } from '@accszone/database';
+import { BulkAllCheckbox, BulkCheckbox, ProductBulkBar, ProductBulkProvider } from '@/components/admin/product-bulk';
 import { Badge } from '@/components/badge';
 import { Pagination } from '@/components/pagination';
+import { productWhere } from '@/lib/admin-products';
 import { requireStaff } from '@/lib/auth';
+import { can } from '@/lib/permissions';
 import { treeOptions } from '@/lib/category-tree';
 import { formatUsd, localized } from '@/lib/format';
 import { buildHref } from '@/lib/url';
@@ -17,24 +20,15 @@ export default async function AdminProductsPage({
 }: {
   searchParams: Promise<{ q?: string; category?: string; status?: string; page?: string }>;
 }) {
-  await requireStaff();
+  const user = await requireStaff();
+  const editable = can(user, 'products.edit');
   const params = await searchParams;
   const q = params.q?.trim() ?? '';
   const category = params.category ?? '';
   const status = params.status === 'active' || params.status === 'inactive' ? params.status : '';
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1);
 
-  const where: Prisma.ProductWhereInput = {
-    ...(category && { categoryId: category }),
-    ...(status && { isActive: status === 'active' }),
-    // name là Json đa ngôn ngữ -> tìm theo slug / tên tiếng Anh
-    ...(q && {
-      OR: [
-        { slug: { contains: q, mode: 'insensitive' } },
-        { name: { path: ['en'], string_contains: q, mode: 'insensitive' } },
-      ],
-    }),
-  };
+  const where = productWhere({ q, category, status });
 
   const [total, products, categories] = await Promise.all([
     prisma.product.count({ where }),
@@ -78,19 +72,22 @@ export default async function AdminProductsPage({
         {(q || category || status) && <Link href="/admin/products" className="btn-ghost">Xóa lọc</Link>}
       </form>
 
+      <ProductBulkProvider ids={editable ? products.map((p) => p.id) : []}>
+      {editable && <ProductBulkBar total={total} filter={{ q, category, status }} categories={treeOptions(categories)} />}
       <div className="card overflow-x-auto p-0">
         <table className="table">
           <thead>
-            <tr><th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Giá vốn</th><th>Còn hàng</th><th>Trạng thái</th><th /></tr>
+            <tr>{editable && <th className="w-8"><BulkAllCheckbox /></th>}<th>Sản phẩm</th><th>Danh mục</th><th>Giá bán</th><th>Giá vốn</th><th>Còn hàng</th><th>Trạng thái</th><th /></tr>
           </thead>
           <tbody>
             {products.length === 0 && (
-              <tr><td colSpan={7} className="py-10 text-center text-zinc-500">Không có sản phẩm nào.</td></tr>
+              <tr><td colSpan={editable ? 8 : 7} className="py-10 text-center text-zinc-500">Không có sản phẩm nào.</td></tr>
             )}
             {products.map((p) => {
               const inStock = p.source === 'LOCAL' ? (available.get(p.id) ?? 0) : (p.externalStock ?? 0);
               return (
                 <tr key={p.id}>
+                  {editable && <td><BulkCheckbox id={p.id} /></td>}
                   <td>
                     <Link href={`/admin/products/${p.id}`} className="font-medium hover:text-blue-600">{localized(p.name)}</Link>
                     <p className="font-mono text-xs text-zinc-400">{p.slug}</p>
@@ -116,6 +113,7 @@ export default async function AdminProductsPage({
           </tbody>
         </table>
       </div>
+      </ProductBulkProvider>
 
       <Pagination
         page={page}

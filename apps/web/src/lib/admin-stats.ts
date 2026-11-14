@@ -1,4 +1,4 @@
-import { prisma } from '@accszone/database';
+import { Prisma, prisma } from '@accszone/database';
 
 // Thống kê admin tính theo giờ Việt Nam (UTC+7, không có giờ mùa hè), không theo giờ máy chủ.
 const OFFSET_MS = 7 * 3_600_000;
@@ -33,6 +33,14 @@ export function periodStarts(now = new Date()) {
   return { today, week: new Date(today.getTime() - weekday * DAY_MS), month: vnDate(y, m) };
 }
 
+// Đơn hoàn tất: tiền thực thu = tổng đơn − tiền đã hoàn 1 phần; giá vốn = giá vốn lúc mua (đơn cũ chưa lưu thì lấy giá vốn hiện tại)
+export const ORDER_REFUNDS_JOIN = Prisma.sql`LEFT JOIN (
+  SELECT "orderId", sum(amount) AS refund FROM transactions
+  WHERE type = 'REFUND' AND status = 'COMPLETED' AND "orderId" IS NOT NULL GROUP BY "orderId"
+) r ON r."orderId" = o.id`;
+export const NET_REVENUE = Prisma.sql`(o."totalAmount" - coalesce(r.refund, 0))`;
+export const ORDER_COST = Prisma.sql`(o.quantity * coalesce(o."unitCost", p."costPrice", 0))`;
+
 export interface PeriodStats {
   users: number;
   orders: number;
@@ -40,18 +48,17 @@ export interface PeriodStats {
   profit: number;
 }
 
-// Lợi nhuận = doanh thu đơn hoàn tất − giá vốn hiện tại của sản phẩm × số lượng (ước tính:
-// đơn không lưu giá vốn tại thời điểm bán; sản phẩm tự nhập không có giá vốn được tính vốn 0).
+// Lợi nhuận = tiền thực thu đơn hoàn tất − giá vốn × số lượng (sản phẩm không khai giá vốn được tính vốn 0)
 export async function periodStats(from?: Date): Promise<PeriodStats> {
   const since = from ?? new Date(0);
   const [users, rows] = await Promise.all([
     prisma.user.count({ where: { createdAt: { gte: since } } }),
-    prisma.$queryRaw<{ orders: number; revenue: string; cost: string }[]>`
+    prisma.$queryRaw<{ orders: number; revenue: string; cost: string }[]>(Prisma.sql`
       SELECT count(*)::int AS orders,
-             coalesce(sum(o."totalAmount"), 0)::text AS revenue,
-             coalesce(sum(o.quantity * coalesce(p."costPrice", 0)), 0)::text AS cost
-      FROM orders o JOIN products p ON p.id = o."productId"
-      WHERE o.status = 'COMPLETED' AND o."createdAt" >= ${since}`,
+             coalesce(sum(${NET_REVENUE}), 0)::text AS revenue,
+             coalesce(sum(${ORDER_COST}), 0)::text AS cost
+      FROM orders o JOIN products p ON p.id = o."productId" ${ORDER_REFUNDS_JOIN}
+      WHERE o.status = 'COMPLETED' AND o."createdAt" >= ${since}`),
   ]);
   const r = rows[0]!;
   const revenue = Number(r.revenue);
@@ -71,18 +78,18 @@ export async function monthlySeries(y: number, m: number): Promise<DailyPoint[]>
   const to = vnDate(y, m + 1);
   const days = Math.round((to.getTime() - from.getTime()) / DAY_MS);
   const [orders, deposits] = await Promise.all([
-    prisma.$queryRaw<{ d: number; revenue: string; cost: string }[]>`
+    prisma.$queryRaw<{ d: number; revenue: string; cost: string }[]>(Prisma.sql`
       SELECT extract(day FROM o."createdAt" + interval '7 hours')::int AS d,
-             sum(o."totalAmount")::text AS revenue,
-             sum(o.quantity * coalesce(p."costPrice", 0))::text AS cost
-      FROM orders o JOIN products p ON p.id = o."productId"
+             sum(${NET_REVENUE})::text AS revenue,
+             sum(${ORDER_COST})::text AS cost
+      FROM orders o JOIN products p ON p.id = o."productId" ${ORDER_REFUNDS_JOIN}
       WHERE o.status = 'COMPLETED' AND o."createdAt" >= ${from} AND o."createdAt" < ${to}
-      GROUP BY 1`,
-    prisma.$queryRaw<{ d: number; amount: string }[]>`
+      GROUP BY 1`),
+    prisma.$queryRaw<{ d: number; amount: string }[]>(Prisma.sql`
       SELECT extract(day FROM "createdAt" + interval '7 hours')::int AS d, sum(amount)::text AS amount
       FROM transactions
       WHERE type = 'DEPOSIT' AND status = 'COMPLETED' AND "createdAt" >= ${from} AND "createdAt" < ${to}
-      GROUP BY 1`,
+      GROUP BY 1`),
   ]);
   const series = Array.from({ length: days }, (_, i) => ({ day: i + 1, revenue: 0, profit: 0, deposit: 0 }));
   for (const o of orders) {

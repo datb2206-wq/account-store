@@ -4,11 +4,12 @@ import { notFound } from 'next/navigation';
 import { prisma, type Prisma, type StockStatus } from '@accszone/database';
 import { BatchActions, StockTable } from '@/components/admin/stock-actions';
 import { StockImport } from '@/components/admin/stock-import';
+import { StockTools } from '@/components/admin/stock-tools';
 import { Pagination } from '@/components/pagination';
 import { StatCard } from '@/components/stat-card';
 import { can } from '@/lib/permissions';
 import { requireStaff } from '@/lib/auth';
-import { formatDate } from '@/lib/format';
+import { formatDate, localized } from '@/lib/format';
 import { buildHref } from '@/lib/url';
 
 export const metadata: Metadata = { title: 'Kho hàng' };
@@ -40,7 +41,8 @@ export default async function ProductStockPage({
   if (!product) notFound();
 
   const where: Prisma.StockItemWhereInput = { productId: id, status, importBatch: batch };
-  const [statusGroups, batchGroups, filteredTotal, items] = await Promise.all([
+  const canMove = can(user, 'products.edit');
+  const [statusGroups, batchGroups, filteredTotal, items, targets] = await Promise.all([
     prisma.stockItem.groupBy({ by: ['status'], where: { productId: id }, _count: true }),
     prisma.stockItem.groupBy({
       by: ['importBatch', 'status'],
@@ -57,6 +59,9 @@ export default async function ProductStockPage({
       // KHÔNG select `content` -> dữ liệu mã hóa không bao giờ rời server khi chỉ xem danh sách
       select: { id: true, status: true, importBatch: true, createdAt: true, soldAt: true, order: { select: { code: true } } },
     }),
+    canMove
+      ? prisma.product.findMany({ where: { source: 'LOCAL', id: { not: id } }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }], select: { id: true, name: true } })
+      : [],
   ]);
 
   const counts = Object.fromEntries(statusGroups.map((g) => [g.status, g._count])) as Partial<Record<StockStatus, number>>;
@@ -123,6 +128,17 @@ export default async function ProductStockPage({
           )}
         </section>
       </div>
+
+      {(can(user, 'stock.reveal') || (canMove && product.source === 'LOCAL')) && (counts.AVAILABLE || counts.INVALID || counts.SOLD) ? (
+        <StockTools
+          productId={id}
+          batch={batch}
+          counts={{ AVAILABLE: counts.AVAILABLE ?? 0, INVALID: counts.INVALID ?? 0, SOLD: counts.SOLD ?? 0 }}
+          targets={targets.map((t) => ({ id: t.id, name: localized(t.name) }))}
+          canExport={can(user, 'stock.reveal')}
+          canMove={canMove && product.source === 'LOCAL'}
+        />
+      ) : null}
 
       <section className="card space-y-4">
         <div className="flex flex-wrap items-center gap-2">

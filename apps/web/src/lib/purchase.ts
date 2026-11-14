@@ -119,6 +119,7 @@ async function runPurchase(tx: Prisma.TransactionClient, input: PurchaseInput, k
     select: {
       id: true,
       price: true,
+      costPrice: true,
       minQty: true,
       maxQty: true,
       isActive: true,
@@ -156,6 +157,7 @@ async function runPurchase(tx: Prisma.TransactionClient, input: PurchaseInput, k
       productId,
       quantity,
       unitPrice: product.price,
+      unitCost: product.costPrice,
       totalAmount: total,
       status: 'PENDING',
       idempotencyKey: key,

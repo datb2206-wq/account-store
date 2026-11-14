@@ -29,7 +29,13 @@ export interface ShellProps {
 // Toàn bộ menu; filterMenu() bỏ những mục người đang đăng nhập không có quyền
 function buildMenu({ pendingDeposits, stuckOrders }: Pick<ShellProps, 'pendingDeposits' | 'stuckOrders'>): Section[] {
   return [
-    { title: 'Main', items: [{ label: 'Dashboard', href: '/admin', icon: GridIcon }] },
+    {
+      title: 'Main',
+      items: [
+        { label: 'Dashboard', href: '/admin', icon: GridIcon },
+        { label: 'Báo cáo lãi & bán chạy', href: '/admin/reports', icon: CoinIcon },
+      ],
+    },
     {
       title: 'Lịch sử',
       items: [
