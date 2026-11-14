@@ -8,6 +8,7 @@ export * from './deposits';
 export * from './errors';
 export * from './fx';
 export * from './stock';
+export * from './telegram';
 export * from './usdt-scanner';
 export * from './suppliers/generic-adapter';
 export * from './suppliers/adapters';

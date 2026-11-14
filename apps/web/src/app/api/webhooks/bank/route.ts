@@ -1,9 +1,9 @@
 import { timingSafeEqual } from 'node:crypto';
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { Prisma, prisma } from '@accszone/database';
 import { writeAudit } from '@/lib/audit';
-import { creditDeposit, DomainError, extractTransferCode } from '@accszone/core';
+import { creditDeposit, DomainError, extractTransferCode, notifyDeposit } from '@accszone/core';
 import { getClientIp, jsonError, readJson } from '@/lib/http';
 
 // Webhook "có tiền vào tài khoản" từ dịch vụ đọc biến động số dư ngân hàng (Casso, SePay, PayOS...).
@@ -92,5 +92,6 @@ export async function POST(req: NextRequest) {
     after: { bankRef, amount, usd: usd.toFixed(6) },
     ip,
   });
+  after(() => notifyDeposit(deposit.id)); // Telegram, gửi sau khi đã trả kết quả
   return NextResponse.json({ matched: true, transactionId: deposit.id });
 }

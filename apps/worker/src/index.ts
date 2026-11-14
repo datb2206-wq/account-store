@@ -8,7 +8,7 @@
 //   fulfill-order    theo sự kiện -> web đẩy vào ngay khi khách mua hàng RESELLER
 import { Queue, Worker, type Job } from 'bullmq';
 import { prisma } from '@accszone/database';
-import { AUTOMATION_EVERY_MS, expireStaleDeposits, fulfillResellerOrder, runDueAutomations, scanUsdtDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
+import { AUTOMATION_EVERY_MS, decrypt, expireStaleDeposits, fulfillResellerOrder, getAdapter, notifyLowBalance, runDueAutomations, scanUsdtDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
 import {
   FULFILL_JOB_OPTIONS,
   fulfillJobId,
@@ -41,6 +41,19 @@ const queue = new Queue(QUEUE_NAME, {
 const enqueueFulfill = (orderId: string) =>
   queue.add(JOBS.fulfillOrder, { orderId } satisfies FulfillOrderData, { ...FULFILL_JOB_OPTIONS, jobId: fulfillJobId(orderId) });
 
+// Số dư tại nguồn API dưới ngưỡng (Admin > Thông báo Telegram) -> báo Telegram. Lỗi ở đây không làm hỏng job đồng bộ.
+async function checkSupplierBalance(supplierId: string) {
+  try {
+    const s = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { name: true, adapter: true, baseUrl: true, apiKeyEnc: true } });
+    const adapter = s && getAdapter(s.adapter);
+    if (!s || !adapter?.getBalance) return;
+    const balance = Number(await adapter.getBalance({ baseUrl: s.baseUrl, apiKey: decrypt(s.apiKeyEnc) }));
+    if (Number.isFinite(balance)) await notifyLowBalance(supplierId, s.name, balance);
+  } catch (err) {
+    log('sync').warn(`balance check ${supplierId}: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
 async function processJob(job: Job) {
   switch (job.name) {
     case JOBS.expireDeposits: {
@@ -71,6 +84,7 @@ async function processJob(job: Job) {
       try {
         const result = await syncSupplier(data.supplierId);
         log('sync').info(JSON.stringify(result));
+        await checkSupplierBalance(data.supplierId);
         await prisma.auditLog.create({
           data: { actorId: data.actorId ?? null, action: 'supplier.sync', entity: 'Supplier', entityId: data.supplierId, after: { ...result, trigger: data.trigger } },
         });

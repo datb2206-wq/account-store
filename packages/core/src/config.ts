@@ -49,6 +49,20 @@ export const CONFIG_SCHEMAS = {
       onRegister: z.boolean(),
     }),
   }),
+  // Thông báo Telegram (Admin > Thông báo Telegram). Mẫu tin dùng biến {username}, {amount}... (xem core/telegram.ts)
+  telegram: z.object({
+    enabled: z.boolean(),
+    botToken: z.string().trim().max(200),
+    chatId: z.string().trim().max(100),
+    events: z.object({ order: z.boolean(), deposit: z.boolean(), refund: z.boolean(), lowBalance: z.boolean() }),
+    lowBalanceUsd: z.number().min(0).max(1_000_000), // số dư nguồn API dưới mức này -> báo
+    templates: z.object({
+      order: z.string().max(2000),
+      deposit: z.string().max(2000),
+      refund: z.string().max(2000),
+      lowBalance: z.string().max(2000),
+    }),
+  }),
   // Hiển thị tiền tệ cho khách (Admin > Tiền tệ). Tỷ giá vẫn nằm ở currency.rates.
   // defaultCurrency: "AUTO" = theo ngôn ngữ khách chọn; mã tiền tệ = mặc định quy đổi sang tiền đó (khách vẫn đổi được)
   'currency.display': z.object({

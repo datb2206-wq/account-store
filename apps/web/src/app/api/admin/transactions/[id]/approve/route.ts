@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { prisma } from '@accszone/database';
 import { adminRoute, badRequest, notFound, parseBody } from '@/lib/admin-route';
 import { approveDepositSchema } from '@/lib/admin-schemas';
 import { writeAudit } from '@/lib/audit';
-import { creditDeposit, normalizeTxHash, type UsdtNetwork } from '@accszone/core';
+import { creditDeposit, normalizeTxHash, notifyDeposit, type UsdtNetwork } from '@accszone/core';
 import { getClientIp } from '@/lib/http';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -33,5 +33,6 @@ export const POST = adminRoute<Ctx>(async (req, { params }, user) => {
     after: { status: 'COMPLETED', amount: result.amount, bankRef, txHash, note },
     ip: getClientIp(req),
   });
+  after(() => notifyDeposit(id)); // Telegram, gửi sau khi đã trả kết quả
   return NextResponse.json({ ok: true, balanceAfter: result.balanceAfter.toString() });
 });

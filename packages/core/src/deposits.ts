@@ -5,6 +5,7 @@ import { domainError } from './errors';
 import { ChainError, fetchUsdtTx, fromRawUnits, normalizeTxHash, sameAddress, toRawUnits, USDT_DECIMALS, type UsdtNetwork } from './chain';
 import { randomCode } from './codes';
 import { getConfig } from './config';
+import { notifyDeposit } from './telegram';
 
 const MAX_PENDING_PER_USER = 5;
 // Yêu cầu USDT đã hết hạn vẫn được gửi TxID trong khoảng này (khách chuyển trễ)
@@ -185,6 +186,7 @@ export async function verifyUsdtDeposit(id: string, userId: string | null, txHas
       return { status: 'confirming', confirmations: chain.confirmations, required: cfg.minConfirmations };
     }
     await prisma.$transaction((tx) => creditDeposit(tx, id, fields));
+    await notifyDeposit(id);
     return { status: 'completed' };
   } catch (err) {
     // @@unique([network, txHash]): 1 TxID chỉ được ghi nhận 1 lần trên toàn hệ thống

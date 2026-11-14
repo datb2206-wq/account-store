@@ -5,6 +5,7 @@ import { Prisma, prisma } from '@accszone/database';
 import { contentHash, decrypt, encrypt } from '../crypto';
 import { domainError } from '../errors';
 import { pickRandomStock } from '../stock';
+import { notifyRefund } from '../telegram';
 import { getAdapter } from './adapters';
 import { SupplierTransientError, type SupplierOrderResult } from './generic-adapter';
 
@@ -50,13 +51,15 @@ export async function refundOrder(orderId: string, internalReason: string, exter
       where: { id: orderId, status: 'PENDING' },
       data: { status: 'REFUNDED', failReason: CUSTOMER_REFUND_MESSAGE, ...(externalOrderId && { externalOrderId }) },
     });
-    if (claimed.count === 0) return false;
+    if (claimed.count === 0) return null;
     const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { userId: true, totalAmount: true } });
     await creditRefund(tx, order.userId, orderId, order.totalAmount, `Auto refund: ${internalReason}`.slice(0, 500));
-    return true;
+    return order.totalAmount;
   });
-  if (refunded) await audit('order.refund', orderId, { reason: internalReason });
-  return refunded;
+  if (!refunded) return false;
+  await audit('order.refund', orderId, { reason: internalReason });
+  await notifyRefund(orderId, refunded, internalReason);
+  return true;
 }
 
 // Giao hàng cho đơn PENDING (từ web gốc, hoặc admin dán tay). Thiếu hàng -> hoàn phần thiếu.
@@ -163,6 +166,7 @@ export async function manualRefundOrder(input: { orderId: string; amount?: strin
       after: { amount: result.amount.toFixed(6), full: result.full, reason: input.reason, previousStatus: result.previousStatus },
     },
   });
+  await notifyRefund(input.orderId, result.amount, `Admin hoàn tay: ${input.reason}`);
   return result;
 }
 

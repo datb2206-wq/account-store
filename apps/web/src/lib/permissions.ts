@@ -106,6 +106,7 @@ const ROUTE_RULES: Rule[] = [
   ['/admin/translations', 'settings.edit'],
   ['/admin/theme', 'settings.edit'],
   ['/admin/currencies', 'settings.edit'],
+  ['/admin/telegram', 'settings.edit'],
 
   // ---- API ----
   ['/api/admin/adjustments', 'users.balance'],
@@ -121,6 +122,7 @@ const ROUTE_RULES: Rule[] = [
   ['/api/admin/translations', 'settings.edit'],
   ['/api/admin/theme', 'settings.edit'],
   ['/api/admin/currencies', 'settings.edit'],
+  ['/api/admin/telegram', 'settings.edit'],
   ['/api/admin/coupons', 'coupons.edit'],
   ['/api/admin/deposit-bonuses', 'promotions.edit'],
   ['/api/admin/orders/', 'orders.manage'],

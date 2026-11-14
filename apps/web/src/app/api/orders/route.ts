@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
+import { notifyOrder } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { getCurrentUser } from '@/lib/auth';
 import { getClientIp, isSameOrigin, jsonError, readJson, tooManyRequests } from '@/lib/http';
@@ -31,6 +32,10 @@ export async function POST(req: NextRequest) {
   try {
     const result = await purchase({ userId: user.id, idempotencyKey, ...parsed.data });
     const { balance } = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { balance: true } });
+    if (!result.replayed) {
+      const ip = getClientIp(req);
+      after(() => notifyOrder({ code: result.order.code }, ip)); // Telegram, gửi sau khi đã trả kết quả
+    }
     return NextResponse.json(
       { ...result, balance: balance.toString() },
       {
