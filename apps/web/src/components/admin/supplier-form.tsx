@@ -127,7 +127,7 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
           <FormField label="Loại API *" htmlFor="sp-adapter" error={fields.adapter} hint="AccsZone dùng API v1 chính thức; Via79 tính giá VND, tự quy đổi USD theo tỷ giá VND ở Cấu hình; loại khác dùng chuẩn chung GET /products, POST /orders.">
             <select id="sp-adapter" className="input" value={values.adapter} onChange={(e) => changeAdapter(e.target.value)}>
               <option value="accszone">AccsZone API v1</option>
-              <option value="via79">Via79 (giá VND)</option>
+              <option value="via79">Via79 / CloneMMO247 (cùng kiểu API, giá VND)</option>
               <option value="generic">API khác (chuẩn chung)</option>
             </select>
           </FormField>

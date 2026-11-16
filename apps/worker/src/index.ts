@@ -138,11 +138,12 @@ async function processJob(job: Job) {
 
 async function main() {
   // upsertJobScheduler: idempotent, khởi động lại worker không tạo lịch trùng
-  await queue.upsertJobScheduler(JOBS.expireDeposits, { every: 60_000 }, { name: JOBS.expireDeposits });
+  // Redis gói free (Upstash) tính theo số lệnh: job không gấp chạy thưa hơn để tiết kiệm hạn mức
+  await queue.upsertJobScheduler(JOBS.expireDeposits, { every: 5 * 60_000 }, { name: JOBS.expireDeposits });
   await queue.upsertJobScheduler(JOBS.scanUsdt, { every: 60_000 }, { name: JOBS.scanUsdt });
   await queue.upsertJobScheduler(JOBS.syncSuppliers, { every: SYNC_MINUTES * 60_000 }, { name: JOBS.syncSuppliers });
-  await queue.upsertJobScheduler(JOBS.sweepOrders, { every: 60_000 }, { name: JOBS.sweepOrders });
-  await queue.upsertJobScheduler(JOBS.emailCampaigns, { every: 60_000 }, { name: JOBS.emailCampaigns });
+  await queue.upsertJobScheduler(JOBS.sweepOrders, { every: 2 * 60_000 }, { name: JOBS.sweepOrders });
+  await queue.upsertJobScheduler(JOBS.emailCampaigns, { every: 2 * 60_000 }, { name: JOBS.emailCampaigns });
   await queue.upsertJobScheduler(JOBS.translations, { every: 60_000 }, { name: JOBS.translations });
   await queue.upsertJobScheduler(JOBS.automations, { every: AUTOMATION_EVERY_MS }, { name: JOBS.automations });
   if (FX_RATES_URL) {
@@ -152,7 +153,14 @@ async function main() {
     await queue.removeJobScheduler(JOBS.updateFx); // đã tắt FX_RATES_URL -> gỡ lịch cũ
   }
 
-  const worker = new Worker(QUEUE_NAME, processJob, { connection, concurrency: 3 });
+  const worker = new Worker(QUEUE_NAME, processJob, {
+    connection,
+    concurrency: 3,
+    // Mặc định BullMQ hỏi Redis mỗi 5 giây khi rảnh và kiểm tra job treo mỗi 30 giây -> ~30 nghìn lệnh/ngày dù không có việc.
+    // Chờ lâu hơn khi rảnh (job mới vẫn được nhận ngay, Redis báo về khi có job) + kiểm tra treo mỗi 5 phút.
+    drainDelay: 60,
+    stalledInterval: 5 * 60_000,
+  });
   worker.on('failed', (job, err) => log('worker').warn(`job ${job?.name} (${job?.id}) failed: ${err.message}`));
   worker.on('error', (err) => log('worker').warn(`worker error: ${err.message}`));
   log('worker').info(`started — queue "${QUEUE_NAME}", supplier sync every ${SYNC_MINUTES} min`);
