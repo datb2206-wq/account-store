@@ -84,7 +84,10 @@ export const buyaccfbAdapter: SupplierAdapter = {
       if (!p.success) continue; // bỏ qua dòng lỗi, không làm hỏng cả lần đồng bộ
       const { id, name, price, quantity, description, detailed_description } = p.data;
       const detail = decodeDetail(detailed_description);
-      const desc = [description?.trim(), detail.trim()].filter(Boolean).join('\n\n');
+      // Mô tả chi tiết thường lặp lại đúng mô tả ngắn (bọc trong <p>) -> bỏ phần trùng
+      const plain = (s: string) => s.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+      const short = description?.trim() ?? '';
+      const desc = (detail.trim() && plain(detail) !== plain(short) ? [short, detail.trim()] : [short]).filter(Boolean).join('\n\n');
       products.push({
         externalId: id,
         name: name.slice(0, 200),
