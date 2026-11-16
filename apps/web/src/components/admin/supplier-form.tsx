@@ -19,7 +19,7 @@ export interface SupplierFormValues {
   isActive: boolean;
 }
 
-const DEFAULT_URL: Record<string, string> = { accszone: 'https://accszone.com/api/v1', via79: 'https://via79.com/api', generic: '' };
+const DEFAULT_URL: Record<string, string> = { accszone: 'https://accszone.com/api/v1', via79: 'https://via79.com/api', buyaccfb: 'https://graph.buyaccfb.com/api', generic: '' };
 
 const EMPTY: SupplierFormValues = {
   name: '',
@@ -128,6 +128,7 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
             <select id="sp-adapter" className="input" value={values.adapter} onChange={(e) => changeAdapter(e.target.value)}>
               <option value="accszone">AccsZone API v1</option>
               <option value="via79">Via79 / CloneMMO247 (cùng kiểu API, giá VND)</option>
+              <option value="buyaccfb">BuyAccFB (giá VND)</option>
               <option value="generic">API khác (chuẩn chung)</option>
             </select>
           </FormField>

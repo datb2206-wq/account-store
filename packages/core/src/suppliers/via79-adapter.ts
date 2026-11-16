@@ -58,7 +58,7 @@ const replySchema = z.object({
 });
 
 // Số VND -> USD (chuỗi thập phân 8 chữ số) theo tỷ giá đang cấu hình
-async function vndToUsd() {
+export async function vndToUsd() {
   const rates = await getConfig('currency.rates');
   const vnd = rates.VND;
   if (!vnd) throw new Error('Chưa có tỷ giá VND trong Admin > Cấu hình (currency.rates) — via79 tính giá bằng VND');

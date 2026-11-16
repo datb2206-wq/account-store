@@ -34,6 +34,15 @@ export function SupplierNotes() {
         </div>
       </div>
       <div className="flex items-center gap-3 rounded-lg bg-zinc-50 px-3 py-3">
+        <span className="text-2xl" aria-hidden>📘</span>
+        <div>
+          <p className="font-semibold text-zinc-800">BuyAccFB</p>
+          <p className="text-xs text-zinc-500">
+            URL <code>https://graph.buyaccfb.com/api</code>, API key là token trong tài khoản buyaccfb. Giá VND được quy đổi USD theo tỷ giá VND ở Cấu hình. API không có tên danh mục nên sản phẩm về chung 1 danh mục mang tên kết nối, chuyển danh mục ở trang Sản phẩm.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 rounded-lg bg-zinc-50 px-3 py-3">
         <span className="text-2xl" aria-hidden>🔗</span>
         <div>
           <p className="font-semibold text-zinc-800">API khác (chuẩn chung)</p>
