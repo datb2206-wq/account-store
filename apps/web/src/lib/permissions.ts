@@ -160,6 +160,7 @@ export function requiredPermission(pathname: string, method = 'GET'): Permission
   // Các đường dẫn con cần quyền khác quyền của nhóm
   if (/^\/api\/admin\/orders\/[^/]+\/refund$/.test(path)) return 'orders.refund';
   if (/^\/api\/admin\/suppliers\/[^/]+$/.test(path)) return 'suppliers.edit';
+  if (/^\/api\/admin\/suppliers\/[^/]+\/active$/.test(path)) return 'suppliers.edit';
   if (/^\/api\/admin\/users\/[^/]+\/role$/.test(path)) return 'roles.manage';
 
   const write = method !== 'GET' && method !== 'HEAD';

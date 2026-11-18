@@ -10,15 +10,16 @@ type Ctx = { params: Promise<{ id: string }> };
 const schema = z.object({
   sortOrder: z.number().int().min(-100_000).max(100_000).optional(),
   isFeatured: z.boolean().optional(),
+  isActive: z.boolean().optional(), // bật/tắt bán nhanh từ danh sách
   // Lên đầu / xuống cuối danh mục của sản phẩm
   move: z.enum(['top', 'bottom']).optional(),
 });
 
-// Sửa nhanh thứ tự / ghim nổi bật ngay trong danh sách sản phẩm Admin
+// Sửa nhanh thứ tự / ghim nổi bật / bật-tắt bán ngay trong danh sách sản phẩm Admin
 export const PATCH = adminRoute<Ctx>(async (req, { params }, user) => {
   const { id } = await params;
   const input = await parseBody(req, schema);
-  const p = await prisma.product.findUnique({ where: { id }, select: { categoryId: true, sortOrder: true, isFeatured: true } });
+  const p = await prisma.product.findUnique({ where: { id }, select: { categoryId: true, sortOrder: true, isFeatured: true, isActive: true } });
   if (!p) throw notFound('Sản phẩm không tồn tại');
 
   let sortOrder = input.sortOrder;
@@ -28,9 +29,9 @@ export const PATCH = adminRoute<Ctx>(async (req, { params }, user) => {
   }
   const updated = await prisma.product.update({
     where: { id },
-    data: { ...(sortOrder !== undefined && { sortOrder }), ...(input.isFeatured !== undefined && { isFeatured: input.isFeatured }) },
-    select: { sortOrder: true, isFeatured: true },
+    data: { ...(sortOrder !== undefined && { sortOrder }), ...(input.isFeatured !== undefined && { isFeatured: input.isFeatured }), ...(input.isActive !== undefined && { isActive: input.isActive }) },
+    select: { sortOrder: true, isFeatured: true, isActive: true },
   });
-  await writeAudit({ actorId: user.id, action: 'product.order', entity: 'Product', entityId: id, before: { sortOrder: p.sortOrder, isFeatured: p.isFeatured }, after: updated, ip: getClientIp(req) });
+  await writeAudit({ actorId: user.id, action: 'product.order', entity: 'Product', entityId: id, before: { sortOrder: p.sortOrder, isFeatured: p.isFeatured, isActive: p.isActive }, after: updated, ip: getClientIp(req) });
   return NextResponse.json(updated);
 });
