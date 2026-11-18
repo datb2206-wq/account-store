@@ -9,7 +9,7 @@
 //   fulfill-order    theo sự kiện -> web đẩy vào ngay khi khách mua hàng RESELLER
 import { Queue, Worker, type Job } from 'bullmq';
 import { prisma } from '@accszone/database';
-import { AUTOMATION_EVERY_MS, backfillSellerEarnings, decrypt, expireStaleDeposits, fulfillResellerOrder, getAdapter, notifyLowBalance, processEmailCampaigns, processTranslations, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
+import { AUTOMATION_EVERY_MS, backfillSellerEarnings, expireStaleDeposits, fulfillResellerOrder, notifyLowBalance, processEmailCampaigns, processTranslations, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, supplierClient, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
 import {
   FULFILL_JOB_OPTIONS,
   fulfillJobId,
@@ -45,10 +45,10 @@ const enqueueFulfill = (orderId: string) =>
 // Số dư tại nguồn API dưới ngưỡng (Admin > Thông báo Telegram) -> báo Telegram. Lỗi ở đây không làm hỏng job đồng bộ.
 async function checkSupplierBalance(supplierId: string) {
   try {
-    const s = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { name: true, adapter: true, baseUrl: true, apiKeyEnc: true } });
-    const adapter = s && getAdapter(s.adapter);
-    if (!s || !adapter?.getBalance) return;
-    const balance = Number(await adapter.getBalance({ baseUrl: s.baseUrl, apiKey: decrypt(s.apiKeyEnc) }));
+    const s = await prisma.supplier.findUnique({ where: { id: supplierId }, select: { name: true, adapter: true, baseUrl: true, apiKeyEnc: true, priceRate: true, proxyEnc: true } });
+    const client = s && supplierClient(s);
+    if (!s || !client?.getBalance) return;
+    const balance = Number(await client.getBalance());
     if (Number.isFinite(balance)) await notifyLowBalance(supplierId, s.name, balance);
   } catch (err) {
     log('sync').warn(`balance check ${supplierId}: ${err instanceof Error ? err.message : err}`);

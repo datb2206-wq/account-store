@@ -1,6 +1,6 @@
 // Dùng được ở cả server lẫn client (không import gì của Node/Next server).
 // Danh sách khớp enum Locale trong schema.prisma.
-export const LOCALES = ['en', 'id', 'ru', 'zh'] as const;
+export const LOCALES = ['en', 'id', 'ru', 'zh', 'pt'] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = 'en';
 
@@ -15,6 +15,7 @@ export const LOCALE_META: Record<Locale, { name: string; short: string; htmlLang
   id: { name: 'Bahasa Indonesia', short: 'ID', htmlLang: 'id' },
   ru: { name: 'Русский', short: 'RU', htmlLang: 'ru' },
   zh: { name: '中文', short: 'ZH', htmlLang: 'zh-CN' },
+  pt: { name: 'Português (Brasil)', short: 'PT', htmlLang: 'pt-BR' },
 };
 
 export function isLocale(value: unknown): value is Locale {
@@ -54,7 +55,7 @@ export function plural(locale: Locale, n: number, forms: Plural) {
 
 // Tiền tệ hiển thị tham khảo mặc định theo ngôn ngữ (khi khách chưa chọn và admin để "Tự động").
 // Số dư & thanh toán luôn tính bằng USD; giá quy đổi chỉ hiện thêm dạng "≈". Tỷ giá: Admin > Tiền tệ.
-export const LOCALE_CURRENCY: Record<Locale, string> = { en: 'USD', id: 'IDR', ru: 'RUB', zh: 'CNY' };
+export const LOCALE_CURRENCY: Record<Locale, string> = { en: 'USD', id: 'IDR', ru: 'RUB', zh: 'CNY', pt: 'BRL' };
 
 // decimals: số chữ số lẻ admin đặt cho tiền đó (Admin > Tiền tệ)
 export type Fx = { currency: string; rate: number; decimals?: number } | null;

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@accszone/database';
-import { decrypt, getAdapter } from '@accszone/core';
+import { supplierClient, type SupplierConnection } from '@accszone/core';
 import { PublishButton, SupplierForm, SyncButton } from '@/components/admin/supplier-form';
 import { SupplierNotes } from '@/components/admin/supplier-notes';
 import { Panel } from '@/components/admin/ui';
@@ -44,6 +44,10 @@ export default async function AdminSupplierDetailPage({ params }: { params: Prom
         priceRounding: true,
         autoUpdateInfo: true,
         stripHtml: true,
+        syncCategories: true,
+        autoActivate: true,
+        priceRate: true,
+        proxyEnc: true,
         isActive: true,
         lastSyncAt: true,
       },
@@ -152,8 +156,12 @@ export default async function AdminSupplierDetailPage({ params }: { params: Prom
                 priceRounding: supplier.priceRounding,
                 autoUpdateInfo: supplier.autoUpdateInfo,
                 stripHtml: supplier.stripHtml,
+                syncCategories: supplier.syncCategories,
+                autoActivate: supplier.autoActivate,
+                priceRate: supplier.priceRate ? supplier.priceRate.toFixed() : '',
                 isActive: supplier.isActive,
               }}
+              hasProxy={!!supplier.proxyEnc}
             />
           </Panel>
           <SupplierNotes />
@@ -164,11 +172,11 @@ export default async function AdminSupplierDetailPage({ params }: { params: Prom
 }
 
 // Số dư tài khoản mình tại web gốc (nguồn không hỗ trợ / lỗi mạng -> hiện lý do thay vì làm hỏng trang)
-async function sourceBalance(supplier: { adapter: string; baseUrl: string; apiKeyEnc: string }) {
-  const adapter = getAdapter(supplier.adapter);
-  if (!adapter.getBalance) return { ok: false as const, error: 'Nguồn này không cung cấp số dư qua API' };
+async function sourceBalance(supplier: SupplierConnection) {
   try {
-    return { ok: true as const, value: await adapter.getBalance({ baseUrl: supplier.baseUrl, apiKey: decrypt(supplier.apiKeyEnc) }) };
+    const client = supplierClient(supplier);
+    if (!client.getBalance) return { ok: false as const, error: 'Nguồn này không cung cấp số dư qua API' };
+    return { ok: true as const, value: await client.getBalance() };
   } catch (err) {
     return { ok: false as const, error: `Không lấy được số dư: ${err instanceof Error ? err.message : String(err)}`.slice(0, 160) };
   }

@@ -144,7 +144,7 @@ export const CONFIG_SCHEMAS = {
     azureRegion: z.string().trim().regex(/^[a-z0-9]{0,40}$/, 'Region dạng southeastasia, eastasia, global…').default(''),
     apiKey: z.string().trim().max(300),
     model: z.string().trim().regex(/^claude-[a-z0-9.-]{3,60}$/, 'Model dạng claude-...'),
-    targets: z.array(z.enum(['id', 'ru', 'zh'])).max(3),
+    targets: z.array(z.enum(['id', 'ru', 'zh', 'pt'])).max(4),
     description: z.boolean(), // dịch cả mô tả (tốn hơn tên)
     autoNew: z.boolean(), // sản phẩm mới đồng bộ từ nguồn API tự được dịch
   }),

@@ -2,13 +2,13 @@
 // An toàn khi chạy lặp/đồng thời: mọi thay đổi trạng thái đều là UPDATE ... WHERE status = 'PENDING',
 // nên "giao hàng" và "hoàn tiền" không bao giờ cùng xảy ra cho 1 đơn, và không hoàn tiền 2 lần.
 import { Prisma, prisma } from '@accszone/database';
-import { contentHash, decrypt, encrypt } from '../crypto';
+import { contentHash, encrypt } from '../crypto';
 import { domainError } from '../errors';
 import { pickRandomStock } from '../stock';
 import { creditCommission, reverseCommission } from '../affiliate';
 import { syncSellerEarning } from '../sellers';
 import { notifyRefund } from '../telegram';
-import { getAdapter } from './adapters';
+import { supplierClient } from './adapters';
 import { SupplierTransientError, type SupplierOrderResult } from './generic-adapter';
 
 export const RESELLER_TIMEOUT_MS = 24 * 60 * 60 * 1000;
@@ -213,7 +213,7 @@ export async function fulfillResellerOrder(orderId: string, opts: { isLastAttemp
       externalOrderId: true,
       createdAt: true,
       product: { select: { externalId: true } },
-      supplier: { select: { baseUrl: true, apiKeyEnc: true, isActive: true, adapter: true } },
+      supplier: { select: { baseUrl: true, apiKeyEnc: true, isActive: true, adapter: true, priceRate: true, proxyEnc: true } },
     },
   });
   if (!order || order.status !== 'PENDING') return 'skipped';
@@ -227,14 +227,13 @@ export async function fulfillResellerOrder(orderId: string, opts: { isLastAttemp
     return 'refunded';
   }
 
-  const adapter = getAdapter(order.supplier.adapter);
-  const creds = { baseUrl: order.supplier.baseUrl, apiKey: decrypt(order.supplier.apiKeyEnc) };
+  const client = supplierClient(order.supplier);
 
   let result: SupplierOrderResult;
   try {
     result = order.externalOrderId
-      ? await adapter.getOrder({ ...creds, externalOrderId: order.externalOrderId })
-      : await adapter.placeOrder({ ...creds, externalProductId: order.product.externalId, quantity: order.quantity, reference: order.id });
+      ? await client.getOrder({ externalOrderId: order.externalOrderId })
+      : await client.placeOrder({ externalProductId: order.product.externalId, quantity: order.quantity, reference: order.id });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // Chưa có mã đơn bên web gốc + hết lượt thử -> coi như không đặt được, hoàn tiền.

@@ -8,6 +8,7 @@
 //  - client_reference bắt buộc là UUID, gửi lại đúng UUID thì web gốc trả lại đơn cũ, không trừ tiền lần 2.
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { supplierFetch } from './context';
 import { SupplierTransientError, type SupplierAdapter, type SupplierCatalogItem, type SupplierOrderResult } from './generic-adapter';
 
 // 30 request/phút -> mỗi trang cách nhau hơn 2 giây để không đụng giới hạn
@@ -84,7 +85,7 @@ function toCatalogItem(l: z.infer<typeof listingSchema>): SupplierCatalogItem {
 async function getCatalogPage(baseUrl: string, apiKey: string, page: number) {
   const url = `${base(baseUrl)}/listings?include=description&page=${page}`;
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(url, {
+    const res = await supplierFetch(url, {
       headers: { 'X-API-Key': apiKey, Accept: 'application/json' },
       signal: AbortSignal.timeout(30_000),
       cache: 'no-store',
@@ -106,7 +107,7 @@ async function getCatalogPage(baseUrl: string, apiKey: string, page: number) {
 async function orderRequest(url: string, apiKey: string, body?: unknown) {
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await supplierFetch(url, {
       method: body ? 'POST' : 'GET',
       headers: { 'X-API-Key': apiKey, Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,

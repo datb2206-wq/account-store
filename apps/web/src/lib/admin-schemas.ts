@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const LOCALES = ['en', 'id', 'ru', 'zh'] as const;
+export const LOCALES = ['en', 'id', 'ru', 'zh', 'pt'] as const;
 export type LocaleCode = (typeof LOCALES)[number];
 
 const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v);
@@ -14,6 +14,7 @@ function i18n(max: number, required: boolean) {
       id: opt,
       ru: opt,
       zh: opt,
+      pt: opt,
     })
     .transform((obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v)) as Record<string, string>);
 }
@@ -121,6 +122,21 @@ export const supplierSchema = z.object({
   priceRounding: z.enum(['none', '0.01', '0.1', '1']).default('none'), // khớp PRICE_ROUNDINGS ở core
   autoUpdateInfo: z.boolean().default(false),
   stripHtml: z.boolean().default(true),
+  syncCategories: z.boolean().default(true),
+  autoActivate: z.boolean().default(false),
+  // Tỷ giá tự đặt: 1 đơn vị tiền của API = ? USD. Trống = tự động
+  priceRate: z
+    .preprocess(
+      (v) => (v === '' || v == null ? null : typeof v === 'number' ? String(v) : typeof v === 'string' ? v.trim().replace(',', '.') : v),
+      z
+        .string()
+        .regex(/^\d{1,10}(\.\d{1,12})?$/, 'Nhập số, VD 1 hoặc 0.000038')
+        .refine((v) => Number(v) > 0, 'Tỷ giá phải lớn hơn 0')
+        .nullable(),
+    )
+    .default(null),
+  proxy: optionalText(300), // để trống khi sửa = giữ proxy cũ
+  clearProxy: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
 

@@ -37,6 +37,7 @@ enum Locale {
   id
   ru
   zh
+  pt
 }
 
 enum ProductSource {
@@ -369,6 +370,10 @@ model Supplier {
   priceRounding   String  @default("none") // làm tròn LÊN giá bán: "none" | "0.01" | "0.1" | "1"
   autoUpdateInfo  Boolean @default(false) // ghi đè tên & mô tả (tiếng Anh) theo nguồn mỗi lần đồng bộ
   stripHtml       Boolean @default(true)  // lọc thẻ HTML khỏi tên & mô tả lấy từ nguồn
+  syncCategories  Boolean @default(true)  // tạo danh mục theo nguồn; tắt = gom về 1 danh mục mang tên nhà cung cấp
+  autoActivate    Boolean @default(false) // sản phẩm mới đồng bộ về (còn hàng) được bật bán ngay
+  priceRate       Decimal? @db.Decimal(24, 12) // tỷ giá tự đặt: 1 đơn vị tiền của API = priceRate USD; null = tự động
+  proxyEnc        String? // proxy MÃ HÓA "ip:port:user:pass", dùng khi gọi web nguồn
   isActive     Boolean    @default(true)
   lastSyncAt   DateTime?
   createdAt    DateTime   @default(now())

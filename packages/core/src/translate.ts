@@ -1,7 +1,7 @@
 // Dịch tên / mô tả sản phẩm sang ngôn ngữ khác: Microsoft Azure Translator (mặc định, có gói miễn phí) hoặc Claude (Anthropic API).
 // Admin tạo 1 "lượt dịch" (danh sách sản phẩm + ngôn ngữ) -> lưu ở SystemConfig 'translate.job'.
 // Worker mỗi phút chạy processTranslations(): dịch tiếp từng nhóm ~40 giây rồi dừng, lần sau làm tiếp (tắt máy không mất tiến độ).
-// Chỉ ghi vào ngôn ngữ đích ({ en, id, ru, zh }), không bao giờ sửa bản tiếng Anh gốc.
+// Chỉ ghi vào ngôn ngữ đích ({ en, id, ru, zh, pt }), không bao giờ sửa bản tiếng Anh gốc.
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z as z4 } from 'zod/v4';
@@ -27,7 +27,7 @@ export const TRANSLATE_DEFAULTS: TranslateSettings = {
 export const translateReady = (s: TranslateSettings) => (s.provider === 'azure' ? !!s.azureKey : !!s.apiKey);
 
 // Mã ngôn ngữ của Azure Translator
-const AZURE_LANG: Record<TranslateLocale, string> = { id: 'id', ru: 'ru', zh: 'zh-Hans' };
+const AZURE_LANG: Record<TranslateLocale, string> = { id: 'id', ru: 'ru', zh: 'zh-Hans', pt: 'pt' };
 // AZURE_TRANSLATOR_ENDPOINT chỉ dùng khi thử nghiệm với máy chủ giả lập
 const AZURE_URL = `${process.env.AZURE_TRANSLATOR_ENDPOINT || 'https://api.cognitive.microsofttranslator.com'}/translate?api-version=3.0&from=en`;
 // Giới hạn 1 request Azure: 1.000 đoạn, 50.000 ký tự -> chừa biên an toàn
@@ -41,6 +41,7 @@ export const TRANSLATE_LANG: Record<TranslateLocale, string> = {
   id: 'Indonesian (Bahasa Indonesia)',
   ru: 'Russian',
   zh: 'Simplified Chinese',
+  pt: 'Brazilian Portuguese (pt-BR)',
 };
 
 // Model hỗ trợ server-side fallback khi bị từ chối (Haiku không có)

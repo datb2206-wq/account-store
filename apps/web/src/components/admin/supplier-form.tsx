@@ -16,6 +16,11 @@ export interface SupplierFormValues {
   priceRounding: string;
   autoUpdateInfo: boolean;
   stripHtml: boolean;
+  syncCategories: boolean;
+  autoActivate: boolean;
+  priceRate: string; // '' = tự động
+  proxy: string; // chỉ gửi lên, không bao giờ trả về trình duyệt
+  clearProxy: boolean;
   isActive: boolean;
 }
 
@@ -31,6 +36,11 @@ const EMPTY: SupplierFormValues = {
   priceRounding: 'none',
   autoUpdateInfo: false,
   stripHtml: true,
+  syncCategories: true,
+  autoActivate: false,
+  priceRate: '',
+  proxy: '',
+  clearProxy: false,
   isActive: true,
 };
 
@@ -72,10 +82,10 @@ function OnOff({ id, value, onChange, on, off }: { id: string; value: boolean; o
   );
 }
 
-export function SupplierForm({ supplierId, initial }: { supplierId?: string; initial?: Omit<SupplierFormValues, 'apiKey'> }) {
+export function SupplierForm({ supplierId, initial, hasProxy = false }: { supplierId?: string; initial?: Omit<SupplierFormValues, 'apiKey' | 'proxy' | 'clearProxy'>; hasProxy?: boolean }) {
   const router = useRouter();
   const isEdit = !!supplierId;
-  const start = initial ? { ...initial, apiKey: '' } : EMPTY;
+  const start = initial ? { ...initial, apiKey: '', proxy: '', clearProxy: false } : EMPTY;
   const [values, setValues] = useState<SupplierFormValues>(start);
   const [percent, setPercent] = useState(markupToPercent(start.priceMarkup));
   const [pending, setPending] = useState(false);
@@ -108,7 +118,7 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
     }
     if (isEdit) {
       setSuccess('Đã lưu. Thay đổi áp dụng từ lần đồng bộ tiếp theo.');
-      set('apiKey', '');
+      setValues((s) => ({ ...s, apiKey: '', proxy: '', clearProxy: false }));
       router.refresh();
     } else {
       router.push(`/admin/suppliers/${res.data.supplier!.id}`);
@@ -124,15 +134,15 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
 
       <Section icon="🔌" title="Thông tin kết nối API">
         <div className="grid gap-4 md:grid-cols-2">
-          <FormField label="Loại API *" htmlFor="sp-adapter" error={fields.adapter} hint="AccsZone dùng API v1 chính thức; Via79 tính giá VND, tự quy đổi USD theo tỷ giá VND ở Cấu hình; loại khác dùng chuẩn chung GET /products, POST /orders.">
+          <FormField label="Loại API *" htmlFor="sp-adapter" error={fields.adapter} hint="AccsZone dùng API v1 chính thức; SHOPCLONE7 / CMSNT (Via79, CloneMMO247 và các web cùng mã nguồn) chỉ cần nhập tên miền, giá VND tự quy đổi USD theo tỷ giá VND ở Cấu hình; loại khác dùng chuẩn chung GET /products, POST /orders.">
             <select id="sp-adapter" className="input" value={values.adapter} onChange={(e) => changeAdapter(e.target.value)}>
               <option value="accszone">AccsZone API v1</option>
-              <option value="via79">Via79 / CloneMMO247 (cùng kiểu API, giá VND)</option>
+              <option value="via79">SHOPCLONE7 / CMSNT: Via79, CloneMMO247… (giá VND)</option>
               <option value="buyaccfb">BuyAccFB (giá VND)</option>
               <option value="generic">API khác (chuẩn chung)</option>
             </select>
           </FormField>
-          <FormField label="Domain / API URL *" htmlFor="sp-url" error={fields.baseUrl} hint="Nhập đầy đủ URL kèm https://">
+          <FormField label="Domain / API URL *" htmlFor="sp-url" error={fields.baseUrl} hint={values.adapter === 'via79' ? 'Nhập tên miền web nguồn kèm https://, VD: https://via79.com/' : 'Nhập đầy đủ URL kèm https://'}>
             <input id="sp-url" className="input font-mono text-xs" placeholder="VD: https://domain.com/api" value={values.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} />
           </FormField>
           <FormField label={isEdit ? 'API key' : 'API key *'} htmlFor="sp-key" error={fields.apiKey} hint={isEdit ? 'Để trống = giữ key hiện tại. Key được lưu mã hóa.' : 'Lấy ở trang API của web nguồn. Key được lưu mã hóa.'}>
@@ -146,6 +156,12 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
 
       <Section icon="⚙️" title="Cài đặt đồng bộ dữ liệu">
         <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="Đồng bộ chuyên mục từ API *" htmlFor="sp-cats" hint="Bật = tự tạo danh mục theo web nguồn. Tắt = sản phẩm mới về chung 1 danh mục mang tên kết nối.">
+            <OnOff id="sp-cats" value={values.syncCategories} onChange={(v) => set('syncCategories', v)} on="Đồng bộ chuyên mục" off="Không đồng bộ" />
+          </FormField>
+          <FormField label="Tự động bật bán sản phẩm *" htmlFor="sp-activate" hint="Bật = sản phẩm mới (còn hàng) được bật bán ngay sau khi đồng bộ. Tắt = để ẩn, bạn kiểm tra giá rồi bật.">
+            <OnOff id="sp-activate" value={values.autoActivate} onChange={(v) => set('autoActivate', v)} on="Bật bán ngay" off="Giữ ẩn khi đồng bộ" />
+          </FormField>
           <FormField label="Cập nhật giá bán tự động *" htmlFor="sp-autoprice" hint="Khi giá gốc thay đổi, hệ thống tự tính lại giá bán. Tắt = giữ giá bạn tự đặt (vẫn tự nâng nếu giá gốc vượt giá bán).">
             <OnOff id="sp-autoprice" value={values.autoUpdatePrice} onChange={(v) => set('autoUpdatePrice', v)} on="Cập nhật tự động" off="Giữ giá đã đặt" />
           </FormField>
@@ -160,6 +176,21 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
               <span className="flex items-center rounded-r-lg border border-l-0 border-zinc-300 bg-zinc-100 px-3 text-sm text-zinc-500">%</span>
             </div>
           </FormField>
+          <FormField
+            label="Tỷ giá tiền tệ của API (nếu có)"
+            htmlFor="sp-rate"
+            error={fields.priceRate}
+            hint={
+              values.adapter === 'via79' || values.adapter === 'buyaccfb'
+                ? 'Để trống = tự dùng tỷ giá VND ở Cấu hình. Nhập để đặt riêng: 1 VND = ? USD, VD 0.000038.'
+                : 'Để trống = giá API đã là USD. Nếu API tính bằng tiền khác, nhập 1 đơn vị tiền đó = ? USD, VD API giá VND thì nhập 0.000038.'
+            }
+          >
+            <div className="flex">
+              <input id="sp-rate" className="input rounded-r-none font-mono" inputMode="decimal" placeholder="Tự động" value={values.priceRate} onChange={(e) => set('priceRate', e.target.value)} />
+              <span className="flex items-center rounded-r-lg border border-l-0 border-zinc-300 bg-zinc-100 px-3 text-sm text-zinc-500">USD</span>
+            </div>
+          </FormField>
           <FormField label="Cập nhật tên & mô tả tự động *" htmlFor="sp-autoinfo" hint="Bật = tên & mô tả tiếng Anh luôn theo web nguồn (ghi đè chỗ bạn đã sửa).">
             <OnOff id="sp-autoinfo" value={values.autoUpdateInfo} onChange={(v) => set('autoUpdateInfo', v)} on="Cập nhật tự động" off="Giữ nội dung đã sửa" />
           </FormField>
@@ -170,6 +201,32 @@ export function SupplierForm({ supplierId, initial }: { supplierId?: string; ini
       </Section>
 
       <Section icon="🧩" title="Cài đặt khác">
+        <FormField
+          label="Proxy v4 hoặc v6 (nếu có)"
+          htmlFor="sp-proxy"
+          error={fields.proxy}
+          hint={`Chỉ dùng khi web nguồn bắt whitelist IP mà vẫn không kết nối được. Proxy HTTP dạng ip:port hoặc ip:port:username:password (IPv6 để trong [ ]). Được lưu mã hóa.${hasProxy ? ' Đang có proxy: để trống = giữ nguyên.' : ''}`}
+        >
+          <input
+            id="sp-proxy"
+            name="supplier-proxy"
+            type="password"
+            autoComplete="new-password"
+            data-1p-ignore
+            data-lpignore="true"
+            className="input font-mono text-xs"
+            placeholder={hasProxy && !values.clearProxy ? '•••••••• (đang dùng proxy)' : 'ip:port:username:password'}
+            value={values.proxy}
+            disabled={values.clearProxy}
+            onChange={(e) => set('proxy', e.target.value)}
+          />
+          {hasProxy && (
+            <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
+              <input type="checkbox" checked={values.clearProxy} onChange={(e) => setValues((s) => ({ ...s, clearProxy: e.target.checked, proxy: '' }))} />
+              Bỏ proxy (kết nối trực tiếp)
+            </label>
+          )}
+        </FormField>
         <FormField label="Trạng thái kết nối" htmlFor="sp-active" hint="Tắt = ngừng đồng bộ định kỳ với web nguồn.">
           <OnOff id="sp-active" value={values.isActive} onChange={(v) => set('isActive', v)} on="Đang hoạt động" off="Tạm dừng" />
         </FormField>

@@ -1,6 +1,8 @@
 // Đồng bộ catalog từ nhà cung cấp -> Category/Product (source = RESELLER).
 // Nguyên tắc:
 //  - Sản phẩm MỚI tạo ở trạng thái ẨN (isActive = false): admin xem giá rồi mới bật bán.
+//    Bật autoActivate -> sản phẩm mới còn hàng được bật bán ngay.
+//  - Tắt syncCategories -> không tạo danh mục theo nguồn, sản phẩm mới về 1 danh mục mang tên nhà cung cấp.
 //  - Giá bán = giá vốn × priceMarkup, làm tròn LÊN theo priceRounding (đổi markup để chỉnh giá hàng loạt).
 //    Tắt autoUpdatePrice -> giữ giá admin đặt, trừ khi giá đó thấp hơn giá vốn mới (tránh bán lỗ).
 //  - Mặc định không ghi đè tên/mô tả/danh mục admin đã sửa; bật autoUpdateInfo thì ghi đè bản tiếng Anh theo nguồn.
@@ -9,10 +11,9 @@
 //  - Danh mục nguồn trùng tên với danh mục có sẵn của shop (cùng cấp cha) -> dùng luôn danh mục đó, không tạo bản trùng.
 import { createHash } from 'node:crypto';
 import { Prisma, prisma } from '@accszone/database';
-import { decrypt } from '../crypto';
 import { slugify } from '../slugify';
 import { htmlToText } from './accszone-adapter';
-import { getAdapter } from './adapters';
+import { supplierClient } from './adapters';
 
 export const PRICE_ROUNDINGS = ['none', '0.01', '0.1', '1'] as const;
 
@@ -63,7 +64,7 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
   if (!supplier) throw new Error(`Supplier ${supplierId} không tồn tại`);
   if (!supplier.isActive) throw new Error(`Supplier "${supplier.name}" đang tắt`);
 
-  const catalog = await getAdapter(supplier.adapter).fetchCatalog({ baseUrl: supplier.baseUrl, apiKey: decrypt(supplier.apiKeyEnc) });
+  const catalog = await supplierClient(supplier).fetchCatalog();
   const result: SyncResult = {
     supplier: supplier.name,
     fetched: catalog.products.length,
@@ -80,7 +81,10 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
   const fallbackKey = '__default__';
   const wanted = new Map<string, string>([[fallbackKey, supplier.name]]);
   const parentOf = new Map<string, string>();
-  for (const { category } of catalog.products) {
+  // Tắt đồng bộ chuyên mục: coi như nguồn không có danh mục
+  const catOf = (item: (typeof catalog.products)[number]) => (supplier.syncCategories ? item.category : null);
+  for (const item of catalog.products) {
+    const category = catOf(item);
     if (!category) continue;
     if (category.parent) {
       wanted.set(category.parent.externalId, category.parent.name);
@@ -97,7 +101,7 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
   // Danh mục cha được đưa vào `wanted` trước danh mục con nên luôn được tạo trước
   for (const [externalId, name] of wanted) {
     if (categoryIds.has(externalId)) continue;
-    if (externalId === fallbackKey && !catalog.products.some((p) => !p.category)) continue;
+    if (externalId === fallbackKey && !catalog.products.some((p) => !catOf(p))) continue;
     const parentId = categoryIds.get(parentOf.get(externalId) ?? '') ?? null;
     const local = externalId === fallbackKey ? null : await findShopCategory(name, parentId);
     if (local) {
@@ -167,9 +171,9 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
           supplierId,
           externalId: item.externalId,
           source: 'RESELLER',
-          isActive: false,
+          isActive: supplier.autoActivate && item.stock > 0,
           slug: stableSlug(name, supplierId, item.externalId),
-          categoryId: categoryIds.get(item.category?.externalId ?? fallbackKey)!,
+          categoryId: categoryIds.get(catOf(item)?.externalId ?? fallbackKey)!,
           name: { en: name },
           description: description ? { en: description } : {},
         },

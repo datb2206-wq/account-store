@@ -13,6 +13,7 @@
 // nên chỉ thử lại lệnh mua khi chắc chắn lệnh chưa tới web gốc. API không trả tên danh mục (chỉ category_id)
 // -> sản phẩm được gom vào 1 danh mục mang tên nhà cung cấp, admin tự chuyển danh mục nếu muốn.
 import { z } from 'zod';
+import { supplierFetch } from './context';
 import { SupplierTransientError, type SupplierAdapter, type SupplierCatalogItem, type SupplierOrderResult } from './generic-adapter';
 import { vndToUsd } from './via79-adapter';
 
@@ -47,7 +48,7 @@ function decodeDetail(b64: string | null | undefined) {
 async function call(baseUrl: string, apiKey: string, body: object, timeoutMs = 60_000) {
   let res: Response;
   try {
-    res = await fetch(base(baseUrl), {
+    res = await supplierFetch(base(baseUrl), {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: apiKey, 'User-Agent': 'Mozilla/5.0 (compatible; ShopSync/1.0)' },
       body: JSON.stringify(body),
@@ -112,7 +113,7 @@ export const buyaccfbAdapter: SupplierAdapter = {
   async placeOrder({ baseUrl, apiKey, externalProductId, quantity }): Promise<SupplierOrderResult> {
     let res: Response;
     try {
-      res = await fetch(base(baseUrl), {
+      res = await supplierFetch(base(baseUrl), {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: apiKey, 'User-Agent': 'Mozilla/5.0 (compatible; ShopSync/1.0)' },
         body: JSON.stringify({ act: 'Create-Order', data: { service_id: Number(externalProductId), quantity } }),

@@ -17,6 +17,7 @@
 //                         "category": { "id": "7", "name": "Twitter" },        // không bắt buộc
 //                         "minQty": 1, "maxQty": 500, "description": "login:pass" } ] }  // không bắt buộc
 import { z } from 'zod';
+import { supplierFetch } from './context';
 
 export interface SupplierCatalogItem {
   externalId: string;
@@ -88,7 +89,7 @@ const orderResponseSchema = z.object({
 async function orderRequest(url: string, apiKey: string, init: { method: 'GET' } | { method: 'POST'; body: unknown; reference: string }) {
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await supplierFetch(url, {
       method: init.method,
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -142,7 +143,7 @@ export const genericAdapter: SupplierAdapter = {
   },
 
   async fetchCatalog({ baseUrl, apiKey }) {
-    const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/products`, {
+    const res = await supplierFetch(`${baseUrl.replace(/\/+$/, '')}/products`, {
       headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
       signal: AbortSignal.timeout(30_000),
       cache: 'no-store',

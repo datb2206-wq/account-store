@@ -5,7 +5,7 @@ import { LOCALES, type LocaleCode } from '@/lib/admin-schemas';
 
 export type I18nText = Partial<Record<LocaleCode, string>>;
 
-const LABELS: Record<LocaleCode, string> = { en: 'English', id: 'Indonesia', ru: 'Русский', zh: '中文' };
+const LABELS: Record<LocaleCode, string> = { en: 'English', id: 'Indonesia', ru: 'Русский', zh: '中文', pt: 'Português (BR)' };
 
 // Tên + mô tả theo 4 ngôn ngữ, chuyển qua lại bằng tab. EN bắt buộc (dùng làm fallback).
 export function I18nFields({

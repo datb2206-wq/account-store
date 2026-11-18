@@ -44,6 +44,15 @@ const FLAGS: Record<Locale, React.ReactNode> = {
       <polygon points={star(10, 9, 1, 20)} fill="#FFDE00" />
     </svg>
   ),
+  // Brasil (rút gọn: nền xanh lá, hình thoi vàng, quả cầu xanh dương có dải trắng)
+  pt: (
+    <svg preserveAspectRatio="xMidYMid slice" viewBox="0 0 20 14">
+      <rect width="20" height="14" fill="#009C3B" />
+      <polygon points="10,1.7 18.3,7 10,12.3 1.7,7" fill="#FFDF00" />
+      <circle cx="10" cy="7" r="3.5" fill="#002776" />
+      <path d="M6.6,6.3 Q10,5.4 13.4,7.4" stroke="#fff" strokeWidth="0.6" fill="none" />
+    </svg>
+  ),
 };
 
 export function Flag({ locale, className = '' }: { locale: Locale; className?: string }) {

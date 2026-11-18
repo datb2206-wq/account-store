@@ -20,10 +20,11 @@ export default async function TranslatePage() {
     getTranslateSettings(),
     getTranslateJob(),
     prisma.product.count({ where: { isActive: true } }),
-    prisma.$queryRaw<{ id: number; ru: number; zh: number }[]>`
+    prisma.$queryRaw<{ id: number; ru: number; zh: number; pt: number }[]>`
       SELECT count(*) FILTER (WHERE coalesce(name->>'id','') <> '')::int AS id,
              count(*) FILTER (WHERE coalesce(name->>'ru','') <> '')::int AS ru,
-             count(*) FILTER (WHERE coalesce(name->>'zh','') <> '')::int AS zh
+             count(*) FILTER (WHERE coalesce(name->>'zh','') <> '')::int AS zh,
+             count(*) FILTER (WHERE coalesce(name->>'pt','') <> '')::int AS pt
       FROM products WHERE "isActive" = true`,
     workerOnline().catch(() => false),
   ]);
@@ -31,7 +32,7 @@ export default async function TranslatePage() {
   const { apiKey, azureKey, ...publicSettings } = settings;
   const running = job?.status === 'RUNNING';
   const pct = job ? Math.round((job.cursor / Math.max(1, job.productIds.length)) * 100) : 0;
-  const cov = coverage[0] ?? { id: 0, ru: 0, zh: 0 };
+  const cov = coverage[0] ?? { id: 0, ru: 0, zh: 0, pt: 0 };
 
   return (
     <div className="space-y-5">
@@ -43,7 +44,7 @@ export default async function TranslatePage() {
 
       <Panel title="Tiến độ" action={can(user, 'products.edit') && <TranslateActions running={running} canStart={translateReady(settings) && settings.targets.length > 0} />}>
         {running && <AutoRefresh everyMs={10_000} />}
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {(Object.keys(LOCALE_LABEL) as (keyof typeof LOCALE_LABEL)[]).map((l) => (
             <div key={l} className="rounded-lg bg-zinc-50 p-3 text-sm">
               <p className="text-zinc-500">{LOCALE_LABEL[l]}{settings.targets.includes(l) ? '' : ' (không bật)'}</p>

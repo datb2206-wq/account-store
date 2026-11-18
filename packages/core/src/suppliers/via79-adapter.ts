@@ -1,5 +1,6 @@
-// Adapter cho API của via79.com (tài liệu ở /client/document-api, cần đăng nhập).
-// Base URL khi thêm nhà cung cấp: https://via79.com/api
+// Adapter cho API của các web chạy mã nguồn SHOPCLONE7 (CMSNT): via79.com, clonemmo247.com, ...
+// (tài liệu ở /client/document-api, cần đăng nhập).
+// Base URL khi thêm nhà cung cấp: https://via79.com/api (hoặc chỉ tên miền https://via79.com/, tự thêm /api)
 //
 //   GET  /profile.php?api_key=          -> { status, data: { username, money } }          (money: VND)
 //   GET  /products.php?api_key=         -> { status, categories: [ { id, parent_id, name, products: [
@@ -18,9 +19,18 @@
 import { z } from 'zod';
 import { Prisma } from '@accszone/database';
 import { getConfig } from '../config';
+import { supplierFetch, supplierRuntime } from './context';
 import { SupplierTransientError, type SupplierAdapter, type SupplierCatalogItem, type SupplierOrderResult } from './generic-adapter';
 
-const base = (url: string) => url.replace(/\/+$/, '');
+// Web SHOPCLONE7 (CMSNT): admin có thể chỉ nhập tên miền "https://via79.com/" -> tự thêm "/api"
+const base = (url: string) => {
+  const u = url.trim().replace(/\/+$/, '');
+  try {
+    return new URL(u).pathname === '/' ? `${u}/api` : u;
+  } catch {
+    return u;
+  }
+};
 const HEADERS = { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; ShopSync/1.0)' };
 const MAX_QTY = 1000;
 // Lỗi xảy ra TRƯỚC khi request tới được máy chủ -> chắc chắn chưa mua
@@ -57,8 +67,11 @@ const replySchema = z.object({
   data: z.unknown().optional(),
 });
 
-// Số VND -> USD (chuỗi thập phân 8 chữ số) theo tỷ giá đang cấu hình
+// Số VND -> USD (chuỗi thập phân 8 chữ số) theo tỷ giá đang cấu hình.
+// Kết nối có "Tỷ giá tự đặt" -> dùng tỷ giá đó (1 đơn vị tiền API = priceRate USD).
 export async function vndToUsd() {
+  const own = supplierRuntime()?.priceRate;
+  if (own) return (amount: string) => new Prisma.Decimal(amount).mul(own).toDecimalPlaces(8, Prisma.Decimal.ROUND_UP).toFixed(8);
   const rates = await getConfig('currency.rates');
   const vnd = rates.VND;
   if (!vnd) throw new Error('Chưa có tỷ giá VND trong Admin > Cấu hình (currency.rates) — via79 tính giá bằng VND');
@@ -84,7 +97,7 @@ function accountsOf(data: unknown): string[] | null {
 async function getJson(url: string) {
   let res: Response;
   try {
-    res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(60_000), cache: 'no-store' });
+    res = await supplierFetch(url, { headers: HEADERS, signal: AbortSignal.timeout(60_000), cache: 'no-store' });
   } catch (err) {
     throw new SupplierTransientError(`Không kết nối được via79: ${err}`);
   }
@@ -97,7 +110,7 @@ const errorText = (res: Response, body: z.infer<typeof replySchema> | null) => `
 export const via79Adapter: SupplierAdapter = {
   async fetchCatalog({ baseUrl, apiKey }) {
     const toUsd = await vndToUsd();
-    const res = await fetch(`${base(baseUrl)}/products.php?api_key=${encodeURIComponent(apiKey)}`, {
+    const res = await supplierFetch(`${base(baseUrl)}/products.php?api_key=${encodeURIComponent(apiKey)}`, {
       headers: HEADERS,
       signal: AbortSignal.timeout(60_000),
       cache: 'no-store',
@@ -148,7 +161,7 @@ export const via79Adapter: SupplierAdapter = {
 
     let res: Response;
     try {
-      res = await fetch(`${base(baseUrl)}/buy_product`, {
+      res = await supplierFetch(`${base(baseUrl)}/buy_product`, {
         method: 'POST',
         headers: HEADERS,
         body: form,

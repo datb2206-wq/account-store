@@ -6,7 +6,7 @@ import type { TranslateSettings } from '@accszone/core'; // chỉ kiểu
 import { apiRequest } from '@/lib/client-api';
 import { FormAlert } from './form-field';
 
-export const LOCALE_LABEL = { id: 'Tiếng Indonesia', ru: 'Tiếng Nga', zh: 'Tiếng Trung' } as const;
+export const LOCALE_LABEL = { id: 'Tiếng Indonesia', ru: 'Tiếng Nga', zh: 'Tiếng Trung', pt: 'Tiếng Bồ Đào Nha (Brazil)' } as const;
 type Locale = keyof typeof LOCALE_LABEL;
 
 const MODELS = [

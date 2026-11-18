@@ -18,5 +18,6 @@ export * from './translate';
 export * from './usdt-scanner';
 export * from './suppliers/generic-adapter';
 export * from './suppliers/adapters';
+export * from './suppliers/context';
 export * from './suppliers/sync';
 export * from './suppliers/fulfill';
