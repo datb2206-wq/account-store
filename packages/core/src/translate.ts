@@ -1,4 +1,4 @@
-// Dịch tên / mô tả sản phẩm sang ngôn ngữ khác: Microsoft Azure Translator (mặc định, có gói miễn phí) hoặc Claude (Anthropic API).
+// Dịch tên / mô tả sản phẩm sang ngôn ngữ khác: Microsoft Azure Translator (mặc định, có gói miễn phí), Google Gemini (gói free) hoặc Claude (Anthropic API).
 // Admin tạo 1 "lượt dịch" (danh sách sản phẩm + ngôn ngữ) -> lưu ở SystemConfig 'translate.job'.
 // Worker mỗi phút chạy processTranslations(): dịch tiếp từng nhóm ~40 giây rồi dừng, lần sau làm tiếp (tắt máy không mất tiến độ).
 // Tên gốc từ web nguồn thường là tiếng Việt -> tự nhận ngôn ngữ gốc. Dịch sang 'en' thì bản gốc được cất ở khóa 'src'
@@ -17,6 +17,8 @@ export const TRANSLATE_DEFAULTS: TranslateSettings = {
   provider: 'azure',
   azureKey: '',
   azureRegion: '',
+  geminiKey: '',
+  geminiModel: 'gemini-flash-latest',
   apiKey: '',
   model: 'claude-opus-5-5',
   targets: ['id'],
@@ -25,7 +27,7 @@ export const TRANSLATE_DEFAULTS: TranslateSettings = {
 };
 
 // Đã có key cho nhà cung cấp đang chọn chưa
-export const translateReady = (s: TranslateSettings) => (s.provider === 'azure' ? !!s.azureKey : !!s.apiKey);
+export const translateReady = (s: TranslateSettings) => (s.provider === 'azure' ? !!s.azureKey : s.provider === 'gemini' ? !!s.geminiKey : !!s.apiKey);
 
 // Mã ngôn ngữ của Azure Translator
 const AZURE_LANG: Record<TranslateLocale, string> = { en: 'en', id: 'id', ru: 'ru', zh: 'zh-Hans', pt: 'pt' };
@@ -183,6 +185,64 @@ async function translateBatchAzure(s: TranslateSettings, items: Item[], locale: 
   return map;
 }
 
+// Google Gemini (AI Studio): trả JSON theo schema. Gói free giới hạn số request / phút và / ngày.
+const GEMINI_BASE = process.env.GEMINI_ENDPOINT || 'https://generativelanguage.googleapis.com';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const parseJson = (t: string): unknown => {
+  try {
+    return JSON.parse(t);
+  } catch {
+    return null;
+  }
+};
+
+async function translateBatchGemini(s: TranslateSettings, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: SYSTEM }] },
+    contents: [{ role: 'user', parts: [{ text: `Target language: ${TRANSLATE_LANG[locale]}\n\nItems (JSON):\n${JSON.stringify(items)}` }] }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'OBJECT',
+        properties: { items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: { type: 'STRING' }, name: { type: 'STRING' }, description: { type: 'STRING' } }, required: ['id', 'name', 'description'] } } },
+        required: ['items'],
+      },
+      maxOutputTokens: 32000,
+      temperature: 0.2,
+    },
+  });
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${GEMINI_BASE}/v1beta/models/${encodeURIComponent(s.geminiModel)}:generateContent`, {
+      method: 'POST',
+      headers: { 'x-goog-api-key': s.geminiKey, 'Content-Type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(90_000),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[]; promptFeedback?: { blockReason?: string } };
+      if (data.promptFeedback?.blockReason) throw new Error(`Gemini chặn nhóm này: ${data.promptFeedback.blockReason}`);
+      const c = data.candidates?.[0];
+      if (c?.finishReason === 'MAX_TOKENS') throw new Error('Kết quả quá dài (MAX_TOKENS)');
+      const text = (c?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? '').join('');
+      const parsed = ResultSchema.safeParse(parseJson(text));
+      if (!parsed.success) throw new Error(`Gemini trả về JSON không đúng (${c?.finishReason ?? 'không có kết quả'})`);
+      return new Map(parsed.data.items.map((i) => [i.id, i]));
+    }
+    const detail = (await res.text().catch(() => '')).slice(0, 300);
+    // Hết lượt trong phút -> chờ rồi thử lại; hết lượt trong ngày -> dừng (hôm sau bấm dịch tiếp, phần đã dịch được giữ)
+    if (res.status === 429 || res.status === 503) {
+      if (/PerDay|per day/i.test(detail)) throw new FatalTranslateError(`Gemini hết lượt miễn phí hôm nay, mai bấm dịch tiếp: ${detail}`);
+      if (attempt < 2) {
+        await sleep(20_000);
+        continue;
+      }
+    }
+    // 400 sai key / 403 không có quyền / 404 sai tên model -> dừng hẳn
+    if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) throw new FatalTranslateError(`Gemini ${res.status}: ${detail}`);
+    throw new Error(`Gemini ${res.status}: ${detail}`);
+  }
+}
+
 async function translateBatch(client: Anthropic, model: string, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
   const response = await client.beta.messages.parse({
     model,
@@ -225,6 +285,7 @@ export function withTranslation(v: unknown, locale: TranslateLocale, text: strin
 
 // Dịch 1 nhóm (sản phẩm hoặc chuyên mục) sang 1 ngôn ngữ, trả về bản dịch theo id
 function translateItems(client: Anthropic | null, s: TranslateSettings, items: Item[], locale: TranslateLocale) {
+  if (s.provider === 'gemini') return translateBatchGemini(s, items, locale);
   return s.provider === 'azure' || !client ? translateBatchAzure(s, items, locale) : translateBatch(client, s.model, items, locale);
 }
 

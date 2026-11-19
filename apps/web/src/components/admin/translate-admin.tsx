@@ -15,9 +15,9 @@ const MODELS = [
   ['claude-haiku-5-5', 'Claude Haiku 5.5 (rẻ nhất, ~40 lần)'],
 ] as const;
 
-export function TranslateSettingsForm({ initial, hasKey, hasAzureKey }: { initial: Omit<TranslateSettings, 'apiKey' | 'azureKey'>; hasKey: boolean; hasAzureKey: boolean }) {
+export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiKey }: { initial: Omit<TranslateSettings, 'apiKey' | 'azureKey' | 'geminiKey'>; hasKey: boolean; hasAzureKey: boolean; hasGeminiKey: boolean }) {
   const router = useRouter();
-  const [f, setF] = useState({ ...initial, apiKey: '', azureKey: '' });
+  const [f, setF] = useState({ ...initial, apiKey: '', azureKey: '', geminiKey: '' });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey }: { initia
     setPending(false);
     if (!res.ok) return setError(res.data.error ?? 'Lưu thất bại');
     setSuccess('Đã lưu cấu hình dịch.');
-    setF((s) => ({ ...s, apiKey: '', azureKey: '' }));
+    setF((s) => ({ ...s, apiKey: '', azureKey: '', geminiKey: '' }));
     router.refresh();
   }
 
@@ -41,6 +41,7 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey }: { initia
         <span className="block font-medium text-zinc-700">Dịch bằng</span>
         <div className="flex flex-wrap gap-4">
           <label className="flex items-center gap-2"><input type="radio" checked={f.provider === 'azure'} onChange={() => setF((s) => ({ ...s, provider: 'azure' }))} />Microsoft Azure Translator <span className="rounded bg-emerald-50 px-1.5 text-xs font-medium text-emerald-700">miễn phí 2 triệu ký tự/tháng</span></label>
+          <label className="flex items-center gap-2"><input type="radio" checked={f.provider === 'gemini'} onChange={() => setF((s) => ({ ...s, provider: 'gemini' }))} />Google Gemini <span className="rounded bg-emerald-50 px-1.5 text-xs font-medium text-emerald-700">miễn phí, không cần thẻ</span></label>
           <label className="flex items-center gap-2"><input type="radio" checked={f.provider === 'claude'} onChange={() => setF((s) => ({ ...s, provider: 'claude' }))} />Claude AI (trả phí, dịch tự nhiên hơn)</label>
         </div>
       </div>
@@ -61,6 +62,27 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey }: { initia
             <li>Đăng ký tài khoản miễn phí ở portal.azure.com (cần thẻ Visa/Mastercard để xác minh, không bị trừ tiền khi dùng gói Free).</li>
             <li>Tìm &quot;Translator&quot; → Create → Pricing tier chọn <b>Free F0</b>, Region chọn <b>Southeast Asia</b> → Review + create.</li>
             <li>Mở resource vừa tạo → <b>Keys and Endpoint</b> → copy <b>KEY 1</b> và <b>Location/Region</b> dán vào 2 ô trên.</li>
+          </ol>
+        </div>
+      )}
+
+      {f.provider === 'gemini' && (
+        <div className="space-y-3">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-zinc-700">API key Gemini</span>
+              <input className="input font-mono" type="password" autoComplete="new-password" placeholder={hasGeminiKey ? '•••••••• (để trống = giữ nguyên)' : 'AIza...'} value={f.geminiKey} onChange={(e) => setF((s) => ({ ...s, geminiKey: e.target.value.trim() }))} />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-zinc-700">Model</span>
+              <input className="input font-mono" value={f.geminiModel} onChange={(e) => setF((s) => ({ ...s, geminiModel: e.target.value.trim() }))} />
+              <span className="mt-1 block text-xs text-zinc-400">Để gemini-flash-latest (luôn là bản Flash mới nhất, có gói free).</span>
+            </label>
+          </div>
+          <ol className="list-decimal space-y-0.5 rounded-lg bg-zinc-50 py-3 pr-3 pl-8 text-xs text-zinc-600">
+            <li>Vào aistudio.google.com/api-keys, đăng nhập Gmail → <b>Create API key</b> (hoặc bấm nút copy ở key có sẵn).</li>
+            <li>Dán key vào ô trên → Lưu. Key chỉ lưu trên server, không hiện ra trình duyệt.</li>
+            <li>Gói free giới hạn số lượt/phút và /ngày: hệ thống tự chờ khi bị giới hạn; hết lượt trong ngày thì hôm sau bấm dịch tiếp.</li>
           </ol>
         </div>
       )}
