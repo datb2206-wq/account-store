@@ -1,7 +1,8 @@
 // Dịch tên / mô tả sản phẩm sang ngôn ngữ khác: Microsoft Azure Translator (mặc định, có gói miễn phí) hoặc Claude (Anthropic API).
 // Admin tạo 1 "lượt dịch" (danh sách sản phẩm + ngôn ngữ) -> lưu ở SystemConfig 'translate.job'.
 // Worker mỗi phút chạy processTranslations(): dịch tiếp từng nhóm ~40 giây rồi dừng, lần sau làm tiếp (tắt máy không mất tiến độ).
-// Chỉ ghi vào ngôn ngữ đích ({ en, id, ru, zh, pt }), không bao giờ sửa bản tiếng Anh gốc.
+// Tên gốc từ web nguồn thường là tiếng Việt -> tự nhận ngôn ngữ gốc. Dịch sang 'en' thì bản gốc được cất ở khóa 'src'
+// (name.src / description.src) để lần đồng bộ sau vẫn so được với tên của web nguồn và không mất bản gốc.
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z as z4 } from 'zod/v4';
@@ -27,9 +28,9 @@ export const TRANSLATE_DEFAULTS: TranslateSettings = {
 export const translateReady = (s: TranslateSettings) => (s.provider === 'azure' ? !!s.azureKey : !!s.apiKey);
 
 // Mã ngôn ngữ của Azure Translator
-const AZURE_LANG: Record<TranslateLocale, string> = { id: 'id', ru: 'ru', zh: 'zh-Hans', pt: 'pt' };
+const AZURE_LANG: Record<TranslateLocale, string> = { en: 'en', id: 'id', ru: 'ru', zh: 'zh-Hans', pt: 'pt' };
 // AZURE_TRANSLATOR_ENDPOINT chỉ dùng khi thử nghiệm với máy chủ giả lập
-const AZURE_URL = `${process.env.AZURE_TRANSLATOR_ENDPOINT || 'https://api.cognitive.microsofttranslator.com'}/translate?api-version=3.0&from=en`;
+const AZURE_URL = `${process.env.AZURE_TRANSLATOR_ENDPOINT || 'https://api.cognitive.microsofttranslator.com'}/translate?api-version=3.0`; // không đặt from: Azure tự nhận ngôn ngữ gốc (thường là tiếng Việt)
 // Giới hạn 1 request Azure: 1.000 đoạn, 50.000 ký tự -> chừa biên an toàn
 const AZURE_MAX_CHARS = 45_000;
 const AZURE_MAX_TEXTS = 500;
@@ -38,6 +39,7 @@ const AZURE_MAX_TEXTS = 500;
 class FatalTranslateError extends Error {}
 
 export const TRANSLATE_LANG: Record<TranslateLocale, string> = {
+  en: 'English',
   id: 'Indonesian (Bahasa Indonesia)',
   ru: 'Russian',
   zh: 'Simplified Chinese',
@@ -123,12 +125,13 @@ const ResultSchema = z4.object({
 });
 
 const SYSTEM = `You translate product listings for an online store that sells digital accounts and online services.
-Translate each item's name and description from English into the target language so shoppers who speak it understand them naturally.
+Translate each item's name and description from its source language (usually Vietnamese, sometimes English) into the target language so shoppers who speak it understand them naturally.
 Rules:
 - Keep brand, platform and product names unchanged (Gmail, Facebook, TikTok, Instagram, Outlook, Telegram, ChatGPT, etc.).
 - Keep numbers, years, quantities, country codes, units and technical abbreviations unchanged (2FA, PVA, IP, API, VPN, SMS, OTP, USA, EU).
 - Keep separators and formatting characters such as | - : / [ ] ( ) and line breaks.
 - Keep the meaning exact; do not add marketing claims or remove details.
+- If the text is already in the target language, return it unchanged.
 - Return every item with its original id. If a description is empty, return an empty string for it.`;
 
 type Item = { id: string; name: string; description: string };
@@ -203,19 +206,41 @@ async function translateBatch(client: Anthropic, model: string, items: Item[], l
 
 type Log = { info: (m: string) => void; warn: (m: string) => void };
 
+// Văn bản gốc để dịch: bản của web nguồn đã cất ở 'src' (khi đã dịch sang en), không thì bản 'en'
+export const sourceText = (v: unknown) => {
+  const m = asMap(v);
+  return m.src ?? m.en ?? Object.values(m)[0] ?? '';
+};
+// Đã có bản dịch cho locale chưa. Riêng 'en': chỉ coi là đã dịch khi có 'src' (bản en ban đầu là tên gốc chưa dịch)
+export const hasTranslation = (v: unknown, locale: TranslateLocale) => {
+  const m = asMap(v);
+  return locale === 'en' ? m.src !== undefined : !!m[locale]?.trim();
+};
+// Ghi bản dịch, giữ nguyên các ngôn ngữ khác; dịch sang en thì cất bản gốc vào src
+export function withTranslation(v: unknown, locale: TranslateLocale, text: string): Record<string, string> {
+  const m = asMap(v);
+  if (locale === 'en') return { ...m, src: m.src ?? m.en ?? '', en: text };
+  return { ...m, [locale]: text };
+}
+
+// Dịch 1 nhóm (sản phẩm hoặc chuyên mục) sang 1 ngôn ngữ, trả về bản dịch theo id
+function translateItems(client: Anthropic | null, s: TranslateSettings, items: Item[], locale: TranslateLocale) {
+  return s.provider === 'azure' || !client ? translateBatchAzure(s, items, locale) : translateBatch(client, s.model, items, locale);
+}
+
 // Dịch 1 nhóm sản phẩm sang 1 ngôn ngữ. Trả về số sản phẩm đã ghi.
 async function translateProducts(client: Anthropic | null, s: TranslateSettings, ids: string[], locale: TranslateLocale, opts: { description: boolean; overwrite: boolean }) {
   const products = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, description: true } });
-  const todo = products.filter((p) => opts.overwrite || !asMap(p.name)[locale]?.trim());
+  const todo = products.filter((p) => opts.overwrite || !hasTranslation(p.name, locale));
   const items: Item[] = todo
-    .map((p) => {
-      const name = asMap(p.name).en ?? Object.values(asMap(p.name))[0] ?? '';
-      const description = opts.description ? (asMap(p.description).en ?? '') : '';
-      return { id: p.id, name: name.slice(0, 300), description: description.slice(0, 3000) };
-    })
+    .map((p) => ({
+      id: p.id,
+      name: sourceText(p.name).slice(0, 300),
+      description: opts.description ? sourceText(p.description).slice(0, 3000) : '',
+    }))
     .filter((i) => i.name.trim());
   if (!items.length) return { written: 0, skipped: products.length };
-  const result = s.provider === 'azure' || !client ? await translateBatchAzure(s, items, locale) : await translateBatch(client, s.model, items, locale);
+  const result = await translateItems(client, s, items, locale);
   let written = 0;
   for (const p of todo) {
     const t = result.get(p.id);
@@ -223,13 +248,32 @@ async function translateProducts(client: Anthropic | null, s: TranslateSettings,
     await prisma.product.update({
       where: { id: p.id },
       data: {
-        name: { ...asMap(p.name), [locale]: t.name.trim().slice(0, 300) },
-        ...(opts.description && t.description.trim() && { description: { ...asMap(p.description), [locale]: t.description.trim().slice(0, 5000) } }),
+        name: withTranslation(p.name, locale, t.name.trim().slice(0, 300)),
+        ...(opts.description && t.description.trim() && { description: withTranslation(p.description, locale, t.description.trim().slice(0, 5000)) }),
       },
     });
     written++;
   }
   return { written, skipped: products.length - todo.length };
+}
+
+// Tên chuyên mục (chuyên mục đồng bộ từ nguồn API thường là tiếng Việt). Trả về số chuyên mục đã ghi.
+async function translateCategories(client: Anthropic | null, s: TranslateSettings, locale: TranslateLocale) {
+  const cats = await prisma.category.findMany({ select: { id: true, name: true } });
+  const todo = cats.filter((c) => !hasTranslation(c.name, locale) && !autoSkip.has(`cat:${c.id}:${locale}`) && sourceText(c.name).trim()).slice(0, 200);
+  if (!todo.length) return 0;
+  const result = await translateItems(client, s, todo.map((c) => ({ id: c.id, name: sourceText(c.name).slice(0, 200), description: '' })), locale);
+  let written = 0;
+  for (const c of todo) {
+    const t = result.get(c.id)?.name.trim();
+    if (!t) {
+      autoSkip.add(`cat:${c.id}:${locale}`);
+      continue;
+    }
+    await prisma.category.update({ where: { id: c.id }, data: { name: withTranslation(c.name, locale, t.slice(0, 200)) } });
+    written++;
+  }
+  return written;
 }
 
 const isFatal = (err: unknown) => err instanceof FatalTranslateError || err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError || err instanceof Anthropic.NotFoundError || err instanceof Anthropic.BadRequestError;
@@ -292,23 +336,34 @@ async function runTranslations(log: Log) {
   if (!s.autoNew || !s.targets.length) return { idle: true };
   let written = 0;
   for (const locale of s.targets) {
-    const skip = [...autoSkip].filter((k) => k.endsWith(`:${locale}`)).map((k) => k.slice(0, -locale.length - 1));
-    const rows = await prisma.$queryRaw<{ id: string }[]>`
-      SELECT id FROM products WHERE "isActive" = true AND coalesce(name->>${locale}, '') = '' AND id <> ALL(${skip})
-      ORDER BY "createdAt" DESC LIMIT ${BATCH}`;
+    try {
+      written += await translateCategories(client, s, locale);
+    } catch (err) {
+      log.warn(`auto translate categories (${locale}) failed: ${errText(err)}`);
+      if (isFatal(err)) break;
+    }
+    const skip = [...autoSkip].filter((k) => !k.startsWith('cat:') && k.endsWith(`:${locale}`)).map((k) => k.slice(0, -locale.length - 1));
+    const rows =
+      locale === 'en'
+        ? await prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM products WHERE "isActive" = true AND name->>'src' IS NULL AND id <> ALL(${skip})
+            ORDER BY "createdAt" DESC LIMIT ${BATCH}`
+        : await prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM products WHERE "isActive" = true AND coalesce(name->>${locale}, '') = '' AND id <> ALL(${skip})
+            ORDER BY "createdAt" DESC LIMIT ${BATCH}`;
     if (!rows.length) continue;
     const ids = rows.map((r) => r.id);
     try {
       written += (await translateProducts(client, s, ids, locale, { description: s.description, overwrite: false })).written;
       // Sản phẩm vẫn chưa có bản dịch sau khi gọi (tên rỗng, Claude bỏ sót) -> không thử lại liên tục
       const still = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
-      for (const p of still) if (!asMap(p.name)[locale]?.trim()) autoSkip.add(`${p.id}:${locale}`);
+      for (const p of still) if (!hasTranslation(p.name, locale)) autoSkip.add(`${p.id}:${locale}`);
     } catch (err) {
       log.warn(`auto translate (${locale}) failed: ${errText(err)}`);
       if (isFatal(err)) break;
       for (const id of ids) autoSkip.add(`${id}:${locale}`);
     }
   }
-  if (written) log.info(`auto translated ${written} products`);
+  if (written) log.info(`auto translated ${written} products/categories`);
   return { auto: written };
 }

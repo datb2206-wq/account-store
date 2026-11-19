@@ -96,7 +96,8 @@ export async function notifyOrder(ref: { id: string } | { code: string }, ip?: s
   const name = o.product.name as Record<string, string> | null;
   await notify('order', {
     username: who(o.user),
-    product: name?.vi ?? name?.en ?? Object.values(name ?? {})[0] ?? '',
+    // Báo cho admin: ưu tiên tên gốc của web nguồn (thường là tiếng Việt), không phải bản đã dịch
+    product: name?.vi ?? name?.src ?? name?.en ?? Object.values(name ?? {})[0] ?? '',
     amount: String(o.quantity),
     pay: usd(o.totalAmount),
     code: o.code,

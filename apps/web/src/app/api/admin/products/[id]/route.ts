@@ -4,6 +4,7 @@ import { adminRoute, badRequest, conflict, notFound, parseBody } from '@/lib/adm
 import { productSchema } from '@/lib/admin-schemas';
 import { writeAudit } from '@/lib/audit';
 import { getClientIp } from '@/lib/http';
+import { keepSource } from '@/lib/i18n-source';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -16,7 +17,10 @@ export const PATCH = adminRoute<Ctx>(async (req, { params }, user) => {
     throw badRequest('Danh mục không tồn tại', { categoryId: ['Danh mục không tồn tại'] });
   }
 
-  const product = await prisma.product.update({ where: { id }, data });
+  const product = await prisma.product.update({
+    where: { id },
+    data: { ...data, name: keepSource(before.name, data.name), description: keepSource(before.description, data.description) },
+  });
   await writeAudit({
     actorId: user.id,
     action: 'product.update',

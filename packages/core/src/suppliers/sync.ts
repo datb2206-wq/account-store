@@ -5,7 +5,8 @@
 //  - Tắt syncCategories -> không tạo danh mục theo nguồn, sản phẩm mới về 1 danh mục mang tên nhà cung cấp.
 //  - Giá bán = giá vốn × priceMarkup, làm tròn LÊN theo priceRounding (đổi markup để chỉnh giá hàng loạt).
 //    Tắt autoUpdatePrice -> giữ giá admin đặt, trừ khi giá đó thấp hơn giá vốn mới (tránh bán lỗ).
-//  - Mặc định không ghi đè tên/mô tả/danh mục admin đã sửa; bật autoUpdateInfo thì ghi đè bản tiếng Anh theo nguồn.
+//  - Mặc định không ghi đè tên/mô tả/danh mục admin đã sửa; bật autoUpdateInfo thì cập nhật theo nguồn KHI nguồn đổi tên/mô tả
+//    (bỏ các bản dịch cũ để worker dịch lại). Tên nguồn không đổi -> giữ nguyên bản dịch (kể cả bản en đã dịch, gốc ở 'src').
 //  - stripHtml: lọc thẻ HTML khỏi tên & mô tả lấy từ nguồn.
 //  - Sản phẩm biến mất khỏi catalog -> externalStock = 0 (không xóa: có thể đã có đơn hàng).
 //  - Danh mục nguồn trùng tên với danh mục có sẵn của shop (cùng cấp cha) -> dùng luôn danh mục đó, không tạo bản trùng.
@@ -14,6 +15,12 @@ import { Prisma, prisma } from '@accszone/database';
 import { slugify } from '../slugify';
 import { htmlToText } from './accszone-adapter';
 import { supplierClient } from './adapters';
+
+// Nguồn giữ nguyên văn bản -> giữ mọi bản dịch; nguồn đổi -> lấy văn bản mới, bỏ bản dịch cũ (đã sai nghĩa) để dịch lại
+function fromSource(prev: Prisma.JsonValue | null, text: string): Record<string, Prisma.JsonValue> {
+  const m = asObject(prev);
+  return (m.src ?? m.en) === text ? m : { en: text };
+}
 
 export const PRICE_ROUNDINGS = ['none', '0.01', '0.1', '1'] as const;
 
@@ -48,7 +55,7 @@ function stableSlug(name: string, supplierId: string, externalId: string) {
 async function findShopCategory(name: string, parentId: string | null) {
   const [row] = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM categories
-    WHERE "supplierId" IS NULL AND lower(trim(name->>'en')) = lower(trim(${name})) AND "parentId" IS NOT DISTINCT FROM ${parentId}
+    WHERE "supplierId" IS NULL AND lower(trim(coalesce(name->>'src', name->>'en'))) = lower(trim(${name})) AND "parentId" IS NOT DISTINCT FROM ${parentId}
     ORDER BY "sortOrder" ASC, "createdAt" ASC
     LIMIT 1`;
   return row?.id ?? null;
@@ -156,8 +163,8 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
           ...common,
           ...(!keepPrice && { price: price.toFixed(6) }),
           ...(supplier.autoUpdateInfo && {
-            name: { ...asObject(prev.name), en: name },
-            description: { ...asObject(prev.description), ...(description ? { en: description } : {}) },
+            name: fromSource(prev.name, name),
+            description: description ? fromSource(prev.description, description) : asObject(prev.description),
           }),
         },
       });

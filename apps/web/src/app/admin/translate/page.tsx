@@ -20,8 +20,9 @@ export default async function TranslatePage() {
     getTranslateSettings(),
     getTranslateJob(),
     prisma.product.count({ where: { isActive: true } }),
-    prisma.$queryRaw<{ id: number; ru: number; zh: number; pt: number }[]>`
-      SELECT count(*) FILTER (WHERE coalesce(name->>'id','') <> '')::int AS id,
+    prisma.$queryRaw<{ en: number; id: number; ru: number; zh: number; pt: number }[]>`
+      SELECT count(*) FILTER (WHERE name->>'src' IS NOT NULL)::int AS en,
+             count(*) FILTER (WHERE coalesce(name->>'id','') <> '')::int AS id,
              count(*) FILTER (WHERE coalesce(name->>'ru','') <> '')::int AS ru,
              count(*) FILTER (WHERE coalesce(name->>'zh','') <> '')::int AS zh,
              count(*) FILTER (WHERE coalesce(name->>'pt','') <> '')::int AS pt
@@ -32,19 +33,19 @@ export default async function TranslatePage() {
   const { apiKey, azureKey, ...publicSettings } = settings;
   const running = job?.status === 'RUNNING';
   const pct = job ? Math.round((job.cursor / Math.max(1, job.productIds.length)) * 100) : 0;
-  const cov = coverage[0] ?? { id: 0, ru: 0, zh: 0, pt: 0 };
+  const cov = coverage[0] ?? { en: 0, id: 0, ru: 0, zh: 0, pt: 0 };
 
   return (
     <div className="space-y-5">
       <PageHeader title="Dịch sản phẩm" />
       <p className="text-sm text-zinc-500">
-        Tên / mô tả sản phẩm (thường là tiếng Anh từ web gốc) được dịch tự động sang ngôn ngữ khách đang xem. Bản tiếng Anh gốc không bị đổi; đồng bộ từ nguồn API chỉ cập nhật tiếng Anh nên bản dịch được giữ. Muốn tự đổi tên theo ý: mở sản phẩm, sửa ô tên của từng ngôn ngữ.
+        Tên / mô tả sản phẩm và tên chuyên mục (thường là tiếng Việt từ web nguồn) được dịch tự động sang ngôn ngữ khách chọn trên thanh ngôn ngữ, kể cả tiếng Anh. Hệ thống tự nhận ngôn ngữ gốc và cất bản gốc riêng; nguồn API giữ nguyên tên thì bản dịch được giữ, nguồn đổi tên thì tự dịch lại. Muốn tự đổi tên theo ý: mở sản phẩm, sửa ô tên của từng ngôn ngữ.
       </p>
       {!online && <p className="rounded-lg bg-amber-50 px-4 py-2.5 text-sm text-amber-800">Worker đang không chạy: lượt dịch sẽ chỉ chạy khi bật worker.</p>}
 
       <Panel title="Tiến độ" action={can(user, 'products.edit') && <TranslateActions running={running} canStart={translateReady(settings) && settings.targets.length > 0} />}>
         {running && <AutoRefresh everyMs={10_000} />}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {(Object.keys(LOCALE_LABEL) as (keyof typeof LOCALE_LABEL)[]).map((l) => (
             <div key={l} className="rounded-lg bg-zinc-50 p-3 text-sm">
               <p className="text-zinc-500">{LOCALE_LABEL[l]}{settings.targets.includes(l) ? '' : ' (không bật)'}</p>
