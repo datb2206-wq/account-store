@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { claimDeposit } from '@accszone/core';
 import { badRequest, userRoute } from '@/lib/admin-route';
 import { tooManyRequests } from '@/lib/http';
 import { rateLimit } from '@/lib/rate-limit';
+import { notifyDepositClaim } from '@/lib/telegram-admin';
 import { deleteProof, saveProof, UploadError } from '@/lib/uploads';
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -34,6 +35,7 @@ export const POST = userRoute<Ctx>(async (req, { params }, user) => {
   try {
     const { replacedProof } = await claimDeposit(user.id, id, proofKey, reference || null);
     await deleteProof(replacedProof);
+    after(() => notifyDepositClaim(id)); // báo admin qua Telegram, kèm nút duyệt
   } catch (err) {
     await deleteProof(proofKey); // không gắn được vào yêu cầu nào -> xóa file vừa lưu
     throw err;

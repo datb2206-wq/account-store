@@ -122,6 +122,9 @@ model User {
   referredBy    User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals     User[]    @relation("Referrals")
   commissionBalance Decimal @default(0) @db.Decimal(18, 6)
+  // Telegram đã liên kết (bot khách / bot admin dùng chung: ID người dùng Telegram là duy nhất)
+  telegramId    String?   @unique
+  telegramName  String?
   emailOptOut   Boolean   @default(false) // khách bấm "hủy nhận tin" trong email chiến dịch
   registerIp    String?   // IP lúc đăng ký: giới hạn số tài khoản / IP (Admin > Bảo mật)
   createdAt     DateTime   @default(now())

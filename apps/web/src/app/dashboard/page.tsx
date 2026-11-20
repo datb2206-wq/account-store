@@ -11,6 +11,17 @@ import { rich } from '@/i18n/rich';
 import { getI18n } from '@/i18n/server';
 import { requireUser } from '@/lib/auth';
 import { localized } from '@/lib/format';
+import { TelegramLinkButton } from '@/components/admin/telegram-bots';
+import { getShopBotSettings } from '@/lib/telegram-bot';
+
+// Thẻ "Kết nối Telegram" (bot khách hàng)
+const TG_TEXT = {
+  en: { title: 'Telegram bot', desc: 'Buy and receive accounts right in Telegram with your balance.', connect: '🔗 Connect Telegram', reconnect: '🔗 Reconnect', disconnect: 'Disconnect', linked: 'Connected:', open: 'Open bot' },
+  id: { title: 'Bot Telegram', desc: 'Beli dan terima akun langsung di Telegram dengan saldo Anda.', connect: '🔗 Hubungkan Telegram', reconnect: '🔗 Hubungkan ulang', disconnect: 'Putuskan', linked: 'Terhubung:', open: 'Buka bot' },
+  ru: { title: 'Telegram-бот', desc: 'Покупайте и получайте аккаунты прямо в Telegram с баланса.', connect: '🔗 Подключить Telegram', reconnect: '🔗 Переподключить', disconnect: 'Отключить', linked: 'Подключено:', open: 'Открыть бота' },
+  zh: { title: 'Telegram 机器人', desc: '在 Telegram 中直接用余额购买并接收账户。', connect: '🔗 绑定 Telegram', reconnect: '🔗 重新绑定', disconnect: '解绑', linked: '已绑定：', open: '打开机器人' },
+  pt: { title: 'Bot do Telegram', desc: 'Compre e receba contas direto no Telegram usando seu saldo.', connect: '🔗 Conectar Telegram', reconnect: '🔗 Reconectar', disconnect: 'Desconectar', linked: 'Conectado:', open: 'Abrir bot' },
+} as const;
 
 export async function generateMetadata(): Promise<Metadata> {
   const { d } = await getI18n();
@@ -26,6 +37,9 @@ export default async function DashboardPage() {
   const ctv = await getCtvSettings();
   const sellerOn = ctv.enabled && (ctv.allowApply || !!(await prisma.seller.findUnique({ where: { userId: user.id }, select: { id: true } })));
 
+  const shopBot = await getShopBotSettings();
+  const tgUser = shopBot.enabled ? await prisma.user.findUnique({ where: { id: user.id }, select: { telegramId: true, telegramName: true } }) : null;
+  const tg = TG_TEXT[locale];
   const [completed, recentOrders, recentTxs] = await Promise.all([
     prisma.order.aggregate({
       where: { userId: user.id, status: 'COMPLETED' },
@@ -72,6 +86,16 @@ export default async function DashboardPage() {
         <StatCard label={t.completedOrders} value={completed._count} />
         <StatCard label={t.totalSpent} value={<Money value={completed._sum.totalAmount} />} />
       </div>
+
+      {shopBot.enabled && shopBot.botUsername && (
+        <section id="telegram" className="card flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold">✈️ {tg.title}</h2>
+            <p className="text-sm text-zinc-500">{tg.desc} <a className="text-indigo-600 hover:underline" href={`https://t.me/${shopBot.botUsername}`} target="_blank" rel="noreferrer">@{shopBot.botUsername}</a></p>
+          </div>
+          <TelegramLinkButton bot="shop" linkedName={tgUser?.telegramId ? (tgUser.telegramName ?? tgUser.telegramId) : null} labels={tg} />
+        </section>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card">

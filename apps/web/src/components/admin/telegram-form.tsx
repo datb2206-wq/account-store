@@ -87,6 +87,15 @@ export function TelegramForm({
             </span>
           </label>
           <button type="button" className="btn-ghost border border-zinc-200" disabled={!!pending} onClick={test}>{pending === 'test' ? 'Đang gửi…' : '✈ Gửi tin thử'}</button>
+          <div className="space-y-1 border-t border-zinc-100 pt-4">
+            <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+              <input type="checkbox" checked={f.adminCommands} onChange={(e) => set({ adminCommands: e.target.checked })} />
+              Nhận lệnh admin qua bot này (bot admin)
+            </label>
+            <span className="block text-xs text-zinc-400">
+              Bật rồi bấm Lưu, sau đó bấm &quot;Kết nối Telegram của tôi&quot; ở bên dưới. Dùng được: /doanhthu, /sodu, /nap (duyệt nạp bằng nút), /don, /khach, /congtien, /sp. Chỉ nhân viên đã kết nối mới ra lệnh được, đúng quyền như trên web.
+            </span>
+          </div>
         </Panel>
 
         <Panel title="Gửi thông báo khi" bodyClassName="space-y-3 p-5">

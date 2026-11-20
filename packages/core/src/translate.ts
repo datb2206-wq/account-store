@@ -132,6 +132,7 @@ Rules:
 - Keep brand, platform and product names unchanged (Gmail, Facebook, TikTok, Instagram, Outlook, Telegram, ChatGPT, etc.).
 - Keep numbers, years, quantities, country codes, units and technical abbreviations unchanged (2FA, PVA, IP, API, VPN, SMS, OTP, USA, EU).
 - Keep separators and formatting characters such as | - : / [ ] ( ) and line breaks.
+- Shoppers are MMO / digital-marketing buyers (ads accounts, social accounts, emails). Vietnamese sellers use slang: clone, via (personal profile accounts), reg (registered / created), ngâm (aged), trust (high trust), BM (Business Manager), TKQC (ad account), ON2FA (2FA enabled), veri (verified), ngoại (foreign), cổ (old). Translate these into the words sellers in the target market actually use, not literally. Example for Brazilian Portuguese: "CLONE REG SẴN 1BM - VERI HOTMAIL TRUST - ON2FA" -> "Perfil com 1 BM Criada - Verificado no Hotmail Aquecido - 2FA Ativo".
 - Keep the meaning exact; do not add marketing claims or remove details.
 - If the text is already in the target language, return it unchanged.
 - Return every item with its original id. If a description is empty, return an empty string for it.`;

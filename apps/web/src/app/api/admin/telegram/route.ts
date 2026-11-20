@@ -4,6 +4,7 @@ import { prisma, type Prisma } from '@accszone/database';
 import { adminRoute, badRequest } from '@/lib/admin-route';
 import { writeAudit } from '@/lib/audit';
 import { getClientIp, readJson } from '@/lib/http';
+import { deleteWebhook, setWebhook } from '@/lib/telegram-bot';
 
 // Lưu cấu hình Telegram. botToken để trống = giữ token đang dùng (trang admin không hiện lại token).
 export const PUT = adminRoute(async (req, _ctx, user) => {
@@ -13,6 +14,21 @@ export const PUT = adminRoute(async (req, _ctx, user) => {
   if (!parsed.success) throw badRequest(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(' · '));
   const value = parsed.data;
   if (value.enabled && (!value.botToken || !value.chatId)) throw badRequest('Bật thông báo cần nhập đủ Bot Token và Chat ID');
+
+  // Nhận lệnh admin: đăng ký webhook để Telegram gửi tin nhắn / nút bấm của bot về web
+  if (value.adminCommands) {
+    if (!value.botToken) throw badRequest('Nhận lệnh admin cần Bot Token');
+    const site = `${req.headers.get('x-forwarded-proto') ?? 'https'}://${req.headers.get('host')}`;
+    if (!site.startsWith('https://')) throw badRequest('Telegram chỉ gọi được web chạy HTTPS (tên miền thật).');
+    try {
+      await setWebhook(value.botToken, `${site}/api/webhooks/telegram/admin`);
+    } catch (err) {
+      throw badRequest(`Không đăng ký được webhook: ${err instanceof Error ? err.message : err}`);
+    }
+  } else if (current.adminCommands && current.botToken) {
+    await deleteWebhook(current.botToken);
+  }
+  if (current.adminCommands && current.botToken && current.botToken !== value.botToken) await deleteWebhook(current.botToken);
 
   await prisma.systemConfig.upsert({
     where: { key: 'telegram' },

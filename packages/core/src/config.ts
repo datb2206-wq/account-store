@@ -20,7 +20,7 @@ export const CONTENT_PAGES = ['policy', 'terms', 'faq', 'contact'] as const;
 export type ContentPage = (typeof CONTENT_PAGES)[number];
 
 // Key có trang quản trị riêng (giữ bí mật, xóa cache…): trang Cấu hình chung không hiển thị / không ghi các key này
-export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual', 'ctv', 'translate'] as const;
+export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual', 'ctv', 'translate', 'telegram.shop'] as const;
 
 // Nhà mạng thẻ cào theo chuẩn API chargingws/v2 của các web đổi thẻ
 export const CARD_TELCOS = ['VIETTEL', 'VINAPHONE', 'MOBIFONE', 'VIETNAMOBILE', 'ZING', 'GATE', 'VCOIN', 'GARENA'] as const;
@@ -93,12 +93,21 @@ export const CONFIG_SCHEMAS = {
     chatId: z.string().trim().max(100),
     events: z.object({ order: z.boolean(), deposit: z.boolean(), refund: z.boolean(), lowBalance: z.boolean() }),
     lowBalanceUsd: z.number().min(0).max(1_000_000), // số dư nguồn API dưới mức này -> báo
+    // Bot admin: nhân viên đã liên kết Telegram ra lệnh cho bot này (/doanhthu, /don, duyệt nạp...)
+    adminCommands: z.boolean().default(false),
     templates: z.object({
       order: z.string().max(2000),
       deposit: z.string().max(2000),
       refund: z.string().max(2000),
       lowBalance: z.string().max(2000),
     }),
+  }),
+  // Bot Telegram cho khách: xem sản phẩm, mua bằng số dư, xem đơn (Admin > Thông báo Telegram > Bot khách hàng)
+  'telegram.shop': z.object({
+    enabled: z.boolean(),
+    botToken: z.string().trim().max(200),
+    botUsername: z.string().trim().max(100).default(''), // lấy từ getMe khi lưu
+    supportUrl: z.string().trim().max(300).default(''), // link hỗ trợ (VD https://t.me/ten_admin)
   }),
   // Hiển thị tiền tệ cho khách (Admin > Tiền tệ). Tỷ giá vẫn nằm ở currency.rates.
   // defaultCurrency: "AUTO" = theo ngôn ngữ khách chọn; mã tiền tệ = mặc định quy đổi sang tiền đó (khách vẫn đổi được)

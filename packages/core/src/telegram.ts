@@ -19,6 +19,7 @@ export const TELEGRAM_DEFAULTS: TelegramSettings = {
   chatId: '',
   events: { order: true, deposit: true, refund: true, lowBalance: true },
   lowBalanceUsd: 5,
+  adminCommands: false,
   templates: {
     order: '🛒 <b>{username}</b> vừa mua <b>{amount}</b> × {product}\n💵 {pay} · Mã đơn <code>{code}</code>\n📦 {source}\n🕒 {time}',
     deposit: '💰 <b>{username}</b> vừa nạp <b>{amount}</b> qua {method}\n🎁 Khuyến mãi: {bonus} · Số dư: {balance}\n🕒 {time}',
