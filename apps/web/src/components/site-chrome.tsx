@@ -12,7 +12,6 @@ export async function SiteChrome() {
   const css = themeCss(x);
   const { gaId, fbPixelId, bodyHtml } = x.tracking;
   const contacts = [
-    tgBot && { href: tgBot, label: TG_PROMO_TEXT[locale].button, className: 'bg-[#229ed9]', icon: <TelegramIcon size={24} /> },
     x.widgets.zalo && { href: `https://zalo.me/${x.widgets.zalo}`, label: d.extras.zalo, className: 'bg-[#0068ff]', icon: <span className="text-[11px] font-extrabold">Zalo</span> },
     x.widgets.messenger && { href: `https://m.me/${x.widgets.messenger}`, label: d.extras.messenger, className: 'bg-gradient-to-br from-[#00b2ff] to-[#a033ff]', icon: <ChatIcon size={22} /> },
     x.widgets.hotline && { href: `tel:${x.widgets.hotline}`, label: `${d.extras.hotline} ${x.widgets.hotline}`, className: 'bg-emerald-600', icon: <PhoneIcon size={20} /> },
@@ -22,6 +21,19 @@ export async function SiteChrome() {
     <>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
       {x.popup.enabled && (x.popup.title || x.popup.body) && <SitePopup popup={x.popup} />}
+      {/* Nút bot Telegram: góc phải, ngay trên nút chat hỗ trợ (size-14). z-30 để panel chat mở ra che lên. */}
+      {tgBot && (
+        <a
+          href={tgBot}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={TG_PROMO_TEXT[locale].button}
+          aria-label={TG_PROMO_TEXT[locale].button}
+          className="fixed right-5 bottom-[84px] z-30 grid size-12 place-items-center rounded-full bg-[#229ed9] text-white shadow-lg shadow-sky-500/30 transition hover:scale-105 sm:right-7 sm:bottom-[92px]"
+        >
+          <TelegramIcon size={24} />
+        </a>
+      )}
       {contacts.length > 0 && (
         <div className="fixed bottom-4 left-4 z-40 flex flex-col gap-2.5 sm:bottom-6 sm:left-6">
           {contacts.map((c) => (
