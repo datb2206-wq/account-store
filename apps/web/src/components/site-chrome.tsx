@@ -3,14 +3,16 @@ import { getI18n } from '@/i18n/server';
 import { getSiteExtras, themeCss } from '@/lib/site-extras';
 import { ChatIcon, PhoneIcon } from './icons';
 import { SitePopup } from './site-popup';
+import { getShopBotLink, TelegramIcon, TG_PROMO_TEXT } from './telegram-promo';
 
 // Phần chung của mọi trang khách (Admin > Cài đặt website): màu, popup, nút Zalo/Messenger/Hotline, mã theo dõi.
 // Không chèn vào trang /admin: mã tùy chỉnh không được chạy trong khu quản trị.
 export async function SiteChrome() {
-  const [x, { d }] = await Promise.all([getSiteExtras(), getI18n()]);
+  const [x, { d, locale }, tgBot] = await Promise.all([getSiteExtras(), getI18n(), getShopBotLink()]);
   const css = themeCss(x);
   const { gaId, fbPixelId, bodyHtml } = x.tracking;
   const contacts = [
+    tgBot && { href: tgBot, label: TG_PROMO_TEXT[locale].button, className: 'bg-[#229ed9]', icon: <TelegramIcon size={24} /> },
     x.widgets.zalo && { href: `https://zalo.me/${x.widgets.zalo}`, label: d.extras.zalo, className: 'bg-[#0068ff]', icon: <span className="text-[11px] font-extrabold">Zalo</span> },
     x.widgets.messenger && { href: `https://m.me/${x.widgets.messenger}`, label: d.extras.messenger, className: 'bg-gradient-to-br from-[#00b2ff] to-[#a033ff]', icon: <ChatIcon size={22} /> },
     x.widgets.hotline && { href: `tel:${x.widgets.hotline}`, label: `${d.extras.hotline} ${x.widgets.hotline}`, className: 'bg-emerald-600', icon: <PhoneIcon size={20} /> },

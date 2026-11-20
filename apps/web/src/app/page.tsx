@@ -10,6 +10,7 @@ import { MaintenanceScreen } from '@/components/maintenance-screen';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { StatCard } from '@/components/stat-card';
+import { TelegramBanner } from '@/components/telegram-promo';
 import { formatFx, plural, fmt } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { getI18n } from '@/i18n/server';
@@ -161,6 +162,9 @@ export default async function ShopPage({
           <StatCard label={t.statSold} value={soldTotal.toLocaleString('en-US')} />
           <StatCard label={t.categories} value={sections.length.toLocaleString('en-US')} />
         </div>
+
+        {/* Bot Telegram bán hàng: chỉ ở trang tổng */}
+        {!q && !selected && <TelegramBanner locale={locale} />}
 
         {/* ---------- SẮP XẾP + LỌC ---------- */}
         <div className="flex flex-wrap items-center justify-between gap-3">
