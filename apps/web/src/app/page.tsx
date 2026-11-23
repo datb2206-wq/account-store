@@ -84,7 +84,7 @@ export default async function ShopPage({
     where: { isActive: true, categoryId: { in: categories.map((c) => c.id) } },
     // 📌 Nổi bật đứng đầu danh mục, sau đó theo số thứ tự admin đặt
     orderBy: [{ isFeatured: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
-    select: { id: true, slug: true, name: true, description: true, price: true, minQty: true, maxQty: true, categoryId: true, source: true, externalStock: true, isFeatured: true },
+    select: { id: true, slug: true, name: true, description: true, price: true, minQty: true, maxQty: true, categoryId: true, source: true, externalStock: true, isFeatured: true, baseSold: true },
   });
   const ids = new Set(allProducts.map((p) => p.id));
   const [stockRows, soldRows] = await Promise.all([
@@ -97,7 +97,9 @@ export default async function ShopPage({
   ]);
   const localStock = new Map(stockRows);
   // Bỏ sản phẩm đã ẩn: nhãn HOT chỉ tính trong hàng đang bán
-  const sold = new Map(soldRows.filter(([id]) => ids.has(id)));
+  // Vendidos = đơn COMPLETED thực tế + baseSold (số đã bán khởi điểm admin đặt cho từng sản phẩm)
+  const realSold = new Map(soldRows.filter(([id]) => ids.has(id)));
+  const sold = new Map(allProducts.map((p): [string, number] => [p.id, (realSold.get(p.id) ?? 0) + p.baseSold]));
   const stockOf = (p: (typeof allProducts)[number]) => (p.source === 'LOCAL' ? (localStock.get(p.id) ?? 0) : (p.externalStock ?? 0));
 
   // Top 3 bán chạy -> nhãn HOT

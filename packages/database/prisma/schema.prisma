@@ -191,6 +191,7 @@ model Product {
   isActive     Boolean       @default(true)
   sortOrder    Int           @default(0)
   isFeatured   Boolean       @default(false) // 📌 Nổi bật: lên đầu danh mục + hàng "Nổi bật" ở trang chủ
+  baseSold     Int           @default(0)     // số đã bán khởi điểm, cộng vào Vendidos ở trang chủ
 
   source       ProductSource @default(LOCAL)
   supplierId   String?
