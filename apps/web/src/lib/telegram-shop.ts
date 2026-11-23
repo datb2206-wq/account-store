@@ -7,6 +7,7 @@ import { ACTIVE_LOCALES, DEFAULT_LOCALE, isActiveLocale as isLocale, LOCALE_META
 import { formatUsd, localized } from './format';
 import { getOrderForUser, purchase, PurchaseError } from './purchase';
 import { rateLimit } from './rate-limit';
+import { getSiteExtras } from './site-extras';
 import { getRedis } from './redis';
 import {
   answerCallback,
@@ -49,6 +50,14 @@ const VISIBLE: Prisma.ProductWhereInput = {
   category: { isActive: true },
   AND: [{ OR: [{ sellerId: null }, { seller: { status: 'ACTIVE' } }] }, { OR: [{ source: 'LOCAL' }, { supplier: { isActive: true } }] }],
 };
+
+// Còn hàng: kho riêng có tài khoản AVAILABLE / nguồn API báo tồn > 0
+const IN_STOCK: Prisma.ProductWhereInput = { OR: [{ source: 'LOCAL', stockItems: { some: { status: 'AVAILABLE' } } }, { source: 'RESELLER', externalStock: { gt: 0 } }] };
+// Danh sách trong bot ẩn hàng hết giống trang web (Admin > Cài đặt website > Tự ẩn sản phẩm hết hàng)
+async function listWhere(extra: Prisma.ProductWhereInput = {}): Promise<Prisma.ProductWhereInput> {
+  const { catalog } = await getSiteExtras();
+  return { ...VISIBLE, ...extra, ...(catalog.hideSoldOut && { AND: [...(VISIBLE.AND as Prisma.ProductWhereInput[]), IN_STOCK] }) };
+}
 
 const short = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -216,7 +225,7 @@ function needLink(ctx: Ctx, fresh: boolean) {
 }
 
 async function showCategories(ctx: Ctx, page: number, fresh = false) {
-  const groups = await prisma.product.groupBy({ by: ['categoryId'], where: VISIBLE, _count: { _all: true } });
+  const groups = await prisma.product.groupBy({ by: ['categoryId'], where: await listWhere(), _count: { _all: true } });
   const counts = new Map(groups.map((g) => [g.categoryId, g._count._all]));
   const cats = await prisma.category.findMany({ where: { id: { in: [...counts.keys()] } }, select: { id: true, name: true }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
   if (!cats.length) return show(ctx, fresh, ctx.t.noProducts, [menuRow(ctx)]);
@@ -248,7 +257,7 @@ async function stockOf(products: { id: string; source: string; externalStock: nu
 async function showProducts(ctx: Ctx, categoryId: string, page: number) {
   const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { name: true } });
   if (!category) return showCategories(ctx, 0);
-  const where = { ...VISIBLE, categoryId };
+  const where = await listWhere({ categoryId });
   const total = await prisma.product.count({ where });
   const pages = Math.max(Math.ceil(total / PRODUCT_PAGE), 1);
   const p = Math.min(Math.max(page, 0), pages - 1);

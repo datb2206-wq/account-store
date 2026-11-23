@@ -139,6 +139,10 @@ export function SiteExtrasForm({ initial, siteUrl }: { initial: SiteExtras; site
       <Panel title="Sắp xếp sản phẩm trang chủ">
         <div className="grid items-end gap-4 sm:grid-cols-3">
           <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+            <input type="checkbox" checked={f.catalog.hideSoldOut} onChange={(e) => set('catalog', { hideSoldOut: e.target.checked })} />
+            Tự ẩn sản phẩm hết hàng (có hàng lại tự hiện)
+          </label>
+          <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
             <input type="checkbox" checked={f.catalog.soldOutLast} onChange={(e) => set('catalog', { soldOutLast: e.target.checked })} />
             Đẩy sản phẩm hết hàng xuống cuối danh mục
           </label>

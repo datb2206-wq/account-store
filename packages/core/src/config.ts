@@ -246,6 +246,8 @@ export const CONFIG_SCHEMAS = {
     // Sắp xếp trang chủ: hàng hết đẩy xuống cuối danh mục, hàng "Nổi bật" (sản phẩm ghim) ở đầu trang
     catalog: z.object({
       soldOutLast: z.boolean(),
+      // Tự ẩn sản phẩm hết hàng (web + bot Telegram); có hàng lại tự hiện. Cấu hình cũ chưa có -> bật.
+      hideSoldOut: z.boolean().default(true),
       featuredRow: z.boolean(),
       featuredLimit: z.number().int().min(3).max(30),
     }),

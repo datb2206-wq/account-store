@@ -105,10 +105,12 @@ export default async function ShopPage({
 
   const allowedCats = new Set(selected ? [selected.id, ...descendantIds(categories, selected.id)] : categories.map((c) => c.id));
   const needle = q.toLowerCase();
+  // Tự ẩn hàng hết (Admin > Cài đặt website): lọc lúc hiển thị, sản phẩm có hàng lại (nhập kho / nguồn API đồng bộ) tự hiện
+  const hideSoldOut = extras.catalog.hideSoldOut;
   const products = allProducts.filter(
     (p) =>
       allowedCats.has(p.categoryId) &&
-      (!inStockOnly || stockOf(p) > 0) &&
+      (!(inStockOnly || hideSoldOut) || stockOf(p) > 0) &&
       (!needle || localized(p.name, locale).toLowerCase().includes(needle) || localized(p.name).toLowerCase().includes(needle) || p.slug.includes(needle)),
   );
   const compare: Record<Sort, ((a: (typeof products)[number], b: (typeof products)[number]) => number) | null> = {
@@ -190,12 +192,12 @@ export default async function ShopPage({
                 {t[SORTS[s]]}
               </Link>
             ))}
-            <Link
+            {!hideSoldOut && <Link
               href={buildHref('/', { ...keep, instock: inStockOnly ? undefined : '1' })}
               className={`ml-1 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 transition ${inStockOnly ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/30' : 'bg-white text-zinc-700 ring-transparent hover:bg-zinc-100'}`}
             >
               <span className={`size-3 rounded border ${inStockOnly ? 'border-emerald-600 bg-emerald-600' : 'border-zinc-300'}`} /> {t.inStockOnly}
-            </Link>
+            </Link>}
           </div>
         </div>
 

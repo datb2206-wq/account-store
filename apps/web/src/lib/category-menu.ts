@@ -1,7 +1,11 @@
 import { cache } from 'react';
-import { prisma } from '@accszone/database';
+import { prisma, type Prisma } from '@accszone/database';
 import { descendantIds } from './category-tree';
 import { localized } from './format';
+import { getSiteExtras } from './site-extras';
+
+// Còn hàng: kho riêng có tài khoản AVAILABLE / nguồn API báo tồn > 0
+const IN_STOCK: Prisma.ProductWhereInput = { OR: [{ source: 'LOCAL', stockItems: { some: { status: 'AVAILABLE' } } }, { source: 'RESELLER', externalStock: { gt: 0 } }] };
 
 export interface MenuItem {
   slug: string;
@@ -17,13 +21,15 @@ export interface MenuColumn extends MenuItem {
 }
 
 export const getCategoryMenu = cache(async (locale: string) => {
+  const { catalog } = await getSiteExtras();
   const [categories, counts] = await Promise.all([
     prisma.category.findMany({
       where: { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       select: { id: true, slug: true, name: true, parentId: true, iconUrl: true },
     }),
-    prisma.product.groupBy({ by: ['categoryId'], where: { isActive: true }, _count: true }),
+    // Tự ẩn hàng hết: chỉ đếm sản phẩm còn hàng, danh mục không còn gì bị ẩn khỏi menu
+    prisma.product.groupBy({ by: ['categoryId'], where: { isActive: true, ...(catalog.hideSoldOut && IN_STOCK) }, _count: true }),
   ]);
   const own = new Map(counts.map((c) => [c.categoryId, c._count]));
   const ids = new Set(categories.map((c) => c.id));
@@ -36,10 +42,12 @@ export const getCategoryMenu = cache(async (locale: string) => {
 
   return {
     total: categories.reduce((s, c) => s + (own.get(c.id) ?? 0), 0),
-    columns: roots.map<MenuColumn>((root) => ({
-      ...toItem(root),
-      key: root.id,
-      items: categories.filter((c) => c.parentId === root.id).map(toItem),
-    })),
+    columns: roots
+      .map<MenuColumn>((root) => ({
+        ...toItem(root),
+        key: root.id,
+        items: categories.filter((c) => c.parentId === root.id).map(toItem).filter((i) => !catalog.hideSoldOut || i.count > 0),
+      }))
+      .filter((col) => !catalog.hideSoldOut || col.count > 0),
   };
 });
