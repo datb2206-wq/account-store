@@ -408,6 +408,7 @@ export const en = {
     MOMO: 'MoMo',
     CARD: 'Phone card',
     CUSTOM: 'Other method',
+    PIX: 'PIX',
   } as Record<string, string>,
   // Lỗi từ API (server trả tiếng Anh) -> dịch ở client bằng translateError() trong i18n/errors.ts
   seller: {
@@ -503,6 +504,18 @@ export const en = {
     failed: 'Something went wrong, please try again.',
   },
   pay: {
+    tabPix: 'PIX',
+    pixStep1: 'Enter the amount in R$ and press Continue',
+    pixStep2: 'Scan the QR code or copy the PIX code in your bank app',
+    pixStep3: 'Your balance is credited automatically after payment',
+    pixAmount: 'Amount (R$)',
+    pixMin: 'Minimum {n}',
+    pixMax: 'Maximum {n}',
+    pixScan: 'Scan this QR code with your bank app, or copy the PIX code below (Pix Copia e Cola).',
+    pixCode: 'PIX code (copy and paste)',
+    pixWaiting: 'Waiting for payment… this page updates automatically.',
+    pixAfterPay: 'Paid but your balance was not credited after a few minutes? Report it below and we will check.',
+    pixQrAlt: 'PIX QR code',
     tabCard: 'Phone card',
     tabOther: 'E-wallet & other',
     telco: 'Card type',

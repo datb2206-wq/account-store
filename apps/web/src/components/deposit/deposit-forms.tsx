@@ -30,8 +30,16 @@ export interface ManualOption {
   rate: number;
 }
 
+export interface PixOption {
+  name: string;
+  currency: string;
+  rate: number;
+  min: number;
+  max: number; // 0 = không giới hạn
+}
+
 type Network = 'TRC20' | 'BEP20';
-type Tab = 'bank' | 'usdt' | 'card' | 'other';
+type Tab = 'pix' | 'bank' | 'usdt' | 'card' | 'other';
 
 const NETWORK_LABEL: Record<Network, [string, string]> = { TRC20: ['TRC20', 'TRON'], BEP20: ['BEP20', 'BNB Smart Chain'] };
 
@@ -46,18 +54,20 @@ export function DepositForms({
   minUsd,
   card = null,
   manual = [],
+  pix = null,
 }: {
   banks: BankOption[];
   networks: Network[];
   minUsd: number;
   card?: CardOption | null;
   manual?: ManualOption[];
+  pix?: PixOption | null;
 }) {
   const router = useRouter();
   const { d } = useI18n();
   const t = d.deposit;
   const p = d.pay;
-  const [tab, setTab] = useState<Tab>(banks.length || !networks.length ? 'bank' : 'usdt');
+  const [tab, setTab] = useState<Tab>(pix ? 'pix' : banks.length || !networks.length ? 'bank' : 'usdt');
   const [network, setNetwork] = useState<Network | undefined>(networks[0]);
   const [bankIndex, setBankIndex] = useState(banks[0]?.index ?? 0);
   const [amount, setAmount] = useState('');
@@ -75,14 +85,21 @@ export function DepositForms({
   const manualPreview = method && Number(amount) > 0 ? usd.format(Number(amount) / method.rate) : null;
   const telcoInfo = card?.telcos.find((x) => x.code === telco);
   const cardPreview = card && telcoInfo ? usd.format((cardValue * (100 - telcoInfo.fee)) / 100 / card.vndRate) : null;
-  const available = { bank: banks.length > 0, usdt: networks.length > 0, card: !!card, other: manual.length > 0 }[tab];
+  const pixPreview = pix && Number(amount) > 0 ? usd.format(Number(amount) / pix.rate) : null;
+  const available = { pix: !!pix, bank: banks.length > 0, usdt: networks.length > 0, card: !!card, other: manual.length > 0 }[tab];
   const steps = {
+    pix: [p.pixStep1, p.pixStep2, p.pixStep3],
     bank: [t.bankStep1, t.bankStep2, t.bankStep3],
     usdt: [t.usdtStep1, t.usdtStep2, t.usdtStep3],
     card: [p.cardStep1, p.cardStep2, p.cardStep3],
     other: [p.manualStep1, p.manualStep2, p.manualStep3],
   }[tab];
-  const canSubmit = tab === 'card' ? serial.trim().length >= 6 && code.trim().length >= 6 : Number(amount) > 0;
+  const canSubmit =
+    tab === 'card'
+      ? serial.trim().length >= 6 && code.trim().length >= 6
+      : tab === 'pix' && pix
+        ? Number(amount) >= pix.min && (pix.max === 0 || Number(amount) <= pix.max)
+        : Number(amount) > 0;
 
   function switchTo(next: Tab) {
     setTab(next);
@@ -96,7 +113,9 @@ export function DepositForms({
     setError(null);
     type R = { deposit: { id: string } };
     const res =
-      tab === 'bank'
+      tab === 'pix'
+        ? await apiRequest<R>('/api/deposits/pix', 'POST', { amount })
+        : tab === 'bank'
         ? await apiRequest<R>('/api/deposits/bank', 'POST', { accountIndex: bankIndex, amount })
         : tab === 'usdt'
           ? await apiRequest<R>('/api/deposits/usdt', 'POST', { network, amount })
@@ -114,6 +133,7 @@ export function DepositForms({
 
   // Thẻ cào / ví điện tử chỉ hiện khi admin đã cấu hình
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    ...(pix ? [{ key: 'pix' as const, label: pix.name, icon: <BankIcon size={17} /> }] : []),
     { key: 'bank', label: t.tabBank, icon: <BankIcon size={17} /> },
     { key: 'usdt', label: t.tabCrypto, icon: <CoinIcon size={17} /> },
     ...(card ? [{ key: 'card' as const, label: p.tabCard, icon: <PhoneIcon size={17} /> }] : []),
@@ -122,7 +142,7 @@ export function DepositForms({
 
   return (
     <form onSubmit={submit} className="card space-y-5">
-      <div role="tablist" aria-label={t.title} className={`grid gap-1 rounded-xl bg-zinc-100 p-1 ${tabs.length > 2 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
+      <div role="tablist" aria-label={t.title} className={`grid gap-1 rounded-xl bg-zinc-100 p-1 ${tabs.length > 4 ? 'grid-cols-2 sm:grid-cols-5' : tabs.length > 2 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
         {tabs.map((it) => (
           <button
             key={it.key}
@@ -150,6 +170,23 @@ export function DepositForms({
 
       {!available ? (
         <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">{t.methodUnavailable}</p>
+      ) : tab === 'pix' && pix ? (
+        <div>
+          <label htmlFor="pix-amount" className="label">{p.pixAmount}</label>
+          <input
+            id="pix-amount"
+            inputMode="decimal"
+            className="input"
+            placeholder={fmt(p.pixMin, { n: `R$ ${pix.min.toLocaleString('pt-BR')}` })}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value.replace(/\s/g, '').replace(',', '.'))}
+          />
+          <p className="mt-1 text-xs text-zinc-500">
+            {fmt(p.pixMin, { n: `R$ ${pix.min.toLocaleString('pt-BR')}` })}
+            {pix.max > 0 && <> · {fmt(p.pixMax, { n: `R$ ${pix.max.toLocaleString('pt-BR')}` })}</>}
+            {pixPreview && <> · {rich(t.receiveApprox, { amount: <b>{pixPreview}</b> })}</>}
+          </p>
+        </div>
       ) : tab === 'card' && card ? (
         <>
           <div>

@@ -11,7 +11,7 @@
 //   fulfill-order    theo sự kiện -> web đẩy vào ngay khi khách mua hàng RESELLER
 import { Queue, Worker, type Job } from 'bullmq';
 import { prisma } from '@accszone/database';
-import { AUTOMATION_EVERY_MS, backfillSellerEarnings, reportSystemError, reportSystemOk, runMonitor, sendDailyReport, expireStaleDeposits, fulfillResellerOrder, notifyLowBalance, processEmailCampaigns, processTranslations, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, supplierClient, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
+import { AUTOMATION_EVERY_MS, backfillSellerEarnings, reportSystemError, reportSystemOk, runMonitor, sendDailyReport, expireStaleDeposits, fulfillResellerOrder, notifyLowBalance, processEmailCampaigns, processTranslations, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, supplierClient, sweepPixDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
 import {
   FULFILL_JOB_OPTIONS,
   fulfillJobId,
@@ -138,6 +138,11 @@ async function processJob(job: Job) {
       return { queued: ids.length };
     }
 
+    case JOBS.sweepPix: {
+      const r = await sweepPixDeposits();
+      if (r.completed) log('pix').info(`credited ${r.completed}/${r.checked} PIX deposits`);
+      return r;
+    }
     case JOBS.monitor: {
       await checkJobs();
       return runMonitor(log('monitor'));
@@ -179,6 +184,7 @@ async function main() {
   await queue.upsertJobScheduler(JOBS.sweepOrders, { every: 2 * 60_000 }, { name: JOBS.sweepOrders });
   await queue.upsertJobScheduler(JOBS.emailCampaigns, { every: 2 * 60_000 }, { name: JOBS.emailCampaigns });
   await queue.upsertJobScheduler(JOBS.translations, { every: 60_000 }, { name: JOBS.translations });
+  await queue.upsertJobScheduler(JOBS.sweepPix, { every: 60_000 }, { name: JOBS.sweepPix });
   await queue.upsertJobScheduler(JOBS.monitor, { every: 5 * 60_000 }, { name: JOBS.monitor });
   await queue.upsertJobScheduler(JOBS.dailyReport, { pattern: '55 23 * * *', tz: 'Asia/Ho_Chi_Minh' }, { name: JOBS.dailyReport });
   await queue.upsertJobScheduler(JOBS.automations, { every: AUTOMATION_EVERY_MS }, { name: JOBS.automations });

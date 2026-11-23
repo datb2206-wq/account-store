@@ -29,6 +29,7 @@ export const METHOD_LABEL: Record<string, string> = {
   MOMO: 'MoMo',
   CARD: 'Thẻ cào',
   CUSTOM: 'Nạp thủ công',
+  PIX: 'PIX',
 };
 
 // Trường Json đa ngôn ngữ: { en: "...", ru: "..." } -> lấy theo locale, fallback en

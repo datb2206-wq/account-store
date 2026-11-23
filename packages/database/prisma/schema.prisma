@@ -85,6 +85,7 @@ enum PaymentMethod {
   MOMO // chuyển MoMo (khách báo đã chuyển, admin duyệt / webhook)
   CUSTOM // phương thức nạp thủ công admin tự tạo (PayPal, Binance Pay…)
   CARD // thẻ cào điện thoại qua đối tác đổi thẻ
+  PIX // PIX Brazil qua API cổng thanh toán (Admin > Cổng nạp tiền)
 }
 
 // -------------------------------------------------------------

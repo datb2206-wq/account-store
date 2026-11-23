@@ -331,7 +331,7 @@ export async function rejectDeposit(id: string, reviewerId: string, note: string
 // Trả về khóa biên lai cũ (nếu bị thay) để nơi gọi xóa file.
 export async function claimDeposit(userId: string, id: string, proofKey: string | null, customerRef: string | null) {
   const t = await prisma.transaction.findFirst({
-    where: { id, userId, type: 'DEPOSIT', method: { in: ['BANK_TRANSFER', 'MOMO', 'CUSTOM', 'USDT_TRC20', 'USDT_BEP20'] } },
+    where: { id, userId, type: 'DEPOSIT', method: { in: ['BANK_TRANSFER', 'MOMO', 'CUSTOM', 'PIX', 'USDT_TRC20', 'USDT_BEP20'] } },
     select: { status: true, createdAt: true, claimedAt: true, proofImageUrl: true, customerRef: true },
   });
   if (!t) throw domainError(404, 'Deposit not found');

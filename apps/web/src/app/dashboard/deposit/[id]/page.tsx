@@ -13,7 +13,7 @@ import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { requireUser } from '@/lib/auth';
 import { explorerTxUrl, shortHash } from '@/lib/chain-links';
-import { expireStaleDeposits, getConfig } from '@accszone/core';
+import { checkPixDeposit, expireStaleDeposits, getConfig, getPixSettings } from '@accszone/core';
 import { formatDate, formatOriginal } from '@/lib/format';
 import { fmt } from '@/i18n/config';
 import { rich } from '@/i18n/rich';
@@ -48,8 +48,14 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   await expireStaleDeposits();
 
-  const t = await prisma.transaction.findFirst({ where: { id, userId: user.id, type: 'DEPOSIT' } });
+  let t = await prisma.transaction.findFirst({ where: { id, userId: user.id, type: 'DEPOSIT' } });
   if (!t) notFound();
+  // PIX: mỗi lần trang tự tải lại thì hỏi cổng PIX xem khách trả chưa (nếu admin có đặt link kiểm tra)
+  const pixAuto = t.method === 'PIX' && !!(await getPixSettings()).statusUrl;
+  if (pixAuto && (t.status === 'PENDING' || t.status === 'EXPIRED')) {
+    const before = t.status;
+    if ((await checkPixDeposit(t.id)) !== before) t = (await prisma.transaction.findFirst({ where: { id, userId: user.id, type: 'DEPOSIT' } }))!;
+  }
 
   const isUsdt = t.method === 'USDT_TRC20' || t.method === 'USDT_BEP20';
   // Hết hạn chưa quá 24h: vẫn cho gửi TxID (USDT) / báo đã chuyển khoản (ngân hàng) vì khách có thể chuyển trễ
@@ -61,6 +67,8 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
   const exactUsdt = t.originalAmount?.toString() ?? '';
   // QR chỉ chứa địa chỉ ví (chuẩn chung mọi ví đọc được). Số tiền khách tự nhập theo số lẻ hiển thị bên cạnh.
   // Địa chỉ ví đã được kiểm tra định dạng ở cấu hình, SVG do thư viện sinh ra.
+  const pix = (t.metadata as { pix?: { code: string } } | null)?.pix;
+  const pixQr = open && t.method === 'PIX' && pix?.code ? await QRCode.toString(pix.code, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) : null;
   const qrSvg = open && isUsdt && t.toAddress ? await QRCode.toString(t.toAddress, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) : null;
 
   return (
@@ -141,6 +149,39 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
             </section>
           )}
           <section className="card">
+            <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
+          </section>
+        </>
+      )}
+
+      {open && t.method === 'PIX' && pix && (
+        <>
+          <section className="card overflow-hidden p-0">
+            {pixQr && (
+              <div className="flex flex-col items-center gap-4 border-b border-zinc-100 p-5 sm:flex-row">
+                <div role="img" aria-label={d.pay.pixQrAlt} className="size-48 shrink-0 rounded-xl border border-zinc-200 bg-white p-2 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: pixQr }} />
+                <p className="text-center text-sm text-zinc-600 sm:text-left">{d.pay.pixScan}</p>
+              </div>
+            )}
+            <div className="divide-y divide-zinc-100">
+              <Row label={tr.amount} value={formatOriginal(t.originalAmount, t.originalCurrency)} highlight />
+              <div className="space-y-2 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-zinc-500">{d.pay.pixCode}</span>
+                  <CopyButton value={pix.code} />
+                </div>
+                <p className="rounded-lg bg-zinc-50 p-2 font-mono text-xs break-all text-zinc-700">{pix.code}</p>
+              </div>
+            </div>
+          </section>
+          {t.status === 'PENDING' && !t.claimedAt && (
+            <div className="card border-blue-200 bg-blue-50 text-sm text-blue-900">
+              {pixAuto && <AutoRefresh everyMs={8_000} />}
+              <p>{d.pay.pixWaiting}</p>
+            </div>
+          )}
+          <section className="card space-y-2">
+            <p className="text-sm text-zinc-500">{d.pay.pixAfterPay}</p>
             <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
           </section>
         </>

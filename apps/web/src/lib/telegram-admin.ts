@@ -188,7 +188,7 @@ async function supplierBalances(ctx: Ctx) {
 }
 
 // ---------------------------------------------------------------- Nạp tiền
-const METHOD: Record<string, string> = { USDT_TRC20: 'USDT TRC20', USDT_BEP20: 'USDT BEP20', BANK_TRANSFER: 'Ngân hàng', MOMO: 'MoMo', CUSTOM: 'Nạp thủ công', CARD: 'Thẻ cào' };
+const METHOD: Record<string, string> = { USDT_TRC20: 'USDT TRC20', USDT_BEP20: 'USDT BEP20', BANK_TRANSFER: 'Ngân hàng', MOMO: 'MoMo', CUSTOM: 'Nạp thủ công', CARD: 'Thẻ cào', PIX: 'PIX' };
 
 export function depositText(t: { id: string; method: string; amount: Prisma.Decimal; customerRef: string | null; transferCode: string | null; originalAmount: Prisma.Decimal | null; originalCurrency: string | null; proofImageUrl: string | null; user: { email: string; username: string | null } }) {
   return [

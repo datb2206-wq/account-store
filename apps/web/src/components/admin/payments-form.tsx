@@ -193,3 +193,84 @@ export function CardCheckButton({ id }: { id: string }) {
     </div>
   );
 }
+
+// Nạp PIX (Brazil): link API chỉ lưu trên server, form không nhận lại link cũ (để trống = giữ nguyên)
+export interface PixForm {
+  enabled: boolean;
+  name: string;
+  currency: string;
+  minAmount: number;
+  maxAmount: number;
+}
+
+export function PixSettingsForm({ initial, hasCreateUrl, hasStatusUrl, currencies }: { initial: PixForm; hasCreateUrl: boolean; hasStatusUrl: boolean; currencies: string[] }) {
+  const [f, setF] = useState(initial);
+  const [createUrl, setCreateUrl] = useState('');
+  const [statusUrl, setStatusUrl] = useState('');
+  const [clearStatus, setClearStatus] = useState(false);
+  const { pending, error, success, save } = useSave();
+  const set = (patch: Partial<PixForm>) => setF((s) => ({ ...s, ...patch }));
+
+  async function submit() {
+    const ok = await save({ pix: { ...f, createUrl, statusUrl: clearStatus ? null : statusUrl } }, 'Đã lưu cấu hình PIX.');
+    if (ok) {
+      setCreateUrl('');
+      setStatusUrl('');
+      setClearStatus(false);
+    }
+  }
+
+  return (
+    <Panel title="PIX (Brazil) qua API">
+      <div className="space-y-4">
+        <p className="text-sm text-zinc-500">
+          Khách nhập số tiền, web gọi link tạo lệnh để lấy mã QR PIX. Link phải có <code className="rounded bg-zinc-100 px-1">{'{amount}'}</code> ở chỗ số tiền,
+          VD <code className="rounded bg-zinc-100 px-1 break-all">https://ten-mien.com/api/deposit/{'{amount}'}</code>. Link chỉ lưu trên máy chủ, không hiện ra trình duyệt.
+        </p>
+        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700">
+          <input type="checkbox" checked={f.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> Bật nạp PIX
+        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-zinc-700">Link tạo lệnh nạp *</span>
+            <input className="input font-mono text-xs" placeholder={hasCreateUrl ? '•••••••• đã đặt (để trống = giữ nguyên)' : 'https://…/{amount}'} value={createUrl} onChange={(e) => setCreateUrl(e.target.value.trim())} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-zinc-700">Link kiểm tra trạng thái (tùy chọn)</span>
+            <input className="input font-mono text-xs" disabled={clearStatus} placeholder={hasStatusUrl ? '•••••••• đã đặt (để trống = giữ nguyên)' : 'https://…/{id}'} value={statusUrl} onChange={(e) => setStatusUrl(e.target.value.trim())} />
+            <span className="mt-1 block text-xs text-zinc-400">
+              Có link này ({'{id}'} = transactionId) thì khách trả xong web tự cộng tiền. Không có thì khách bấm &quot;đã thanh toán&quot;, admin duyệt ở Giao dịch.
+            </span>
+            {hasStatusUrl && (
+              <label className="mt-1 flex items-center gap-2 text-xs text-zinc-600">
+                <input type="checkbox" checked={clearStatus} onChange={(e) => setClearStatus(e.target.checked)} /> Xóa link kiểm tra
+              </label>
+            )}
+          </label>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-4">
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-zinc-700">Tên hiện cho khách</span>
+            <input className="input" value={f.name} maxLength={40} onChange={(e) => set({ name: e.target.value })} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-zinc-700">Tiền tệ</span>
+            <select className="input" value={f.currency} onChange={(e) => set({ currency: e.target.value })}>
+              {[...new Set([f.currency, ...currencies])].map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-zinc-700">Nạp tối thiểu</span>
+            <input className="input tabular-nums" inputMode="decimal" value={f.minAmount} onChange={(e) => set({ minAmount: num(e.target.value) })} />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-zinc-700">Nạp tối đa (0 = không giới hạn)</span>
+            <input className="input tabular-nums" inputMode="decimal" value={f.maxAmount} onChange={(e) => set({ maxAmount: num(e.target.value) })} />
+          </label>
+        </div>
+        <FormAlert error={error} success={success} />
+        <button type="button" className="btn-primary" disabled={pending} onClick={submit}>{pending ? 'Đang lưu…' : 'Lưu PIX'}</button>
+      </div>
+    </Panel>
+  );
+}

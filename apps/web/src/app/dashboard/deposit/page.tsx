@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
-import { DepositForms, type BankOption, type CardOption, type ManualOption } from '@/components/deposit/deposit-forms';
+import { DepositForms, type BankOption, type CardOption, type ManualOption, type PixOption } from '@/components/deposit/deposit-forms';
 import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { Pagination } from '@/components/pagination';
 import { requireUser } from '@/lib/auth';
-import { activeDepositBonuses, CARD_TELCO_LABEL, cardReady, expireStaleDeposits, getCardSettings, getConfig, getManualMethods } from '@accszone/core';
+import { activeDepositBonuses, CARD_TELCO_LABEL, cardReady, expireStaleDeposits, getCardSettings, getConfig, getManualMethods, getPixSettings, pixReady } from '@accszone/core';
 import { formatOriginal } from '@/lib/format';
 import { rich } from '@/i18n/rich';
 import { getI18n } from '@/i18n/server';
@@ -27,7 +27,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
   const page = Math.max(1, Number.parseInt((await searchParams).page ?? '1', 10) || 1);
   await expireStaleDeposits();
 
-  const [bonuses, cardCfg, manualCfg, [accounts, rates, trc20, bep20, deposit, total, history]] = await Promise.all([activeDepositBonuses(), getCardSettings(), getManualMethods(), Promise.all([
+  const [bonuses, cardCfg, manualCfg, pixCfg, [accounts, rates, trc20, bep20, deposit, total, history]] = await Promise.all([activeDepositBonuses(), getCardSettings(), getManualMethods(), getPixSettings(), Promise.all([
     getConfig('bank.accounts'),
     getConfig('currency.rates'),
     getConfig('usdt.trc20'),
@@ -61,6 +61,11 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
     const rate = m.currency === 'USD' ? 1 : rates[m.currency];
     return m.enabled && rate ? [{ id: m.id, name: m.name, currency: m.currency, rate }] : [];
   });
+  // PIX: không gửi link API xuống client
+  const pix: PixOption | null =
+    pixReady(pixCfg) && rates[pixCfg.currency]
+      ? { name: pixCfg.name, currency: pixCfg.currency, rate: rates[pixCfg.currency]!, min: pixCfg.minAmount, max: pixCfg.maxAmount }
+      : null;
   const networks = [trc20.enabled && trc20.wallet ? 'TRC20' : null, bep20.enabled && bep20.wallet ? 'BEP20' : null].filter(
     (n): n is 'TRC20' | 'BEP20' => n !== null,
   );
@@ -84,7 +89,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
       )}
 
       <div className="max-w-xl">
-        <DepositForms banks={banks} networks={networks} minUsd={deposit.minAmountUsd} card={card} manual={manual} />
+        <DepositForms banks={banks} networks={networks} minUsd={deposit.minAmountUsd} card={card} manual={manual} pix={pix} />
       </div>
 
       <section className="space-y-3">

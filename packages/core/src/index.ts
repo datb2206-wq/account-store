@@ -11,6 +11,7 @@ export * from './email';
 export * from './email-campaigns';
 export * from './errors';
 export * from './fx';
+export * from './pix';
 export * from './sellers';
 export * from './stock';
 export * from './telegram';

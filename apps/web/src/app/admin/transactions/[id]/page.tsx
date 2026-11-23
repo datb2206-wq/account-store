@@ -161,7 +161,7 @@ export default async function AdminTransactionDetailPage({ params }: { params: P
                 <CardCheckButton id={t.id} />
               </section>
             )}
-            <ReviewPanel id={t.id} amount={t.amount.toString()} isBank={t.method === 'BANK_TRANSFER' || t.method === 'MOMO' || t.method === 'CUSTOM'} customerRef={t.customerRef} needsTxHash={isUsdt && !t.txHash} />
+            <ReviewPanel id={t.id} amount={t.amount.toString()} isBank={t.method === 'BANK_TRANSFER' || t.method === 'MOMO' || t.method === 'CUSTOM' || t.method === 'PIX'} customerRef={t.customerRef} needsTxHash={isUsdt && !t.txHash} />
           </div>
         )}
       </div>

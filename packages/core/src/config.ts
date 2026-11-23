@@ -20,7 +20,7 @@ export const CONTENT_PAGES = ['policy', 'terms', 'faq', 'contact'] as const;
 export type ContentPage = (typeof CONTENT_PAGES)[number];
 
 // Key có trang quản trị riêng (giữ bí mật, xóa cache…): trang Cấu hình chung không hiển thị / không ghi các key này
-export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual', 'ctv', 'translate', 'telegram.shop', 'site.languages'] as const;
+export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual', 'ctv', 'translate', 'telegram.shop', 'site.languages', 'payment.pix'] as const;
 
 // Nhà mạng thẻ cào theo chuẩn API chargingws/v2 của các web đổi thẻ
 export const CARD_TELCOS = ['VIETTEL', 'VINAPHONE', 'MOBIFONE', 'VIETNAMOBILE', 'ZING', 'GATE', 'VCOIN', 'GARENA'] as const;
@@ -224,6 +224,16 @@ export const CONFIG_SCHEMAS = {
     )
     .max(20)
     .refine((list) => new Set(list.map((m) => m.id)).size === list.length, 'Mã phương thức bị trùng'),
+  // Nạp PIX (Brazil) qua API: link tạo lệnh chứa {amount}, link kiểm tra (tùy chọn) chứa {id}
+  'payment.pix': z.object({
+    enabled: z.boolean(),
+    name: z.string().trim().min(1).max(40),
+    createUrl: z.union([z.literal(''), z.string().trim().url().max(500).refine((u) => /^https:\/\//.test(u) && u.includes('{amount}'), 'Link phải bắt đầu bằng https:// và có {amount}')]),
+    statusUrl: z.union([z.literal(''), z.string().trim().url().max(500).refine((u) => /^https:\/\//.test(u) && u.includes('{id}'), 'Link phải bắt đầu bằng https:// và có {id}')]),
+    currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
+    minAmount: z.number().positive().max(1_000_000),
+    maxAmount: z.number().min(0).max(10_000_000), // 0 = không giới hạn
+  }),
   // Admin > Cài đặt website: màu, popup, trang nội dung, mã theo dõi, nút liên hệ, bảng xếp hạng
   'site.extras': z.object({
     primaryColor: HEX_COLOR,

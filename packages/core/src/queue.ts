@@ -14,6 +14,7 @@ export const JOBS = {
   automations: 'run-automations',
   translations: 'process-translations', // mỗi phút: dịch tiếp tên / mô tả sản phẩm (Admin > Dịch sản phẩm)
   monitor: 'run-monitor', // mỗi 5 phút: cảnh báo Telegram (nguồn API lỗi, kho sắp hết, tiền chưa cộng...)
+  sweepPix: 'sweep-pix-deposits', // mỗi phút: hỏi cổng PIX các lệnh đang chờ (nếu có link kiểm tra)
   dailyReport: 'daily-report', // 23:55 giờ VN: báo cáo cuối ngày qua Telegram
   emailCampaigns: 'send-email-campaigns', // mỗi phút: gửi tiếp 1 đợt email chiến dịch // định kỳ: chạy công việc tự động (Admin > Tự động hóa)
 } as const;
