@@ -190,7 +190,7 @@ async function supplierBalances(ctx: Ctx) {
 // ---------------------------------------------------------------- Nạp tiền
 const METHOD: Record<string, string> = { USDT_TRC20: 'USDT TRC20', USDT_BEP20: 'USDT BEP20', BANK_TRANSFER: 'Ngân hàng', MOMO: 'MoMo', CUSTOM: 'Nạp thủ công', CARD: 'Thẻ cào', PIX: 'PIX' };
 
-export function depositText(t: { id: string; method: string; amount: Prisma.Decimal; customerRef: string | null; transferCode: string | null; originalAmount: Prisma.Decimal | null; originalCurrency: string | null; proofImageUrl: string | null; user: { email: string; username: string | null } }) {
+export function depositText(t: { id: string; method: string; amount: Prisma.Decimal; customerRef: string | null; bankRef: string | null; transferCode: string | null; originalAmount: Prisma.Decimal | null; originalCurrency: string | null; proofImageUrl: string | null; user: { email: string; username: string | null } }) {
   return [
     `💳 <b>Yêu cầu nạp chờ duyệt</b>`,
     `Khách: <b>${escapeHtml(t.user.username ?? t.user.email)}</b>`,
@@ -198,7 +198,33 @@ export function depositText(t: { id: string; method: string; amount: Prisma.Deci
     `Số tiền: <b>${formatUsd(t.amount)}</b>${t.originalAmount && t.originalCurrency ? ` (${Number(t.originalAmount).toLocaleString('en-US')} ${t.originalCurrency})` : ''}`,
     ...(t.transferCode ? [`Nội dung CK: <code>${escapeHtml(t.transferCode)}</code>`] : []),
     ...(t.customerRef ? [`Mã GD khách khai: <code>${escapeHtml(t.customerRef)}</code>`] : []),
+    ...(t.method === 'PIX' && t.bankRef ? [`Mã PIX: <code>${escapeHtml(t.bankRef.replace(/^pix:/, ''))}</code> (đối chiếu bên cổng PIX)`] : []),
     ...(t.proofImageUrl ? ['📎 Có biên lai (xem trên web)'] : []),
+  ].join('\n');
+}
+
+// Chống mã trùng: mã GD khách khai đã xuất hiện ở yêu cầu nạp khác (dùng lại biên lai / 1 lần trả báo cho 2 lệnh)
+async function duplicateRefs(t: { id: string; customerRef: string | null; bankRef: string | null }) {
+  const or: Prisma.TransactionWhereInput[] = [];
+  const ref = t.customerRef?.trim();
+  if (ref) or.push({ customerRef: { equals: ref, mode: 'insensitive' } }, { bankRef: { equals: ref, mode: 'insensitive' } });
+  if (t.bankRef) or.push({ bankRef: t.bankRef });
+  if (!or.length) return [];
+  return prisma.transaction.findMany({
+    where: { type: 'DEPOSIT', id: { not: t.id }, status: { in: ['PENDING', 'COMPLETED'] }, OR: or },
+    select: { id: true, status: true, amount: true, user: { select: { email: true, username: true } } },
+    take: 5,
+  });
+}
+
+function duplicateText(list: Awaited<ReturnType<typeof duplicateRefs>>) {
+  if (!list.length) return '';
+  const done = list.filter((x) => x.status === 'COMPLETED').length;
+  return [
+    '',
+    `⚠️ <b>MÃ TRÙNG</b>: mã giao dịch này đã có ở ${list.length} yêu cầu nạp khác${done ? ` (${done} đã được cộng tiền)` : ''}:`,
+    ...list.map((x) => `• ${escapeHtml(x.user.username ?? x.user.email)} · ${formatUsd(x.amount)} · ${x.status === 'COMPLETED' ? 'đã duyệt' : 'đang chờ'}`),
+    'Không duyệt qua Telegram được, kiểm tra kỹ trên web.',
   ].join('\n');
 }
 
@@ -209,6 +235,7 @@ const depositSelect = {
   method: true,
   amount: true,
   customerRef: true,
+  bankRef: true,
   transferCode: true,
   originalAmount: true,
   originalCurrency: true,
@@ -226,7 +253,10 @@ async function pendingDeposits(ctx: Ctx) {
     select: depositSelect,
   });
   if (!list.length) return sendText(ctx.token, ctx.chatId, '✅ Không có yêu cầu nạp nào đang chờ duyệt.');
-  for (const t of list) await sendText(ctx.token, ctx.chatId, depositText(t), depositButtons(t.id));
+  for (const t of list) {
+    const dup = await duplicateRefs(t);
+    await sendText(ctx.token, ctx.chatId, depositText(t) + duplicateText(dup), dup.length ? undefined : depositButtons(t.id));
+  }
 }
 
 async function approveDeposit(ctx: Ctx, id: string, cbId: string) {
@@ -234,6 +264,12 @@ async function approveDeposit(ctx: Ctx, id: string, cbId: string) {
   if (!t) return answerCallback(ctx.token, cbId, 'Không tìm thấy yêu cầu nạp');
   // USDT duyệt tay phải có TxID để chặn cộng tiền 2 lần cho 1 giao dịch -> làm trên web
   if (t.network && !t.txHash) return answerCallback(ctx.token, cbId, 'Nạp USDT cần nhập TxID: hãy duyệt trên trang web.');
+  // Mã GD trùng với yêu cầu khác -> không cho duyệt nhanh qua Telegram
+  const dup = await duplicateRefs(t);
+  if (dup.length) {
+    await answerCallback(ctx.token, cbId, '⚠️ Mã giao dịch trùng với yêu cầu khác, hãy kiểm tra và duyệt trên web.');
+    return editOrSend(ctx.token, ctx.chatId, ctx.messageId, depositText(t) + duplicateText(dup));
+  }
   const result = await prisma.$transaction((tx) => creditDeposit(tx, id, { reviewedById: ctx.staff.id, note: 'Duyệt qua Telegram' }));
   await writeAudit({ actorId: ctx.staff.id, action: 'transaction.approve', entity: 'Transaction', entityId: id, before: { status: t.status, amount: t.amount }, after: { status: 'COMPLETED', amount: result.amount, via: 'telegram' }, ip: AUDIT_IP });
   await answerCallback(ctx.token, cbId, '✅ Đã duyệt');
@@ -366,7 +402,8 @@ export async function notifyDepositClaim(id: string) {
     if (!s.enabled || !s.botToken || !s.chatId || !s.events.deposit) return;
     const t = await prisma.transaction.findFirst({ where: { id, type: 'DEPOSIT', status: 'PENDING' }, select: depositSelect });
     if (!t) return;
-    await sendText(s.botToken, s.chatId, depositText(t), s.adminCommands ? depositButtons(t.id) : undefined);
+    const dup = await duplicateRefs(t);
+    await sendText(s.botToken, s.chatId, depositText(t) + duplicateText(dup), s.adminCommands && !dup.length ? depositButtons(t.id) : undefined);
   } catch (err) {
     console.warn(`[telegram] deposit claim notify failed: ${err instanceof Error ? err.message : err}`);
   }

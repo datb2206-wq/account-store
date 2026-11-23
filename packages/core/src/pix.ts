@@ -76,6 +76,11 @@ export async function createPixDeposit(userId: string, input: { amount: string }
     console.error(`[pix] amount mismatch: asked ${original} got ${returned}`);
     throw domainError(502, 'PIX is temporarily unavailable, please try again later');
   }
+  // Chống trùng: 1 mã giao dịch PIX chỉ gắn với đúng 1 lệnh nạp trên web
+  if (await prisma.transaction.count({ where: { bankRef: `pix:${transactionId}` } })) {
+    console.error(`[pix] duplicate transactionId ${transactionId}`);
+    throw domainError(502, 'PIX is temporarily unavailable, please try again later');
+  }
   const exp = new Date(str(data.expiresAt));
   const expiresAt = Number.isNaN(exp.getTime()) ? new Date(Date.now() + 30 * 60_000) : exp;
 

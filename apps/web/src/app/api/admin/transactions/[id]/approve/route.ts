@@ -21,8 +21,10 @@ export const POST = adminRoute<Ctx>(async (req, { params }, user) => {
     : null;
   if (before.network && !txHash) throw badRequest('Nhập TxID hợp lệ của giao dịch USDT trước khi duyệt', { txHash: ['TxID không hợp lệ'] });
 
+  // PIX: giữ mã giao dịch PIX gốc (pix:<id>) để đối soát / cảnh báo trùng; mã admin nhập ghi vào ghi chú
+  const pixRef = before.method === 'PIX' && before.bankRef;
   const result = await prisma.$transaction((tx) =>
-    creditDeposit(tx, id, { amount, bankRef, note, reviewedById: user.id, ...(txHash && { txHash }) }),
+    creditDeposit(tx, id, { amount, bankRef: pixRef ? undefined : bankRef, note: pixRef && bankRef ? [note, `Mã GD admin nhập: ${bankRef}`].filter(Boolean).join(' · ') : note, reviewedById: user.id, ...(txHash && { txHash }) }),
   );
   await writeAudit({
     actorId: user.id,
