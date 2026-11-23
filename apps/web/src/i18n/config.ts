@@ -68,7 +68,7 @@ export type Fx = { currency: string; rate: number; decimals?: number } | null;
 
 const fxFormatters = new Map<string, Intl.NumberFormat>();
 
-export function formatFx(usd: number | string, fx: Fx, locale: Locale): string | null {
+export function formatFx(usd: number | string, fx: Fx, locale: Locale, approx = true): string | null {
   if (!fx) return null;
   const digits = fx.decimals ?? (fx.currency === 'IDR' ? 0 : 2);
   const key = `${locale}:${fx.currency}:${digits}`;
@@ -77,5 +77,6 @@ export function formatFx(usd: number | string, fx: Fx, locale: Locale): string |
     f = new Intl.NumberFormat(LOCALE_META[locale].htmlLang, { style: 'currency', currency: fx.currency, minimumFractionDigits: 0, maximumFractionDigits: digits });
     fxFormatters.set(key, f);
   }
-  return `≈ ${f.format(Number(usd) * fx.rate)}`;
+  const v = f.format(Number(usd) * fx.rate);
+  return approx ? `≈ ${v}` : v;
 }

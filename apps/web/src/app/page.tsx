@@ -245,7 +245,7 @@ export default async function ShopPage({
                   const name = localized(p.name, locale);
                   const description = localized(p.description, locale);
                   const soldN = (sold.get(p.id) ?? 0).toLocaleString('en-US');
-                  const local = formatFx(p.price.toString(), fx, locale);
+                  const local = formatFx(p.price.toString(), fx, locale, false);
                   const minNote = p.minQty > 1 ? fmt(t.minQty, { n: p.minQty }) : null;
                   const category = catById.get(p.categoryId)!;
                   const categoryName = localized(category.name, locale);
@@ -279,10 +279,10 @@ export default async function ShopPage({
                       </div>
                       <p className="hidden text-sm text-zinc-500 lg:block">{t.pricePerPc}</p>
                       <div>
-                        <p translate="no" className="text-base font-bold text-zinc-900 tabular-nums">{formatUsd(p.price)}</p>
-                        {/* Giá quy đổi theo ngôn ngữ (≈ Rp / ₽ / ¥) */}
-                        {(local ?? minNote) && <p translate={local ? 'no' : undefined} className="text-[11px] whitespace-nowrap text-zinc-500 tabular-nums">{local ?? minNote}</p>}
-                        {local && minNote && <p className="text-[11px] text-zinc-500">{minNote}</p>}
+                        {/* Khách chọn tiền tệ khác USD: giá quy đổi hiện đậm ở trên, USD nhỏ ở dưới */}
+                        <p translate="no" className="text-base font-bold whitespace-nowrap text-zinc-900 tabular-nums">{local ?? formatUsd(p.price)}</p>
+                        {local && <p translate="no" className="text-[11px] whitespace-nowrap text-zinc-500 tabular-nums">{formatUsd(p.price)}</p>}
+                        {minNote && <p className="text-[11px] text-zinc-500">{minNote}</p>}
                       </div>
                       <div className="flex justify-end">
                         <BuyButton

@@ -209,8 +209,8 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg bg-zinc-50 p-3">
                   <p className="text-zinc-500">{t.price}</p>
-                  <p className="font-semibold"><Money value={product.price} /> <span className="font-normal text-zinc-400">{t.perItem}</span></p>
-                  {fx && <p translate="no" className="text-xs text-zinc-400 tabular-nums">{formatFx(product.price, fx, locale)}</p>}
+                  <p className="font-semibold">{fx ? <span translate="no" className="tabular-nums">{formatFx(product.price, fx, locale, false)}</span> : <Money value={product.price} />} <span className="font-normal text-zinc-400">{t.perItem}</span></p>
+                  {fx && <p className="text-xs text-zinc-400 tabular-nums"><Money value={product.price} /></p>}
                 </div>
                 <div className="rounded-lg bg-zinc-50 p-3">
                   <p className="text-zinc-500">{t.inStock}</p>
@@ -268,8 +268,8 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
                       <span className="text-emerald-600">−<Money value={activeCoupon.discount} /></span>
                     </p>
                   )}
-                  <p className="text-xl font-semibold tabular-nums">{validQty ? <Money value={total} /> : <span>—</span>}</p>
-                  {fx && validQty && <p translate="no" className="text-xs text-zinc-400 tabular-nums">{formatFx(total, fx, locale)}</p>}
+                  <p className="text-xl font-semibold tabular-nums">{validQty ? (fx ? <span translate="no">{formatFx(total, fx, locale, false)}</span> : <Money value={total} />) : <span>—</span>}</p>
+                  {fx && validQty && <p className="text-xs text-zinc-400 tabular-nums"><Money value={total} /></p>}
                 </div>
                 <div className="text-right text-sm">
                   <p className="text-zinc-500">{t.yourBalance}</p>
