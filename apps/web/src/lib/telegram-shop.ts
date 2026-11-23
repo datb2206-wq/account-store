@@ -3,7 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { getConfig } from '@accszone/core';
 import { prisma, type Prisma } from '@accszone/database';
-import { isLocale, LOCALES, LOCALE_META, type Locale } from '@/i18n/config';
+import { ACTIVE_LOCALES, DEFAULT_LOCALE, isActiveLocale as isLocale, LOCALE_META, type Locale } from '@/i18n/config';
 import { formatUsd, localized } from './format';
 import { getOrderForUser, purchase, PurchaseError } from './purchase';
 import { rateLimit } from './rate-limit';
@@ -98,7 +98,8 @@ async function buildCtx(settings: ShopBotSettings, siteUrl: string, chatId: numb
     select: { id: true, email: true, username: true, balance: true, status: true, locale: true },
   });
   const saved = user ? null : await getRedis().get(`tg:lang:${from.id}`).catch(() => null);
-  const locale: Locale = user ? user.locale : isLocale(saved) ? saved : localeFromTelegram(from.language_code);
+  const wanted: Locale = user ? user.locale : isLocale(saved) ? saved : localeFromTelegram(from.language_code);
+  const locale: Locale = isLocale(wanted) ? wanted : DEFAULT_LOCALE; // ngôn ngữ đã ẩn -> tiếng Anh
   let site = 'Shop';
   try {
     site = (await getConfig('site.general')).name;
@@ -411,7 +412,7 @@ async function sendOrder(ctx: Ctx, code: string) {
 }
 
 function showLanguages(ctx: Ctx, fresh = false) {
-  const kb: Keyboard = LOCALES.map((l) => [{ text: `${l === ctx.locale ? '✅ ' : ''}${LOCALE_META[l].name}`, callback_data: `lg:${l}` }]);
+  const kb: Keyboard = ACTIVE_LOCALES.map((l) => [{ text: `${l === ctx.locale ? '✅ ' : ''}${LOCALE_META[l].name}`, callback_data: `lg:${l}` }]);
   kb.push(menuRow(ctx));
   return show(ctx, fresh, ctx.t.language, kb);
 }

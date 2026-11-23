@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { ChevronIcon } from '@/components/icons';
 import { useI18n } from '@/i18n/client';
-import { isLocale, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, LOCALE_META, LOCALE_STORAGE_KEY, LOCALES, type Locale } from '@/i18n/config';
+import { ACTIVE_LOCALES, isActiveLocale as isLocale, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, LOCALE_META, LOCALE_STORAGE_KEY, type Locale } from '@/i18n/config';
 import { Flag } from './flag';
 
 function readStored(): string | null {
@@ -82,7 +82,7 @@ export function LanguageSwitcher({ align = 'right', dark = false }: { align?: 'l
           aria-label={d.common.language}
           className={`absolute top-full z-50 mt-2 w-48 overflow-hidden rounded-xl bg-white p-1 shadow-xl ring-1 ring-zinc-900/10 ${align === 'right' ? 'right-0' : 'left-0'}`}
         >
-          {LOCALES.map((l) => (
+          {ACTIVE_LOCALES.map((l) => (
             <li key={l} role="option" aria-selected={l === locale}>
               <button
                 type="button"

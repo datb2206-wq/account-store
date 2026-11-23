@@ -4,7 +4,7 @@ import { cookies, headers } from 'next/headers';
 import { getCurrentUser } from '@/lib/auth';
 import { getFx } from '@/lib/fx';
 import { applyOverrides, getOverrides } from '@/lib/i18n-overrides';
-import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, matchAcceptLanguage, type Locale } from './config';
+import { DEFAULT_LOCALE, isActiveLocale as isLocale, LOCALE_COOKIE, matchAcceptLanguage, type Locale } from './config';
 import { getDictionary } from './dictionaries';
 
 // Thứ tự ưu tiên: cookie (khách vừa chọn) -> ngôn ngữ lưu trong tài khoản -> trình duyệt -> EN

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { TranslateSettings } from '@accszone/core'; // chỉ kiểu
+import { isActiveLocale } from '@/i18n/config';
 import { apiRequest } from '@/lib/client-api';
 import { FormAlert } from './form-field';
 
@@ -17,7 +18,8 @@ const MODELS = [
 
 export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiKey }: { initial: Omit<TranslateSettings, 'apiKey' | 'azureKey' | 'geminiKey'>; hasKey: boolean; hasAzureKey: boolean; hasGeminiKey: boolean }) {
   const router = useRouter();
-  const [f, setF] = useState({ ...initial, apiKey: '', azureKey: '', geminiKey: '' });
+  // Ngôn ngữ đã ẩn khỏi web thì không dịch nữa (lưu lại cấu hình sẽ bỏ chúng khỏi danh sách)
+  const [f, setF] = useState({ ...initial, targets: initial.targets.filter((l) => isActiveLocale(l)), apiKey: '', azureKey: '', geminiKey: '' });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -104,7 +106,7 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiK
       <div className="space-y-2 text-sm">
         <span className="block font-medium text-zinc-700">Dịch sang</span>
         <div className="flex flex-wrap gap-4">
-          {(Object.keys(LOCALE_LABEL) as Locale[]).map((l) => (
+          {(Object.keys(LOCALE_LABEL) as Locale[]).filter((l) => isActiveLocale(l)).map((l) => (
             <label key={l} className="flex items-center gap-2"><input type="checkbox" checked={f.targets.includes(l)} onChange={() => toggle(l)} />{LOCALE_LABEL[l]}</label>
           ))}
         </div>

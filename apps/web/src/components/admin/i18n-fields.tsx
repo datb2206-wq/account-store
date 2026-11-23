@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { LOCALES, type LocaleCode } from '@/lib/admin-schemas';
+import { ACTIVE_LOCALES } from '@/i18n/config';
+import type { LocaleCode } from '@/lib/admin-schemas';
 
 export type I18nText = Partial<Record<LocaleCode, string>>;
 
@@ -28,7 +29,7 @@ export function I18nFields({
   return (
     <div className="space-y-3 rounded-lg border border-zinc-200 p-3">
       <div className="flex gap-1">
-        {LOCALES.map((l) => (
+        {ACTIVE_LOCALES.map((l) => (
           <button
             key={l}
             type="button"

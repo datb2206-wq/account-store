@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@accszone/database';
-import { isLocale, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from '@/i18n/config';
+import { isActiveLocale as isLocale, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from '@/i18n/config';
 import { getCurrentUser } from '@/lib/auth';
 import { isSameOrigin, jsonError, readJson } from '@/lib/http';
 

@@ -22,6 +22,13 @@ export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }
 
+// Ngôn ngữ đang mở cho khách chọn. Bản dịch của các ngôn ngữ khác vẫn giữ trong code/dữ liệu:
+// muốn mở lại thì thêm mã vào đây (VD 'id', 'ru', 'zh').
+export const ACTIVE_LOCALES: readonly Locale[] = ['en', 'pt'];
+export function isActiveLocale(value: unknown): value is Locale {
+  return typeof value === 'string' && (ACTIVE_LOCALES as readonly string[]).includes(value);
+}
+
 // "Accept-Language: ru-RU,ru;q=0.9,en;q=0.8" -> 'ru'
 export function matchAcceptLanguage(header: string | null): Locale | null {
   if (!header) return null;
@@ -32,7 +39,7 @@ export function matchAcceptLanguage(header: string | null): Locale | null {
       return { lang: tag!.toLowerCase().split('-')[0], q: q ? Number(q) : 1 };
     })
     .sort((a, b) => b.q - a.q);
-  return tags.map((t) => t.lang).find(isLocale) ?? null;
+  return tags.map((t) => t.lang).find(isActiveLocale) ?? null;
 }
 
 /** "Pay {amount}" + { amount: '$5' } -> "Pay $5" */
