@@ -2,12 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { BankIcon, CoinIcon, PhoneIcon, WalletIcon } from '@/components/icons';
+import { BankIcon, PhoneIcon, WalletIcon } from '@/components/icons';
 import { useI18n } from '@/i18n/client';
 import { fmt } from '@/i18n/config';
 import { translateError } from '@/i18n/errors';
 import { rich } from '@/i18n/rich';
 import { apiRequest } from '@/lib/client-api';
+import { BnbLogo, PixLogo, TronLogo, UsdtLogo } from './pay-logos';
 
 export interface BankOption {
   index: number;
@@ -131,17 +132,22 @@ export function DepositForms({
   }
 
   // Thẻ cào / ví điện tử chỉ hiện khi admin đã cấu hình
-  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    ...(pix ? [{ key: 'pix' as const, label: pix.name, icon: <BankIcon size={17} /> }] : []),
-    ...(banks.length ? [{ key: 'bank' as const, label: t.tabBank, icon: <BankIcon size={17} /> }] : []),
-    { key: 'usdt', label: t.tabCrypto, icon: <CoinIcon size={17} /> },
-    ...(card ? [{ key: 'card' as const, label: p.tabCard, icon: <PhoneIcon size={17} /> }] : []),
-    ...(manual.length ? [{ key: 'other' as const, label: p.tabOther, icon: <WalletIcon size={17} /> }] : []),
+  const tabs: { key: Tab; label: string; sub?: string; icon: React.ReactNode }[] = [
+    ...(pix ? [{ key: 'pix' as const, label: pix.name, sub: 'QR Code · Copia e Cola', icon: <PixLogo size={30} /> }] : []),
+    ...(banks.length ? [{ key: 'bank' as const, label: t.tabBank, icon: <BankIcon size={22} /> }] : []),
+    {
+      key: 'usdt',
+      label: t.tabCrypto,
+      sub: networks.length ? networks.join(' · ') : 'TRC20 · BEP20',
+      icon: <UsdtLogo size={30} />,
+    },
+    ...(card ? [{ key: 'card' as const, label: p.tabCard, icon: <PhoneIcon size={22} /> }] : []),
+    ...(manual.length ? [{ key: 'other' as const, label: p.tabOther, icon: <WalletIcon size={22} /> }] : []),
   ];
 
   return (
     <form onSubmit={submit} className="card space-y-5">
-      <div role="tablist" aria-label={t.title} className={`grid gap-1 rounded-xl bg-zinc-100 p-1 ${tabs.length > 4 ? 'grid-cols-2 sm:grid-cols-5' : tabs.length > 2 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
+      <div role="tablist" aria-label={t.title} className={`grid gap-2 ${tabs.length > 4 ? 'grid-cols-2 sm:grid-cols-5' : tabs.length > 2 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2'}`}>
         {tabs.map((it) => (
           <button
             key={it.key}
@@ -149,11 +155,15 @@ export function DepositForms({
             role="tab"
             aria-selected={tab === it.key}
             onClick={() => switchTo(it.key)}
-            className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
-              tab === it.key ? 'bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200' : 'text-zinc-500 hover:text-zinc-800'
+            className={`flex items-center gap-3 rounded-xl border-2 px-3 py-3 text-left transition ${
+              tab === it.key ? 'border-orange-500 bg-orange-50/60 shadow-sm' : 'border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50'
             }`}
           >
-            {it.icon} {it.label}
+            <span className={`flex size-11 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ${tab === it.key ? 'ring-orange-200' : 'ring-zinc-100'} ${it.key === 'bank' || it.key === 'card' || it.key === 'other' ? 'text-zinc-600' : ''}`}>{it.icon}</span>
+            <span className="min-w-0">
+              <span className={`block text-sm font-bold ${tab === it.key ? 'text-zinc-900' : 'text-zinc-700'}`}>{it.label}</span>
+              {it.sub && <span className="block truncate text-[11px] text-zinc-500">{it.sub}</span>}
+            </span>
           </button>
         ))}
       </div>
@@ -253,8 +263,16 @@ export function DepositForms({
                   onClick={() => setNetwork(n)}
                   className={`rounded-lg border px-3 py-2.5 text-left transition ${network === n ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-zinc-200 hover:bg-zinc-50'}`}
                 >
-                  <span className={`block text-sm font-semibold ${network === n ? 'text-blue-700' : 'text-zinc-800'}`}>USDT · {NETWORK_LABEL[n][0]}</span>
-                  <span className="block text-xs text-zinc-500">{NETWORK_LABEL[n][1]}</span>
+                  <span className="flex items-center gap-2.5">
+                    <span className="relative inline-flex shrink-0">
+                      <UsdtLogo size={26} />
+                      <span className="absolute -right-1 -bottom-1 flex rounded-full ring-2 ring-white">{n === 'TRC20' ? <TronLogo size={13} /> : <BnbLogo size={13} />}</span>
+                    </span>
+                    <span>
+                      <span className={`block text-sm font-semibold ${network === n ? 'text-blue-700' : 'text-zinc-800'}`}>USDT · {NETWORK_LABEL[n][0]}</span>
+                      <span className="block text-xs text-zinc-500">{NETWORK_LABEL[n][1]}</span>
+                    </span>
+                  </span>
                 </button>
               ))}
             </div>
