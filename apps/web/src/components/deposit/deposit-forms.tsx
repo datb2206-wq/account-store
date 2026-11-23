@@ -85,7 +85,6 @@ export function DepositForms({
   const manualPreview = method && Number(amount) > 0 ? usd.format(Number(amount) / method.rate) : null;
   const telcoInfo = card?.telcos.find((x) => x.code === telco);
   const cardPreview = card && telcoInfo ? usd.format((cardValue * (100 - telcoInfo.fee)) / 100 / card.vndRate) : null;
-  const pixPreview = pix && Number(amount) > 0 ? usd.format(Number(amount) / pix.rate) : null;
   const available = { pix: !!pix, bank: banks.length > 0, usdt: networks.length > 0, card: !!card, other: manual.length > 0 }[tab];
   const steps = {
     pix: [p.pixStep1, p.pixStep2, p.pixStep3],
@@ -184,7 +183,6 @@ export function DepositForms({
           <p className="mt-1 text-xs text-zinc-500">
             {fmt(p.pixMin, { n: `R$ ${pix.min.toLocaleString('pt-BR')}` })}
             {pix.max > 0 && <> · {fmt(p.pixMax, { n: `R$ ${pix.max.toLocaleString('pt-BR')}` })}</>}
-            {pixPreview && <> · {rich(t.receiveApprox, { amount: <b>{pixPreview}</b> })}</>}
           </p>
         </div>
       ) : tab === 'card' && card ? (
