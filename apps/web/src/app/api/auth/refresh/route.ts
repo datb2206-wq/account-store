@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { clearAuthCookies, rotateSession, setAuthCookies } from '@/lib/auth';
 import { GATE_COOKIE, passedGate } from '@/lib/admin-gate';
-import { jsonError } from '@/lib/http';
+import { jsonError, publicUrl } from '@/lib/http';
 import { REFRESH_COOKIE } from '@/lib/jwt';
 import { safeNext } from '@/lib/safe-next';
 
@@ -31,15 +31,15 @@ export async function GET(req: NextRequest) {
   if (!session) {
     // Chưa mở link đăng nhập admin bí mật mà gõ /admin -> về trang chủ, không lộ trang đăng nhập admin
     if (next.startsWith('/admin') && !(await passedGate(req.cookies.get(GATE_COOKIE)?.value ?? ''))) {
-      return NextResponse.redirect(new URL('/', req.url));
+      return NextResponse.redirect(publicUrl(req, '/'));
     }
-    const loginUrl = new URL('/login', req.url);
+    const loginUrl = publicUrl(req, '/login');
     loginUrl.searchParams.set('next', next);
     const res = NextResponse.redirect(loginUrl);
     clearAuthCookies(res);
     return res;
   }
-  const res = NextResponse.redirect(new URL(next, req.url));
+  const res = NextResponse.redirect(publicUrl(req, next));
   setAuthCookies(res, session.tokens);
   return res;
 }

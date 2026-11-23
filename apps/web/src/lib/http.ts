@@ -39,3 +39,12 @@ export function getClientIp(req: NextRequest) {
     'unknown'
   );
 }
+
+// URL tuyệt đối theo tên miền khách đang mở. Trên VPS (Next standalone sau nginx) req.url là http://0.0.0.0:3000,
+// nên redirect phải lấy host / proto từ header nginx chuyển tới.
+export function publicUrl(req: Request, path: string) {
+  const h = req.headers;
+  const host = h.get('host') ?? h.get('x-forwarded-host');
+  const proto = h.get('x-forwarded-proto') ?? (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+  return new URL(path, host ? `${proto}://${host}` : req.url);
+}
