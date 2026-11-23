@@ -67,7 +67,7 @@ export function DepositForms({
   const { d } = useI18n();
   const t = d.deposit;
   const p = d.pay;
-  const [tab, setTab] = useState<Tab>(pix ? 'pix' : banks.length || !networks.length ? 'bank' : 'usdt');
+  const [tab, setTab] = useState<Tab>(pix ? 'pix' : banks.length ? 'bank' : 'usdt');
   const [network, setNetwork] = useState<Network | undefined>(networks[0]);
   const [bankIndex, setBankIndex] = useState(banks[0]?.index ?? 0);
   const [amount, setAmount] = useState('');
@@ -134,7 +134,7 @@ export function DepositForms({
   // Thẻ cào / ví điện tử chỉ hiện khi admin đã cấu hình
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     ...(pix ? [{ key: 'pix' as const, label: pix.name, icon: <BankIcon size={17} /> }] : []),
-    { key: 'bank', label: t.tabBank, icon: <BankIcon size={17} /> },
+    ...(banks.length ? [{ key: 'bank' as const, label: t.tabBank, icon: <BankIcon size={17} /> }] : []),
     { key: 'usdt', label: t.tabCrypto, icon: <CoinIcon size={17} /> },
     ...(card ? [{ key: 'card' as const, label: p.tabCard, icon: <PhoneIcon size={17} /> }] : []),
     ...(manual.length ? [{ key: 'other' as const, label: p.tabOther, icon: <WalletIcon size={17} /> }] : []),
