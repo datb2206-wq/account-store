@@ -95,6 +95,22 @@ export const CONFIG_SCHEMAS = {
     lowBalanceUsd: z.number().min(0).max(1_000_000), // số dư nguồn API dưới mức này -> báo
     // Bot admin: nhân viên đã liên kết Telegram ra lệnh cho bot này (/doanhthu, /don, duyệt nạp...)
     adminCommands: z.boolean().default(false),
+    // Cảnh báo tự động (core/alerts.ts). Bản cấu hình cũ chưa có -> mặc định bật hết.
+    alerts: z
+      .object({
+        adminAction: z.boolean().default(true), // admin thao tác trên web
+        supplierNoFunds: z.boolean().default(true), // khách mua mà nguồn API không đủ tiền giao hàng
+        newUser: z.boolean().default(true),
+        systemError: z.boolean().default(true), // worker / job định kỳ bị dừng, lỗi
+        supplierIssue: z.boolean().default(true), // nguồn API lỗi / lâu không đồng bộ
+        adminLogin: z.boolean().default(true),
+        lowStock: z.boolean().default(true), // sản phẩm kho riêng sắp hết
+        bankUnmatched: z.boolean().default(true), // tiền vào ngân hàng chưa cộng cho khách
+        duplicateCredit: z.boolean().default(true), // 1 mã giao dịch cộng tiền từ 2 lần
+        dailyReport: z.boolean().default(true), // báo cáo cuối ngày 23:55
+      })
+      .default({}),
+    lowStockQty: z.number().int().min(0).max(1_000_000).default(5),
     templates: z.object({
       order: z.string().max(2000),
       deposit: z.string().max(2000),

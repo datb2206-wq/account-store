@@ -8,7 +8,7 @@ export type TelegramEvent = keyof TelegramSettings['events'];
 
 export const TELEGRAM_VARIABLES: Record<TelegramEvent, [string, string][]> = {
   order: [['site', 'Tên website'], ['username', 'Khách mua'], ['product', 'Sản phẩm'], ['amount', 'Số lượng'], ['pay', 'Thành tiền (USD)'], ['code', 'Mã đơn'], ['source', 'Kho riêng / tên nguồn API'], ['ip', 'IP khách'], ['time', 'Thời gian']],
-  deposit: [['site', 'Tên website'], ['username', 'Khách nạp'], ['method', 'Phương thức'], ['amount', 'Số tiền (USD)'], ['bonus', 'Tiền khuyến mãi (USD)'], ['balance', 'Số dư sau nạp'], ['time', 'Thời gian']],
+  deposit: [['site', 'Tên website'], ['username', 'Khách nạp'], ['method', 'Phương thức'], ['amount', 'Số tiền (USD)'], ['received', 'Số tiền thực nhận (VD 500,000 VND / 25 USDT)'], ['bonus', 'Tiền khuyến mãi (USD)'], ['balance', 'Số dư sau nạp'], ['time', 'Thời gian']],
   refund: [['site', 'Tên website'], ['username', 'Khách'], ['code', 'Mã đơn'], ['amount', 'Số tiền hoàn (USD)'], ['reason', 'Lý do'], ['time', 'Thời gian']],
   lowBalance: [['site', 'Tên website'], ['supplier', 'Tên nguồn API'], ['balance', 'Số dư còn lại (USD)'], ['threshold', 'Ngưỡng cảnh báo (USD)'], ['time', 'Thời gian']],
 };
@@ -20,9 +20,11 @@ export const TELEGRAM_DEFAULTS: TelegramSettings = {
   events: { order: true, deposit: true, refund: true, lowBalance: true },
   lowBalanceUsd: 5,
   adminCommands: false,
+  alerts: { adminAction: true, supplierNoFunds: true, newUser: true, systemError: true, supplierIssue: true, adminLogin: true, lowStock: true, bankUnmatched: true, duplicateCredit: true, dailyReport: true },
+  lowStockQty: 5,
   templates: {
     order: '🛒 <b>{username}</b> vừa mua <b>{amount}</b> × {product}\n💵 {pay} · Mã đơn <code>{code}</code>\n📦 {source}\n🕒 {time}',
-    deposit: '💰 <b>{username}</b> vừa nạp <b>{amount}</b> qua {method}\n🎁 Khuyến mãi: {bonus} · Số dư: {balance}\n🕒 {time}',
+    deposit: '💰 <b>{username}</b> vừa nạp <b>{amount}</b> qua {method}\n💵 Thực nhận: {received}\n🎁 Khuyến mãi: {bonus} · Số dư: {balance}\n🕒 {time}',
     refund: '↩️ Hoàn <b>{amount}</b> cho <b>{username}</b> (đơn <code>{code}</code>)\nLý do: {reason}\n🕒 {time}',
     lowBalance: '⚠️ <b>Nguồn API sắp hết tiền</b>\n{supplier}: còn <b>{balance}</b> (ngưỡng {threshold})\nNạp thêm để đơn của khách không bị hoàn tiền.\n🕒 {time}',
   },
@@ -45,15 +47,15 @@ export async function getTelegramSettings(): Promise<TelegramSettings> {
   return value;
 }
 
-const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const usd = (v: { toString(): string } | number | null | undefined) => (v == null ? '$0' : `$${Number(v.toString()).toLocaleString('en-US', { maximumFractionDigits: 4 })}`);
+export const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export const usd = (v: { toString(): string } | number | null | undefined) => (v == null ? '$0' : `$${Number(v.toString()).toLocaleString('en-US', { maximumFractionDigits: 4 })}`);
 
 // Mẫu tin là HTML admin tự viết; giá trị biến luôn được escape (tên sản phẩm, username do khách nhập)
 export function renderTemplate(template: string, vars: Record<string, string>) {
   return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? escapeHtml(vars[k]!) : m));
 }
 
-async function siteName() {
+export async function siteName() {
   try {
     return (await getConfig('site.general')).name;
   } catch {
@@ -111,7 +113,7 @@ const METHOD_LABEL: Record<string, string> = { USDT_TRC20: 'USDT TRC20', USDT_BE
 
 export async function notifyDeposit(transactionId: string) {
   const t = await prisma.transaction
-    .findUnique({ where: { id: transactionId }, select: { amount: true, method: true, balanceAfter: true, userId: true, createdAt: true, user: { select: { username: true, email: true } } } })
+    .findUnique({ where: { id: transactionId }, select: { amount: true, originalAmount: true, originalCurrency: true, method: true, balanceAfter: true, userId: true, createdAt: true, user: { select: { username: true, email: true } } } })
     .catch(() => null);
   if (!t) return;
   const bonus = await prisma.transaction
@@ -121,6 +123,7 @@ export async function notifyDeposit(transactionId: string) {
     username: who(t.user),
     method: METHOD_LABEL[t.method] ?? t.method,
     amount: usd(t.amount),
+    received: t.originalAmount && t.originalCurrency ? `${Number(t.originalAmount.toString()).toLocaleString('en-US', { maximumFractionDigits: 6 })} ${t.originalCurrency}` : usd(t.amount),
     bonus: usd(bonus?.amount),
     balance: usd(bonus?.balanceAfter ?? t.balanceAfter),
   });

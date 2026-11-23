@@ -6,10 +6,12 @@
 //   update-fx-rates  mỗi FX_UPDATE_HOURS giờ (chỉ khi đặt FX_RATES_URL) -> cập nhật tỷ giá currency.rates
 //   run-automations  mỗi 5 phút  -> công việc tự động admin tạo (dọn dữ liệu cũ)
 //   send-email-campaigns mỗi 1 phút -> gửi tiếp 1 đợt email chiến dịch
+//   run-monitor      mỗi 5 phút  -> cảnh báo Telegram (nguồn API lỗi, kho riêng sắp hết, tiền vào chưa cộng, cộng trùng, job bị dừng)
+//   daily-report     23:55 giờ VN -> báo cáo cuối ngày qua Telegram
 //   fulfill-order    theo sự kiện -> web đẩy vào ngay khi khách mua hàng RESELLER
 import { Queue, Worker, type Job } from 'bullmq';
 import { prisma } from '@accszone/database';
-import { AUTOMATION_EVERY_MS, backfillSellerEarnings, expireStaleDeposits, fulfillResellerOrder, notifyLowBalance, processEmailCampaigns, processTranslations, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, supplierClient, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
+import { AUTOMATION_EVERY_MS, backfillSellerEarnings, reportSystemError, reportSystemOk, runMonitor, sendDailyReport, expireStaleDeposits, fulfillResellerOrder, notifyLowBalance, processEmailCampaigns, processTranslations, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, supplierClient, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
 import {
   FULFILL_JOB_OPTIONS,
   fulfillJobId,
@@ -37,6 +39,30 @@ const queue = new Queue(QUEUE_NAME, {
   connection,
   defaultJobOptions: { removeOnComplete: { count: 200 }, removeOnFail: { count: 500 } },
 });
+
+// ---- Theo dõi job định kỳ: quá lâu không chạy xong / bị lỗi -> báo Telegram (lỗi nghiêm trọng)
+const startedAt = Date.now();
+const lastDone = new Map<string, number>();
+const failing = new Set<string>();
+const WATCHED: Record<string, { label: string; everyMin: number }> = {
+  [JOBS.scanUsdt]: { label: 'Quét nạp USDT', everyMin: 1 },
+  [JOBS.expireDeposits]: { label: 'Hết hạn yêu cầu nạp', everyMin: 5 },
+  [JOBS.sweepOrders]: { label: 'Kiểm tra đơn API', everyMin: 2 },
+  [JOBS.syncSuppliers]: { label: 'Đồng bộ nguồn API', everyMin: SYNC_MINUTES },
+};
+// Báo web biết worker còn sống (web kiểm tra key này, worker chết hẳn thì web báo)
+const WORKER_HEARTBEAT_KEY = 'monitor:worker:heartbeat';
+
+async function checkJobs() {
+  for (const [name, w] of Object.entries(WATCHED)) {
+    const limitMs = Math.max(3 * w.everyMin, 15) * 60_000;
+    if (Date.now() - startedAt < limitMs) continue; // worker mới khởi động
+    const ago = Date.now() - (lastDone.get(name) ?? startedAt);
+    const title = `Công việc tự động "${w.label}" bị dừng`;
+    if (ago > limitMs) await reportSystemError(`stale:${name}`, title, `Đã ${Math.round(ago / 60_000)} phút không chạy xong (bình thường mỗi ${w.everyMin} phút).`);
+    else await reportSystemOk(`stale:${name}`, `Công việc tự động "${w.label}" chạy lại bình thường`);
+  }
+}
 
 // jobId cố định theo đơn: web vừa đẩy job mà job quét cũng nhặt đơn đó -> không chạy trùng
 const enqueueFulfill = (orderId: string) =>
@@ -112,6 +138,14 @@ async function processJob(job: Job) {
       return { queued: ids.length };
     }
 
+    case JOBS.monitor: {
+      await checkJobs();
+      return runMonitor(log('monitor'));
+    }
+
+    case JOBS.dailyReport:
+      return sendDailyReport();
+
     case JOBS.emailCampaigns:
       return processEmailCampaigns(log('email'));
 
@@ -145,6 +179,8 @@ async function main() {
   await queue.upsertJobScheduler(JOBS.sweepOrders, { every: 2 * 60_000 }, { name: JOBS.sweepOrders });
   await queue.upsertJobScheduler(JOBS.emailCampaigns, { every: 2 * 60_000 }, { name: JOBS.emailCampaigns });
   await queue.upsertJobScheduler(JOBS.translations, { every: 60_000 }, { name: JOBS.translations });
+  await queue.upsertJobScheduler(JOBS.monitor, { every: 5 * 60_000 }, { name: JOBS.monitor });
+  await queue.upsertJobScheduler(JOBS.dailyReport, { pattern: '55 23 * * *', tz: 'Asia/Ho_Chi_Minh' }, { name: JOBS.dailyReport });
   await queue.upsertJobScheduler(JOBS.automations, { every: AUTOMATION_EVERY_MS }, { name: JOBS.automations });
   if (FX_RATES_URL) {
     await queue.upsertJobScheduler(JOBS.updateFx, { every: FX_UPDATE_HOURS * 3600_000 }, { name: JOBS.updateFx });
@@ -161,7 +197,22 @@ async function main() {
     drainDelay: 60,
     stalledInterval: 5 * 60_000,
   });
-  worker.on('failed', (job, err) => log('worker').warn(`job ${job?.name} (${job?.id}) failed: ${err.message}`));
+  worker.on('failed', (job, err) => {
+    log('worker').warn(`job ${job?.name} (${job?.id}) failed: ${err.message}`);
+    const w = job && WATCHED[job.name];
+    if (w) {
+      failing.add(job.name);
+      void reportSystemError(`fail:${job.name}`, `Công việc tự động "${w.label}" bị lỗi`, err.message);
+    }
+  });
+  worker.on('completed', (job) => {
+    lastDone.set(job.name, Date.now());
+    const w = WATCHED[job.name];
+    if (w && failing.delete(job.name)) void reportSystemOk(`fail:${job.name}`, `Công việc tự động "${w.label}" chạy lại bình thường`);
+  });
+  const beat = () => queue.client.then((r) => r.set(WORKER_HEARTBEAT_KEY, String(Date.now()))).catch(() => {});
+  void beat();
+  setInterval(beat, 60_000).unref();
   worker.on('error', (err) => log('worker').warn(`worker error: ${err.message}`));
   log('worker').info(`started — queue "${QUEUE_NAME}", supplier sync every ${SYNC_MINUTES} min`);
 

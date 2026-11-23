@@ -407,6 +407,15 @@ model SystemConfig {
 }
 
 // Ghi lại mọi hành động của Staff/Admin (duyệt nạp, sửa số dư, nhập kho...)
+// Chống báo trùng cảnh báo Telegram (VD cùng 1 lỗi chỉ nhắc lại sau 6 giờ) + nhớ trạng thái để báo "đã ổn định lại"
+model TelegramAlert {
+  key    String   @id // VD "supplier:<id>", "job:scan-usdt", "stock:<productId>"
+  state  String?  // nội dung sự cố đang báo; null = đã ổn định
+  sentAt DateTime @default(now())
+
+  @@map("telegram_alerts")
+}
+
 model AuditLog {
   id        String   @id @default(cuid())
   actorId   String?

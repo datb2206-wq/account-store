@@ -14,6 +14,24 @@ const EVENT_LABELS: Record<TelegramEvent, string> = {
   lowBalance: 'Nguồn API sắp hết tiền',
 };
 
+type AlertKind = keyof TelegramSettings['alerts'];
+const ALERT_LABELS: Record<AlertKind, [string, string]> = {
+  adminAction: ['⚙️ Admin thao tác trên web', 'Đổi cài đặt, giao diện, ngân hàng, tiền tệ… kèm tài khoản và IP'],
+  supplierNoFunds: ['⚠️ Nguồn API hết tiền', 'Khách mua mà nguồn không đủ số dư để giao hàng'],
+  newUser: ['👤 Thành viên mới đăng ký', 'Tên tài khoản và IP'],
+  adminLogin: ['🔐 Admin đăng nhập', 'IP, thiết bị; đánh dấu "IP MỚI" nếu IP lạ'],
+  systemError: ['🔴 Web có lỗi nghiêm trọng', 'Worker / công việc tự động (quét nạp USDT, đồng bộ…) bị dừng hoặc lỗi'],
+  supplierIssue: ['🟠 Nguồn API có vấn đề', 'Nguồn trả lỗi hoặc quá 30 phút không đồng bộ'],
+  lowStock: ['🟡 Kho riêng sắp hết hàng', 'Theo ngưỡng bên dưới'],
+  bankUnmatched: ['🟠 Tiền vào ngân hàng chưa cộng', 'Quá 15 phút chưa cộng cho khách, kèm mã GD, số tiền, nội dung CK'],
+  duplicateCredit: ['🔴 Cộng tiền trùng', '1 mã giao dịch được cộng từ 2 lần trở lên'],
+  dailyReport: ['📊 Báo cáo cuối ngày 23:55', 'Đơn, doanh thu, lợi nhuận, tổng nạp, thành viên mới, số dư nguồn API'],
+};
+const ALERT_GROUPS: [string, AlertKind[]][] = [
+  ['Báo ngay khi có sự việc', ['adminAction', 'supplierNoFunds', 'newUser', 'adminLogin', 'dailyReport']],
+  ['Bot tự kiểm tra mỗi 5 phút', ['systemError', 'supplierIssue', 'lowStock', 'bankUnmatched', 'duplicateCredit']],
+];
+
 export function TelegramForm({
   initial,
   hasToken,
@@ -115,6 +133,31 @@ export function TelegramForm({
           </label>
         </Panel>
       </div>
+
+      <Panel title="Cảnh báo tự động" bodyClassName="space-y-4 p-5">
+        <p className="text-sm text-zinc-500">Gửi vào cùng Chat ID ở trên. Bot tự kiểm tra mỗi 5 phút; cùng 1 sự cố chỉ nhắc lại sau 6 giờ, hết sự cố bot báo &quot;✅ đã ổn định lại&quot;.</p>
+        <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
+          {ALERT_GROUPS.map(([title, keys]) => (
+            <div key={title} className="space-y-2">
+              <p className="text-xs font-semibold tracking-wide text-zinc-400 uppercase">{title}</p>
+              {keys.map((k) => (
+                <label key={k} className="flex items-start gap-2 text-sm text-zinc-700">
+                  <input type="checkbox" className="mt-0.5" checked={f.alerts[k]} onChange={(e) => set({ alerts: { ...f.alerts, [k]: e.target.checked } })} />
+                  <span>
+                    {ALERT_LABELS[k][0]}
+                    <span className="block text-xs text-zinc-400">{ALERT_LABELS[k][1]}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-zinc-700">Báo khi sản phẩm kho riêng còn dưới</span>
+          <input className="input w-32 tabular-nums" inputMode="numeric" value={f.lowStockQty} onChange={(e) => set({ lowStockQty: Number(e.target.value.replace(/\D/g, '')) || 0 })} />
+          <span className="mt-1 block text-xs text-zinc-400">tài khoản (mỗi sản phẩm báo 1 lần, nhập thêm hàng rồi hết lại thì báo tiếp)</span>
+        </label>
+      </Panel>
 
       <Panel title="Nội dung tin nhắn" bodyClassName="divide-y divide-zinc-100">
         {(Object.keys(EVENT_LABELS) as TelegramEvent[]).map((ev) => (

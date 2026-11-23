@@ -8,6 +8,7 @@ import { pickRandomStock } from '../stock';
 import { creditCommission, reverseCommission } from '../affiliate';
 import { syncSellerEarning } from '../sellers';
 import { notifyRefund } from '../telegram';
+import { notifySupplierNoFunds } from '../alerts';
 import { supplierClient } from './adapters';
 import { SupplierTransientError, type SupplierOrderResult } from './generic-adapter';
 
@@ -241,6 +242,7 @@ export async function fulfillResellerOrder(orderId: string, opts: { isLastAttemp
     if (opts.isLastAttempt && !order.externalOrderId) {
       log.warn(`order ${orderId}: giving up after retries (${message}) -> refund`);
       await refundOrder(orderId, `Supplier unreachable: ${message}`);
+      await notifySupplierNoFunds(orderId, message);
       return 'refunded';
     }
     if (err instanceof SupplierTransientError && order.externalOrderId) {
@@ -270,6 +272,7 @@ export async function fulfillResellerOrder(orderId: string, opts: { isLastAttemp
     case 'failed':
       log.info(`order ${orderId}: rejected by supplier (${result.reason}) -> refund`);
       await refundOrder(orderId, `Rejected by supplier: ${result.reason}`, result.externalOrderId);
+      await notifySupplierNoFunds(orderId, result.reason);
       return 'refunded';
   }
 }

@@ -1,3 +1,4 @@
+import { notifyAuditLog } from '@accszone/core';
 import { prisma, type Prisma } from '@accszone/database';
 
 interface AuditEntry {
@@ -14,8 +15,10 @@ interface AuditEntry {
 const toJson = (v: unknown) =>
   v === undefined ? undefined : (JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue);
 
-export function writeAudit(entry: AuditEntry, db: Prisma.TransactionClient = prisma) {
-  return db.auditLog.create({
+// Sau khi ghi: báo Telegram (admin thao tác / đăng nhập, thành viên mới). Chờ 1,5 giây để transaction kịp commit;
+// transaction bị rollback thì không còn bản ghi -> không báo.
+export async function writeAudit(entry: AuditEntry, db: Prisma.TransactionClient = prisma) {
+  const row = await db.auditLog.create({
     data: {
       actorId: entry.actorId,
       action: entry.action,
@@ -26,4 +29,6 @@ export function writeAudit(entry: AuditEntry, db: Prisma.TransactionClient = pri
       ip: entry.ip,
     },
   });
+  setTimeout(() => void notifyAuditLog(row.id), 1_500).unref?.();
+  return row;
 }
