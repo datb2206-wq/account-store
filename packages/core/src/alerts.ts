@@ -19,11 +19,11 @@ const VN_OFFSET = 7 * HOUR;
 const vnTime = (d = new Date()) => d.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 const STAFF = ['STAFF', 'SUPER_ADMIN'];
 
-export async function sendAlert(kind: TelegramAlertKind, html: string) {
+export async function sendAlert(kind: TelegramAlertKind, html: string, opts: { time?: boolean } = {}) {
   try {
     const s = await getTelegramSettings();
     if (!s.enabled || !s.botToken || !s.chatId || !s.alerts[kind]) return false;
-    await sendTelegram(s.botToken, s.chatId, `${html}\n🕒 ${vnTime()}`);
+    await sendTelegram(s.botToken, s.chatId, opts.time === false ? html : `${html}\n🕒 ${vnTime()}`);
     return true;
   } catch (err) {
     console.warn(`[telegram] alert ${kind} failed: ${err instanceof Error ? err.message : err}`);
@@ -79,34 +79,69 @@ function device(ua: string) {
 }
 
 // ---------------------------------------------------------------- Theo sự kiện (web gọi sau writeAudit)
-const ACTION_LABEL: [RegExp, string][] = [
-  [/^transaction\.approve/, 'Duyệt nạp tiền'],
-  [/^transaction\.reject/, 'Từ chối nạp tiền'],
-  [/^transaction\.export/, 'Xuất danh sách giao dịch'],
-  [/^(user\.)?balance\.adjust|^user\.balance/, 'Cộng / trừ tiền khách'],
-  [/^user\.role|^role\./, 'Đổi phân quyền'],
-  [/^user\.status/, 'Khóa / mở khóa tài khoản'],
-  [/^security\./, 'Cài đặt bảo mật'],
-  [/^ip\./, 'Chặn / bỏ chặn IP'],
-  [/^payment\./, 'Cài đặt ngân hàng / phương thức nạp'],
-  [/^currency\./, 'Cài đặt tiền tệ, tỷ giá'],
-  [/^theme\.|^site\.extras/, 'Giao diện website'],
-  [/^config\./, 'Cài đặt website'],
-  [/^telegram\./, 'Cài đặt Telegram'],
-  [/^email/, 'Email'],
-  [/^supplier\./, 'Kết nối API nguồn hàng'],
-  [/^product\./, 'Sản phẩm'],
-  [/^category\./, 'Chuyên mục'],
-  [/^stock\./, 'Kho hàng'],
-  [/^order\./, 'Đơn hàng'],
-  [/^coupon\./, 'Mã giảm giá'],
-  [/^deposit_bonus\./, 'Khuyến mãi nạp tiền'],
-  [/^(affiliate|ctv)\./, 'Affiliate / CTV'],
-  [/^blog\./, 'Bài viết'],
-  [/^automation\./, 'Tự động hóa'],
-  [/^translat/, 'Dịch sản phẩm'],
+// Câu đầy đủ cho các thao tác hay gặp; còn lại ghép "động từ + đối tượng" (VD product.delete -> "Xóa sản phẩm")
+const ACTION_TEXT: Record<string, string> = {
+  'config.update': 'Thay đổi cài đặt chung',
+  'security.update': 'Thay đổi cài đặt bảo mật',
+  'site.extras': 'Thay đổi cài đặt website (màu, popup, nút liên hệ, mã theo dõi)',
+  'theme.upload': 'Tải lên logo / banner / ảnh giao diện',
+  'theme.delete': 'Xóa ảnh giao diện',
+  'currency.update': 'Thay đổi tiền tệ, tỷ giá',
+  'payment.manual': 'Thay đổi cổng nạp tiền thủ công (ngân hàng / ví)',
+  'payment.card': 'Thay đổi cài đặt nạp thẻ cào',
+  'telegram.update': 'Thay đổi cài đặt thông báo Telegram',
+  'telegram.shop.update': 'Thay đổi bot Telegram bán hàng',
+  'email.update': 'Thay đổi cài đặt Email (SMTP)',
+  'translate.settings': 'Thay đổi cài đặt dịch tự động',
+  'translate.start': 'Bắt đầu dịch sản phẩm',
+  'translate.stop': 'Dừng dịch sản phẩm',
+  'translations.update': 'Sửa bản dịch giao diện',
+  'transaction.approve': 'Duyệt nạp tiền',
+  'transaction.reject': 'Từ chối nạp tiền',
+  'transaction.verify': 'Kiểm tra giao dịch nạp',
+  'transaction.export': 'Xuất danh sách giao dịch',
+  'user.balance.adjust': 'Cộng / trừ tiền khách',
+  'balance.adjust': 'Cộng / trừ tiền khách',
+  'user.role': 'Đổi phân quyền thành viên',
+  'user.status': 'Khóa / mở khóa thành viên',
+  'ip.block': 'Chặn IP',
+  'ip.unblock': 'Bỏ chặn IP',
+  'supplier.publish': 'Bật bán sản phẩm từ nguồn API',
+  'product.order': 'Sắp xếp thứ tự sản phẩm',
+  'order.retry': 'Giao lại đơn hàng',
+  'affiliate.settings': 'Thay đổi cài đặt Affiliate',
+  'affiliate.withdraw': 'Xử lý rút tiền Affiliate',
+  'ctv.settings': 'Thay đổi cài đặt CTV',
+  'automation.run': 'Chạy công việc tự động',
+  'automation.toggle': 'Bật / tắt công việc tự động',
+};
+const NOUN: [RegExp, string][] = [
+  [/^product\./, 'sản phẩm'],
+  [/^category\./, 'chuyên mục'],
+  [/^stock\./, 'kho hàng'],
+  [/^supplier\./, 'kết nối API'],
+  [/^coupon\./, 'mã giảm giá'],
+  [/^deposit_bonus\./, 'khuyến mãi nạp tiền'],
+  [/^role\./, 'vai trò admin'],
+  [/^blog\.post\./, 'bài viết'],
+  [/^blog\.category\./, 'chuyên mục bài viết'],
+  [/^email_campaign\./, 'chiến dịch email'],
+  [/^automation\./, 'công việc tự động'],
+  [/^ctv\./, 'CTV'],
+  [/^order\./, 'đơn hàng'],
 ];
-const actionLabel = (a: string) => ACTION_LABEL.find(([re]) => re.test(a))?.[1] ?? a;
+const VERB: Record<string, string> = { create: 'Thêm', import: 'Nhập', update: 'Sửa', delete: 'Xóa', clear: 'Xóa hết', move: 'Chuyển', status: 'Đổi trạng thái', toggle: 'Bật / tắt', refund: 'Hoàn tiền', replace: 'Đổi hàng' };
+function actionLabel(a: string) {
+  if (ACTION_TEXT[a]) return ACTION_TEXT[a];
+  const noun = NOUN.find(([re]) => re.test(a))?.[1];
+  const verb = /^product\.bulk_/.test(a) ? 'Thao tác hàng loạt' : VERB[a.split('.').pop() ?? ''];
+  return noun && verb ? `${verb} ${noun}` : noun ? `Thay đổi ${noun}` : a;
+}
+// [2026/11/23 09:55:00] theo giờ VN
+function stamp(d = new Date()) {
+  const v = new Date(d.getTime() + VN_OFFSET).toISOString();
+  return `[${v.slice(0, 10).replace(/-/g, '/')} ${v.slice(11, 19)}]`;
+}
 // Không báo: thao tác của khách / CTV, đăng nhập (đã có loại riêng), thao tác từ chính bot Telegram
 const SKIP_ACTION = /^(auth\.|seller\.|card\.|bank\.|telegram\.link|stock\.reveal)/;
 
@@ -138,11 +173,17 @@ export async function notifyAuditLog(auditId: string) {
     if (SKIP_ACTION.test(a.action) || a.ip === 'telegram') return;
     await sendAlert(
       'adminAction',
-      `⚙️ <b>Admin thao tác trên web</b>\nTài khoản: <b>${who(a.actor)}</b>\nViệc: <b>${escapeHtml(actionLabel(a.action))}</b> <code>${escapeHtml(a.action)}</code>${a.entityId ? `\nĐối tượng: ${escapeHtml(a.entity)} <code>${escapeHtml(a.entityId.slice(0, 60))}</code>` : ''}\nIP: <code>${ip}</code>`,
+      `<b>${stamp()}</b>\n- Username: <code>${who(a.actor)}</code>\n- Action: <code>${escapeHtml(actionLabel(a.action))}</code>\n- IP: <code>${ip}</code>`,
+      { time: false },
     );
   } catch (err) {
     console.warn(`[telegram] audit alert failed: ${err instanceof Error ? err.message : err}`);
   }
+}
+
+// Web khởi động (sau mỗi lần "up" code mới, hoặc VPS / container khởi động lại)
+export async function notifyWebStarted() {
+  await sendAlert('adminAction', `<b>${stamp()}</b>\n- Username: <code>Hệ thống</code>\n- Action: <code>🚀 Cập nhật web lên phiên bản mới / khởi động lại</code>`, { time: false });
 }
 
 // Đơn RESELLER bị web nguồn từ chối / không đặt được: lý do có dấu hiệu hết tiền -> báo (mỗi nguồn tối đa 1 lần / 15 phút)

@@ -2,7 +2,8 @@
 // (worker ghi Redis mỗi phút) mỗi 5 phút, quá 10 phút không thấy thì báo Telegram "lỗi nghiêm trọng".
 export async function startMonitor() {
   if (process.env.NODE_ENV !== 'production') return;
-  const [{ getRedis }, { reportSystemError, reportSystemOk }] = await Promise.all([import('./lib/redis'), import('@accszone/core')]);
+  const [{ getRedis }, { notifyWebStarted, reportSystemError, reportSystemOk }] = await Promise.all([import('./lib/redis'), import('@accszone/core')]);
+  setTimeout(() => void notifyWebStarted(), 15_000).unref(); // báo nhóm admin: web vừa cập nhật / khởi động lại
   const startedAt = Date.now();
   const LIMIT_MS = 10 * 60_000;
   const check = async () => {
