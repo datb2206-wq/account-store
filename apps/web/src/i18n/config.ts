@@ -74,7 +74,7 @@ export function formatFx(usd: number | string, fx: Fx, locale: Locale, approx = 
   const key = `${locale}:${fx.currency}:${digits}`;
   let f = fxFormatters.get(key);
   if (!f) {
-    f = new Intl.NumberFormat(LOCALE_META[locale].htmlLang, { style: 'currency', currency: fx.currency, minimumFractionDigits: 0, maximumFractionDigits: digits });
+    f = new Intl.NumberFormat(LOCALE_META[locale].htmlLang, { style: 'currency', currency: fx.currency, minimumFractionDigits: digits, maximumFractionDigits: digits });
     fxFormatters.set(key, f);
   }
   const v = f.format(Number(usd) * fx.rate);
