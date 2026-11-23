@@ -338,7 +338,7 @@ export async function claimDeposit(userId: string, id: string, proofKey: string 
   // PIX: bắt buộc ảnh biên lai, không nhận mã giao dịch khách tự nhập
   if (t.method === 'PIX') {
     customerRef = null;
-    if (!proofKey && !t.proofImageUrl) throw domainError(400, 'Enter the transaction reference or upload a receipt');
+    if (!proofKey && !t.proofImageUrl) throw domainError(400, 'Please upload the payment receipt');
   }
   if (!proofKey && !customerRef && !t.proofImageUrl && !t.customerRef) {
     throw domainError(400, 'Enter the transaction reference or upload a receipt');

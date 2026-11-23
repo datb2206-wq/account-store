@@ -177,7 +177,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
           {t.status === 'PENDING' && !t.claimedAt && (
             <div className="card border-blue-200 bg-blue-50 text-sm text-blue-900">
               {pixAuto && <AutoRefresh everyMs={8_000} />}
-              <p>{d.pay.pixWaiting}</p>
+              <p>{pixAuto ? d.pay.pixWaiting : d.pay.pixManualWait}</p>
             </div>
           )}
           <section className="card space-y-2">

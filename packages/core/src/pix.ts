@@ -37,7 +37,10 @@ async function callApi(url: string): Promise<Record<string, unknown>> {
   } catch {
     throw new Error(`PIX API trả về không phải JSON (HTTP ${res.status})`);
   }
-  if (!res.ok) throw new Error(`PIX API lỗi HTTP ${res.status}`);
+  if (!res.ok) {
+    const msg = (body as { message?: unknown } | null)?.message;
+    throw new Error(`PIX API lỗi HTTP ${res.status}${typeof msg === 'string' ? `: ${msg.slice(0, 100)}` : ''}`);
+  }
   return (body ?? {}) as Record<string, unknown>;
 }
 
@@ -62,7 +65,10 @@ export async function createPixDeposit(userId: string, input: { amount: string }
   try {
     data = pick(await callApi(s.createUrl.replaceAll('{amount}', original.toString())));
   } catch (err) {
-    console.error('[pix] create failed', err instanceof Error ? err.message : err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[pix] create failed', msg);
+    // Cổng PIX có mức tối thiểu riêng (VD 7max: 100 R$) -> báo rõ cho khách thay vì "tạm thời không dùng được"
+    if (/belowMinimum|below.?min|minimum/i.test(msg)) throw domainError(400, 'This amount is below the PIX minimum. Please enter a higher amount.');
     throw domainError(502, 'PIX is temporarily unavailable, please try again later');
   }
   const transactionId = str(data.transactionId ?? data.id ?? data.txid);

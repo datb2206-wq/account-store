@@ -64,7 +64,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
   // PIX: không gửi link API xuống client
   const pix: PixOption | null =
     pixReady(pixCfg) && rates[pixCfg.currency]
-      ? { name: pixCfg.name, currency: pixCfg.currency, rate: rates[pixCfg.currency]!, min: pixCfg.minAmount, max: pixCfg.maxAmount }
+      ? { name: pixCfg.name, currency: pixCfg.currency, rate: rates[pixCfg.currency]!, min: pixCfg.minAmount, max: pixCfg.maxAmount, auto: pixCfg.statusUrl.includes('{id}') }
       : null;
   const networks = [trc20.enabled && trc20.wallet ? 'TRC20' : null, bep20.enabled && bep20.wallet ? 'BEP20' : null].filter(
     (n): n is 'TRC20' | 'BEP20' => n !== null,

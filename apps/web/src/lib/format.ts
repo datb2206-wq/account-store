@@ -17,6 +17,7 @@ export function formatDate(value: Date | null | undefined) {
 export function formatOriginal(value: DecimalLike, currency: string | null | undefined) {
   if (value === null || value === undefined || !currency) return '—';
   if (currency === 'USDT') return `${value.toString()} USDT`;
+  if (currency === 'BRL') return Number(value.toString()).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   return `${Number(value.toString()).toLocaleString('en-US', { maximumFractionDigits: 2 })} ${currency}`;
 }
 

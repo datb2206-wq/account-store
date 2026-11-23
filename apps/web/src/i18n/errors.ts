@@ -79,6 +79,8 @@ const PATTERNS: Array<[RegExp, ErrorKey]> = [
   [/^Invalid (?:\w+ )?TxID$/, 'txInvalid'],
   [/^Please enter your TxID$/, 'txRequired'],
   [/^Enter the transaction reference or upload a receipt$/, 'claimRequired'],
+  [/^Please upload the payment receipt$/, 'proofRequired'],
+  [/^This amount is below the PIX minimum\./, 'pixBelowMin'],
   [/^(?:Bank account not found|Exchange rate for \w+ is not configured|Could not generate a transfer code)/, 'tryLater'],
   // Lý do lưu trên đơn hàng (failReason) do worker ghi
   [/^The supplier could not fulfil this order\./, 'supplierRefund'],

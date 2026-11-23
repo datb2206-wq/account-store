@@ -37,6 +37,7 @@ export interface PixOption {
   rate: number;
   min: number;
   max: number; // 0 = không giới hạn
+  auto: boolean; // có link kiểm tra trạng thái -> tự cộng tiền; không có -> khách gửi biên lai, admin duyệt
 }
 
 type Network = 'TRC20' | 'BEP20';
@@ -88,7 +89,7 @@ export function DepositForms({
   const cardPreview = card && telcoInfo ? usd.format((cardValue * (100 - telcoInfo.fee)) / 100 / card.vndRate) : null;
   const available = { pix: !!pix, bank: banks.length > 0, usdt: networks.length > 0, card: !!card, other: manual.length > 0 }[tab];
   const steps = {
-    pix: [p.pixStep1, p.pixStep2, p.pixStep3],
+    pix: [p.pixStep1, p.pixStep2, pix?.auto ? p.pixStep3 : p.pixStep3Manual],
     bank: [t.bankStep1, t.bankStep2, t.bankStep3],
     usdt: [t.usdtStep1, t.usdtStep2, t.usdtStep3],
     card: [p.cardStep1, p.cardStep2, p.cardStep3],
