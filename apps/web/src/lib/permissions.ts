@@ -139,6 +139,7 @@ const ROUTE_RULES: Rule[] = [
   ['/api/admin/translate/', 'products.edit'], // start / stop
   ['/api/admin/translate', 'settings.edit'],
   ['/api/admin/translations', 'settings.edit'],
+  ['/api/admin/languages', 'settings.edit'],
   ['/api/admin/theme', 'settings.edit'],
   ['/api/admin/currencies', 'settings.edit'],
   ['/api/admin/telegram', 'settings.edit'],

@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import { DomainError } from '@accszone/core';
 import type { Prisma } from '@accszone/database';
 import { getCurrentUser, STAFF_ROLES, type CurrentUser } from './auth';
+import { passedGate } from './admin-gate';
 import { canAccess } from './permissions';
 import { blockedByMaintenance, MAINTENANCE_ERROR } from './site';
 import { isSameOrigin, jsonError, readJson } from './http';
@@ -41,6 +42,8 @@ function guardedRoute<C extends RouteContext>(handler: Handler<C>, access: Acces
   return async (req: NextRequest, ctx: C) => {
     if (req.method !== 'GET' && !isSameOrigin(req)) return jsonError(403, 'Invalid origin');
 
+    // API admin cũng cần đã mở link đăng nhập admin bí mật (nếu đang bật)
+    if (access !== 'user' && !(await passedGate())) return jsonError(404, 'Not found');
     const user = await getCurrentUser();
     if (!user) return jsonError(401, 'Unauthorized');
     // API admin: quyền theo đường dẫn + method (lib/permissions.ts). superAdminOnly cũ đều ứng với quyền

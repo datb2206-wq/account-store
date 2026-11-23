@@ -20,7 +20,7 @@ export const CONTENT_PAGES = ['policy', 'terms', 'faq', 'contact'] as const;
 export type ContentPage = (typeof CONTENT_PAGES)[number];
 
 // Key có trang quản trị riêng (giữ bí mật, xóa cache…): trang Cấu hình chung không hiển thị / không ghi các key này
-export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual', 'ctv', 'translate', 'telegram.shop'] as const;
+export const DEDICATED_CONFIG_KEYS = ['security', 'telegram', 'email', 'affiliate', 'currency.display', 'currency.rates', 'site.extras', 'payment.card', 'payment.manual', 'ctv', 'translate', 'telegram.shop', 'site.languages'] as const;
 
 // Nhà mạng thẻ cào theo chuẩn API chargingws/v2 của các web đổi thẻ
 export const CARD_TELCOS = ['VIETTEL', 'VINAPHONE', 'MOBIFONE', 'VIETNAMOBILE', 'ZING', 'GATE', 'VCOIN', 'GARENA'] as const;
@@ -118,6 +118,13 @@ export const CONFIG_SCHEMAS = {
       lowBalance: z.string().max(2000),
     }),
   }),
+  // Ngôn ngữ cho khách chọn + ngôn ngữ mặc định (Admin > Ngôn ngữ). Khớp LOCALES ở apps/web/src/i18n/config.ts
+  'site.languages': z
+    .object({
+      enabled: z.array(z.enum(['en', 'id', 'ru', 'zh', 'pt'])).min(1, 'Bật ít nhất 1 ngôn ngữ'),
+      defaultLocale: z.enum(['en', 'id', 'ru', 'zh', 'pt']),
+    })
+    .refine((v) => v.enabled.includes(v.defaultLocale), { message: 'Ngôn ngữ mặc định phải đang bật', path: ['defaultLocale'] }),
   // Bot Telegram cho khách: xem sản phẩm, mua bằng số dư, xem đơn (Admin > Thông báo Telegram > Bot khách hàng)
   'telegram.shop': z.object({
     enabled: z.boolean(),

@@ -2,9 +2,10 @@
 import { randomUUID } from 'node:crypto';
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { NextResponse } from 'next/server';
 import { prisma, type Role } from '@accszone/database';
+import { passedGate } from './admin-gate';
 import { ADMIN_LANDING_PAGES, canAccess } from './permissions';
 import { getRedis } from './redis';
 import { sessionStillValid } from './session-guard';
@@ -128,6 +129,8 @@ export const STAFF_ROLES: Role[] = ['STAFF', 'SUPER_ADMIN'];
 // Trang admin: phải là nhân viên VÀ có quyền với trang đang mở (lib/permissions.ts).
 // Middleware gắn header x-pathname cho mọi request /admin để biết trang đang mở.
 export async function requireStaff() {
+  // Link đăng nhập admin bí mật đang bật mà trình duyệt chưa mở link -> khu admin như không tồn tại
+  if (!(await passedGate())) notFound();
   const user = await requireUser();
   if (!STAFF_ROLES.includes(user.role)) redirect('/dashboard');
   const pathname = (await headers()).get('x-pathname');

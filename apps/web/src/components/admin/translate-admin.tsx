@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { TranslateSettings } from '@accszone/core'; // chỉ kiểu
-import { isActiveLocale } from '@/i18n/config';
+import { useI18n } from '@/i18n/client';
 import { apiRequest } from '@/lib/client-api';
 import { FormAlert } from './form-field';
 
@@ -19,6 +19,8 @@ const MODELS = [
 export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiKey }: { initial: Omit<TranslateSettings, 'apiKey' | 'azureKey' | 'geminiKey'>; hasKey: boolean; hasAzureKey: boolean; hasGeminiKey: boolean }) {
   const router = useRouter();
   // Ngôn ngữ đã ẩn khỏi web thì không dịch nữa (lưu lại cấu hình sẽ bỏ chúng khỏi danh sách)
+  const { locales } = useI18n();
+  const isActiveLocale = (l: string) => (locales as readonly string[]).includes(l);
   const [f, setF] = useState({ ...initial, targets: initial.targets.filter((l) => isActiveLocale(l)), apiKey: '', azureKey: '', geminiKey: '' });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);

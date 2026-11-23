@@ -83,6 +83,8 @@ function device(ua: string) {
 const ACTION_TEXT: Record<string, string> = {
   'config.update': 'Thay đổi cài đặt chung',
   'security.update': 'Thay đổi cài đặt bảo mật',
+  'security.admin_gate.rotate': 'Đổi link đăng nhập admin bí mật',
+  'security.admin_gate.disable': 'Tắt link đăng nhập admin bí mật',
   'site.extras': 'Thay đổi cài đặt website (màu, popup, nút liên hệ, mã theo dõi)',
   'theme.upload': 'Tải lên logo / banner / ảnh giao diện',
   'theme.delete': 'Xóa ảnh giao diện',
@@ -96,6 +98,7 @@ const ACTION_TEXT: Record<string, string> = {
   'translate.start': 'Bắt đầu dịch sản phẩm',
   'translate.stop': 'Dừng dịch sản phẩm',
   'translations.update': 'Sửa bản dịch giao diện',
+  'languages.update': 'Thay đổi ngôn ngữ hiển thị / ngôn ngữ mặc định',
   'transaction.approve': 'Duyệt nạp tiền',
   'transaction.reject': 'Từ chối nạp tiền',
   'transaction.verify': 'Kiểm tra giao dịch nạp',
@@ -160,6 +163,15 @@ export async function notifyAuditLog(auditId: string) {
       return;
     }
     if (!a.actor || !STAFF.includes(a.actor.role)) return;
+
+    if (a.action === 'auth.login_gate_denied') {
+      const ua = typeof after.userAgent === 'string' ? after.userAgent : '';
+      await sendAlert(
+        'adminLogin',
+        `⛔ <b>Chặn đăng nhập admin</b> (không qua link bí mật, mật khẩu ĐÚNG)\nTài khoản: <b>${who(a.actor)}</b>\nIP: <code>${ip}</code>\nThiết bị: ${escapeHtml(device(ua))}\nNếu không phải bạn: đổi mật khẩu tài khoản này ngay.`,
+      );
+      return;
+    }
 
     if (a.action === 'auth.login') {
       const seen = a.ip ? await prisma.auditLog.count({ where: { actorId: a.actorId, action: 'auth.login', ip: a.ip, id: { not: a.id } } }) : 0;

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { clearAuthCookies, rotateSession, setAuthCookies } from '@/lib/auth';
+import { GATE_COOKIE, passedGate } from '@/lib/admin-gate';
 import { jsonError } from '@/lib/http';
 import { REFRESH_COOKIE } from '@/lib/jwt';
 import { safeNext } from '@/lib/safe-next';
@@ -28,6 +29,10 @@ export async function GET(req: NextRequest) {
   const session = await rotate(req);
 
   if (!session) {
+    // Chưa mở link đăng nhập admin bí mật mà gõ /admin -> về trang chủ, không lộ trang đăng nhập admin
+    if (next.startsWith('/admin') && !(await passedGate(req.cookies.get(GATE_COOKIE)?.value ?? ''))) {
+      return NextResponse.redirect(new URL('/', req.url));
+    }
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('next', next);
     const res = NextResponse.redirect(loginUrl);

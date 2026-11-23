@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@accszone/database';
-import { isActiveLocale as isLocale, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from '@/i18n/config';
+import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, type Locale } from '@/i18n/config';
+import { getLanguages } from '@/lib/languages';
 import { getCurrentUser } from '@/lib/auth';
 import { isSameOrigin, jsonError, readJson } from '@/lib/http';
 
@@ -9,8 +10,9 @@ import { isSameOrigin, jsonError, readJson } from '@/lib/http';
 export async function POST(req: NextRequest) {
   if (!isSameOrigin(req)) return jsonError(403, 'Invalid origin');
   const body = (await readJson(req)) as { locale?: unknown } | null;
-  const locale = body?.locale;
-  if (!isLocale(locale)) return jsonError(400, 'Unsupported locale');
+  const { enabled } = await getLanguages();
+  const locale = body?.locale as Locale;
+  if (typeof locale !== 'string' || !enabled.includes(locale)) return jsonError(400, 'Unsupported locale');
 
   const user = await getCurrentUser();
   if (user && user.locale !== locale) {

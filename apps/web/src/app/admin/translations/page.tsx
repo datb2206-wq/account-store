@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import { LanguagesForm } from '@/components/admin/languages-form';
 import { TranslationEditor, type TranslationRow } from '@/components/admin/translation-editor';
 import { requireStaff } from '@/lib/auth';
-import { ACTIVE_LOCALES, LOCALE_META, LOCALES } from '@/i18n/config';
+import { LOCALE_META, LOCALES } from '@/i18n/config';
+import { getLanguages } from '@/lib/languages';
 import { getDictionary } from '@/i18n/dictionaries';
 import { flatten, getOverrides } from '@/lib/i18n-overrides';
 
@@ -15,7 +17,8 @@ export default async function AdminTranslationsPage() {
     key,
     defaults: Object.fromEntries(LOCALES.map((l) => [l, flat[l]![key] ?? ''])) as TranslationRow['defaults'],
   }));
-  const overrides = await getOverrides(true);
+  const [overrides, languages] = await Promise.all([getOverrides(true), getLanguages()]);
+  const ACTIVE_LOCALES = languages.enabled;
 
   return (
     <div className="space-y-6">
@@ -27,6 +30,7 @@ export default async function AdminTranslationsPage() {
           Tên danh mục / sản phẩm dịch ở trang Danh mục và Sản phẩm.
         </p>
       </div>
+      <LanguagesForm initial={languages} />
       <TranslationEditor rows={rows} overrides={overrides} locales={ACTIVE_LOCALES.map((l) => ({ code: l, name: LOCALE_META[l].name }))} />
     </div>
   );

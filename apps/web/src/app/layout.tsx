@@ -36,14 +36,14 @@ var r=Node.prototype.removeChild;Node.prototype.removeChild=function(c){if(c.par
 var i=Node.prototype.insertBefore;Node.prototype.insertBefore=function(n,ref){if(ref&&ref.parentNode!==this)return n;return i.apply(this,arguments)}})();`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const { locale, d, fx } = await getI18n();
+  const { locale, locales, d, fx } = await getI18n();
   return (
     <html lang={LOCALE_META[locale].htmlLang}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: TRANSLATE_GUARD }} />
       </head>
       <body className="min-h-screen bg-zinc-50 text-zinc-900 antialiased">
-        <I18nProvider locale={locale} dictionary={d} fx={fx}>
+        <I18nProvider locale={locale} locales={locales} dictionary={d} fx={fx}>
           {children}
           {/* Màu, popup, nút liên hệ, mã theo dõi (Admin > Cài đặt website): không áp dụng trong /admin */}
           <StorefrontOnly><SiteChrome /></StorefrontOnly>

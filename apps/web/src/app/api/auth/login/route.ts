@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { emailLoginAlert } from '@accszone/core';
 import { prisma } from '@accszone/database';
+import { GATE_COOKIE, passedGate } from '@/lib/admin-gate';
 import { writeAudit } from '@/lib/audit';
 import { createSession, setAuthCookies } from '@/lib/auth';
 import { getClientIp, jsonError, readJson, tooManyRequests } from '@/lib/http';
@@ -54,6 +55,12 @@ export async function POST(req: NextRequest) {
     return jsonError(401, 'Invalid email or password');
   }
   if (user.status === 'BANNED') return jsonError(403, 'This account has been suspended');
+  // Tài khoản admin / nhân viên chỉ đăng nhập được sau khi mở link đăng nhập admin bí mật (nếu đang bật).
+  // Trả lời giống sai mật khẩu để người ngoài không biết email này là admin.
+  if (user.role !== 'USER' && !(await passedGate(req.cookies.get(GATE_COOKIE)?.value ?? ''))) {
+    await writeAudit({ actorId: user.id, action: 'auth.login_gate_denied', entity: 'User', entityId: user.id, after: { userAgent }, ip }).catch(() => null);
+    return jsonError(401, 'Invalid email or password');
+  }
 
   await Promise.all([
     prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), lastLoginIp: ip } }),

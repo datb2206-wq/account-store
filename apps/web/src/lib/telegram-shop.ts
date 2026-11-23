@@ -3,7 +3,8 @@
 import { randomBytes } from 'node:crypto';
 import { getConfig } from '@accszone/core';
 import { prisma, type Prisma } from '@accszone/database';
-import { ACTIVE_LOCALES, DEFAULT_LOCALE, isActiveLocale as isLocale, LOCALE_META, type Locale } from '@/i18n/config';
+import { LOCALE_META, type Locale } from '@/i18n/config';
+import { getLanguages } from './languages';
 import { formatUsd, localized } from './format';
 import { getOrderForUser, purchase, PurchaseError } from './purchase';
 import { rateLimit } from './rate-limit';
@@ -107,8 +108,10 @@ async function buildCtx(settings: ShopBotSettings, siteUrl: string, chatId: numb
     select: { id: true, email: true, username: true, balance: true, status: true, locale: true },
   });
   const saved = user ? null : await getRedis().get(`tg:lang:${from.id}`).catch(() => null);
-  const wanted: Locale = user ? user.locale : isLocale(saved) ? saved : localeFromTelegram(from.language_code);
-  const locale: Locale = isLocale(wanted) ? wanted : DEFAULT_LOCALE; // ngôn ngữ đã ẩn -> tiếng Anh
+  const { enabled, defaultLocale } = await getLanguages();
+  const isLocale = (v: unknown): v is Locale => typeof v === 'string' && (enabled as readonly string[]).includes(v);
+  const wanted = user ? user.locale : isLocale(saved) ? saved : localeFromTelegram(from.language_code);
+  const locale: Locale = isLocale(wanted) ? wanted : defaultLocale; // ngôn ngữ admin đã tắt -> ngôn ngữ mặc định
   let site = 'Shop';
   try {
     site = (await getConfig('site.general')).name;
@@ -420,14 +423,17 @@ async function sendOrder(ctx: Ctx, code: string) {
   return deliver(ctx, code);
 }
 
-function showLanguages(ctx: Ctx, fresh = false) {
-  const kb: Keyboard = ACTIVE_LOCALES.map((l) => [{ text: `${l === ctx.locale ? '✅ ' : ''}${LOCALE_META[l].name}`, callback_data: `lg:${l}` }]);
+async function showLanguages(ctx: Ctx, fresh = false) {
+  const { enabled } = await getLanguages();
+  const kb: Keyboard = enabled.map((l) => [{ text: `${l === ctx.locale ? '✅ ' : ''}${LOCALE_META[l].name}`, callback_data: `lg:${l}` }]);
   kb.push(menuRow(ctx));
   return show(ctx, fresh, ctx.t.language, kb);
 }
 
-async function setLanguage(ctx: Ctx, value: string) {
-  if (!isLocale(value)) return showLanguages(ctx);
+async function setLanguage(ctx: Ctx, raw: string) {
+  const { enabled } = await getLanguages();
+  if (!(enabled as readonly string[]).includes(raw)) return showLanguages(ctx);
+  const value = raw as Locale;
   if (ctx.user) await prisma.user.update({ where: { id: ctx.user.id }, data: { locale: value } });
   else await getRedis().set(`tg:lang:${ctx.from.id}`, value, 'EX', 180 * 86400).catch(() => {});
   ctx.locale = value;

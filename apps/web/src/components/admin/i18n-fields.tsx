@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ACTIVE_LOCALES } from '@/i18n/config';
+import { useI18n } from '@/i18n/client';
 import type { LocaleCode } from '@/lib/admin-schemas';
 
 export type I18nText = Partial<Record<LocaleCode, string>>;
@@ -24,12 +24,13 @@ export function I18nFields({
   descriptionRows?: number;
   descriptionHint?: string;
 }) {
+  const { locales } = useI18n(); // tab theo ngôn ngữ đang bật (Admin > Ngôn ngữ)
   const [locale, setLocale] = useState<LocaleCode>('en');
 
   return (
     <div className="space-y-3 rounded-lg border border-zinc-200 p-3">
       <div className="flex gap-1">
-        {ACTIVE_LOCALES.map((l) => (
+        {locales.map((l) => (
           <button
             key={l}
             type="button"
