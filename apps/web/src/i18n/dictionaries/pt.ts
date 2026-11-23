@@ -514,6 +514,8 @@ export const pt: Dictionary = {
     pixCode: 'Código PIX (Copia e Cola)',
     pixWaiting: 'Aguardando pagamento… esta página atualiza sozinha.',
     pixAfterPay: 'Pagou e o saldo não foi creditado após alguns minutos? Informe abaixo e vamos verificar.',
+    pixReceipt: 'Comprovante de pagamento (print)',
+    pixClaimHint: 'Após pagar, envie o print do comprovante para verificarmos.',
     pixQrAlt: 'QR Code PIX',
     tabCard: 'Cartão telefônico',
     tabOther: 'Carteira digital e outros',

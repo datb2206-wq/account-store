@@ -18,12 +18,14 @@ export function DepositClaim({
   claimedAt,
   hasProof,
   customerRef,
+  proofOnly = false,
 }: {
   kind: 'bank' | 'usdt';
   id: string;
   claimedAt: string | null;
   hasProof: boolean;
   customerRef: string | null;
+  proofOnly?: boolean; // PIX: chỉ nhận ảnh biên lai, không nhập mã giao dịch
 }) {
   const router = useRouter();
   const { d } = useI18n();
@@ -72,12 +74,12 @@ export function DepositClaim({
 
   const form = (
     <form onSubmit={submit} className="space-y-3">
-      <div>
+      {!proofOnly && <div>
         <label htmlFor={`${kind}-ref`} className="label">{t.reference}</label>
         <input id={`${kind}-ref`} className="input font-mono text-sm" maxLength={100} placeholder={t.referencePlaceholder} value={reference} onChange={(e) => setReference(e.target.value)} spellCheck={false} />
-      </div>
+      </div>}
       <div>
-        <p className="label">{t.receipt}</p>
+        <p className="label">{proofOnly ? d.pay.pixReceipt : t.receipt}</p>
         {preview ? (
           <div className="flex items-center gap-3 rounded-lg border border-zinc-200 p-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -93,7 +95,7 @@ export function DepositClaim({
           </label>
         )}
       </div>
-      <button type="submit" disabled={pending || (!file && !reference.trim())} className="btn-primary w-full">
+      <button type="submit" disabled={pending || (proofOnly ? !file : !file && !reference.trim())} className="btn-primary w-full">
         {pending ? t.submitting : claimedAt ? t.sendReceipt : t.submit}
       </button>
     </form>
@@ -127,7 +129,7 @@ export function DepositClaim({
     <div className="space-y-3">
       <div>
         <p className="font-semibold">{t.title}</p>
-        <p className="text-sm text-zinc-500">{t.hint}</p>
+        <p className="text-sm text-zinc-500">{proofOnly ? d.pay.pixClaimHint : t.hint}</p>
       </div>
       {form}
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

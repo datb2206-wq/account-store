@@ -182,7 +182,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
           )}
           <section className="card space-y-2">
             <p className="text-sm text-zinc-500">{d.pay.pixAfterPay}</p>
-            <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
+            <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} proofOnly />
           </section>
         </>
       )}

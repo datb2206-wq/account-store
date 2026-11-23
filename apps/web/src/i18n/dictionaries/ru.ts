@@ -510,6 +510,8 @@ export const ru: Dictionary = {
     pixCode: 'PIX code (copy and paste)',
     pixWaiting: 'Waiting for payment… this page updates automatically.',
     pixAfterPay: 'Paid but your balance was not credited after a few minutes? Report it below and we will check.',
+    pixReceipt: 'Payment receipt screenshot',
+    pixClaimHint: 'After paying, upload a screenshot of the payment receipt so we can verify it.',
     pixQrAlt: 'PIX QR code',
     tabCard: 'Карта оплаты',
     tabOther: 'Кошельки и другое',
