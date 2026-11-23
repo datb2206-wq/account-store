@@ -143,6 +143,8 @@ export const CONFIG_SCHEMAS = {
           name: z.string().trim().min(1).max(50),
           decimals: z.number().int().min(0).max(8),
           enabled: z.boolean(),
+          // Tính tỷ giá theo VND: 1 đơn vị tiền này = vndPer ₫ (VD BRL: 5000). Tỷ giá USD tự = tỷ giá VND / vndPer
+          vndPer: z.number().positive().optional(),
         }),
       )
       .max(50),

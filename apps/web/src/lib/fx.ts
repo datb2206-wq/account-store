@@ -17,6 +17,7 @@ export interface CurrencyInfo {
   rate: number;
   decimals: number;
   enabled: boolean;
+  vndPer?: number; // tính theo VND: 1 đơn vị = vndPer ₫
 }
 
 export interface CurrencySettings {
@@ -33,7 +34,7 @@ export function clearCurrencyCache() {
 // Gộp tỷ giá + cấu hình hiển thị. Tiền có tỷ giá nhưng chưa cấu hình -> hiện với tên = mã, đang bật.
 export function mergeCurrencies(
   rates: Record<string, number>,
-  display: { defaultCurrency: string; currencies: { code: string; name: string; decimals: number; enabled: boolean }[] } | null,
+  display: { defaultCurrency: string; currencies: { code: string; name: string; decimals: number; enabled: boolean; vndPer?: number }[] } | null,
 ): CurrencySettings {
   const meta = new Map((display?.currencies ?? []).map((c) => [c.code, c]));
   const codes = ['USD', ...Object.keys(rates).filter((c) => c !== 'USD').sort()];
@@ -42,7 +43,8 @@ export function mergeCurrencies(
     return {
       code,
       name: m?.name ?? (code === 'USD' ? 'US Dollar' : code),
-      rate: code === 'USD' ? 1 : rates[code]!,
+      rate: code === 'USD' ? 1 : m?.vndPer && rates.VND ? Number((rates.VND / m.vndPer).toPrecision(8)) : rates[code]!,
+      vndPer: m?.vndPer,
       decimals: m?.decimals ?? (ZERO_DECIMAL.has(code) ? 0 : 2),
       enabled: code === 'USD' ? true : (m?.enabled ?? true),
     };

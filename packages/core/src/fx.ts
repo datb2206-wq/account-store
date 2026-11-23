@@ -20,10 +20,12 @@ export async function updateFxRates(url: string, log: FxLogger) {
   if (base !== 'USD' || !body.rates) throw new Error('FX source must return USD-based { rates }');
 
   const current = await getConfig('currency.rates');
+  const display = await getConfig('currency.display').catch(() => null);
+  const pegs = new Map((display?.currencies ?? []).filter((c) => c.vndPer).map((c) => [c.code, c.vndPer!]));
   const next: Record<string, number> = { ...current };
   const changed: string[] = [];
   for (const [code, old] of Object.entries(current)) {
-    if (code === 'USD') continue;
+    if (code === 'USD' || pegs.has(code)) continue;
     const value = Number(body.rates[code]);
     if (!Number.isFinite(value) || value <= 0) continue;
     if (Math.abs(value / old - 1) > MAX_JUMP) {
@@ -34,6 +36,15 @@ export async function updateFxRates(url: string, log: FxLogger) {
     if (rounded !== old) {
       next[code] = rounded;
       changed.push(`${code} ${old}->${rounded}`);
+    }
+  }
+  // Tiền tính theo VND (VD 1 R$ = 5000 ₫) đi theo tỷ giá VND mới
+  for (const [code, per] of pegs) {
+    if (!next.VND || !(code in next)) continue;
+    const rounded = Number((next.VND / per).toPrecision(8));
+    if (rounded !== next[code]) {
+      changed.push(`${code} ${next[code]}->${rounded}`);
+      next[code] = rounded;
     }
   }
   if (changed.length === 0) return { changed };

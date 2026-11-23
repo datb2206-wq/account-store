@@ -11,6 +11,7 @@ interface Row {
   rate: string;
   decimals: string;
   enabled: boolean;
+  vndPer: string; // trống = nhập tỷ giá tay
 }
 
 // Bảng tiền tệ: mã, tên, tỷ giá (1 USD = ?), số lẻ, bật hiển thị; chọn tiền mặc định
@@ -19,18 +20,22 @@ export function CurrencyEditor({
   defaultCurrency,
   usedByBanks,
 }: {
-  initial: { code: string; name: string; rate: number; decimals: number; enabled: boolean }[];
+  initial: { code: string; name: string; rate: number; decimals: number; enabled: boolean; vndPer?: number }[];
   defaultCurrency: string;
   usedByBanks: string[];
 }) {
   const router = useRouter();
-  const [rows, setRows] = useState<Row[]>(initial.map((c) => ({ ...c, rate: String(c.rate), decimals: String(c.decimals) })));
+  const [rows, setRows] = useState<Row[]>(initial.map((c) => ({ ...c, rate: String(c.rate), decimals: String(c.decimals), vndPer: c.vndPer ? String(c.vndPer) : '' })));
   const [def, setDef] = useState(defaultCurrency);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const update = (i: number, patch: Partial<Row>) => setRows((rs) => rs.map((r, n) => (n === i ? { ...r, ...patch } : r)));
+  const num = (v: string) => Number(v.replace(/[\s,]/g, ''));
+  const vndRate = num(rows.find((r) => r.code === 'VND')?.rate ?? '');
+  // Tỷ giá thực dùng: tiền tính theo VND thì = tỷ giá VND / số VND
+  const rateOf = (r: Row) => (r.vndPer && r.code !== 'VND' && r.code !== 'USD' && vndRate > 0 && num(r.vndPer) > 0 ? Number((vndRate / num(r.vndPer)).toPrecision(8)) : num(r.rate));
 
   async function save() {
     setPending(true);
@@ -38,7 +43,7 @@ export function CurrencyEditor({
     setSuccess(null);
     const res = await apiRequest('/api/admin/currencies', 'PUT', {
       defaultCurrency: def,
-      currencies: rows.map((r) => ({ code: r.code, name: r.name, rate: r.rate.replace(/[\s,]/g, ''), decimals: r.decimals, enabled: r.enabled })),
+      currencies: rows.map((r) => ({ code: r.code, name: r.name, rate: String(rateOf(r) || r.rate.replace(/[\s,]/g, '')), decimals: r.decimals, enabled: r.enabled, vndPer: r.vndPer.trim() ? r.vndPer.replace(/[\s,.]/g, '') : '' })),
     });
     setPending(false);
     if (!res.ok) {
@@ -59,12 +64,13 @@ export function CurrencyEditor({
       <div className="overflow-x-auto">
         <table className="table">
           <thead>
-            <tr><th>Mã</th><th>Tên hiển thị</th><th>Tỷ giá (1 USD =)</th><th>Số lẻ</th><th>Hiển thị cho khách</th><th>Ví dụ $10</th><th /></tr>
+            <tr><th>Mã</th><th>Tên hiển thị</th><th>Tỷ giá (1 USD =)</th><th title="Để trống = nhập tỷ giá tay. Điền số thì tỷ giá tự tính theo VND">Tính theo VND (1 đơn vị = ? ₫)</th><th>Số lẻ</th><th>Hiển thị cho khách</th><th>Ví dụ $10</th><th /></tr>
           </thead>
           <tbody>
             {rows.map((r, i) => {
               const usd = r.code === 'USD';
-              const rate = Number(r.rate.replace(/[\s,]/g, ''));
+              const pegged = !!r.vndPer.trim() && r.code !== 'VND' && !usd;
+              const rate = rateOf(r);
               const digits = Number(r.decimals);
               let sample = '—';
               try {
@@ -80,7 +86,12 @@ export function CurrencyEditor({
                     <input className="input w-20 font-mono uppercase" value={r.code} maxLength={3} disabled={usd} onChange={(e) => update(i, { code: e.target.value.toUpperCase() })} aria-label="Mã tiền tệ" />
                   </td>
                   <td><input className="input w-44" value={r.name} maxLength={50} onChange={(e) => update(i, { name: e.target.value })} aria-label="Tên" /></td>
-                  <td><input className="input w-36 tabular-nums" inputMode="decimal" value={r.rate} disabled={usd} onChange={(e) => update(i, { rate: e.target.value })} aria-label="Tỷ giá" /></td>
+                  <td><input className="input w-36 tabular-nums" inputMode="decimal" value={pegged ? String(rate || '') : r.rate} disabled={usd || pegged} onChange={(e) => update(i, { rate: e.target.value })} aria-label="Tỷ giá" /></td>
+                  <td>
+                    {usd || r.code === 'VND' ? <span className="text-xs text-zinc-400">—</span> : (
+                      <input className="input w-32 tabular-nums" inputMode="numeric" placeholder="Trống = tay" value={r.vndPer} onChange={(e) => update(i, { vndPer: e.target.value })} aria-label="Số VND cho 1 đơn vị" />
+                    )}
+                  </td>
                   <td>
                     <select className="input w-20" value={r.decimals} onChange={(e) => update(i, { decimals: e.target.value })} aria-label="Số lẻ">
                       {[0, 1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -107,7 +118,7 @@ export function CurrencyEditor({
         </table>
       </div>
 
-      <button type="button" className="btn-ghost border border-zinc-200" onClick={() => setRows((rs) => [...rs, { code: '', name: '', rate: '', decimals: '2', enabled: true }])}>
+      <button type="button" className="btn-ghost border border-zinc-200" onClick={() => setRows((rs) => [...rs, { code: '', name: '', rate: '', decimals: '2', enabled: true, vndPer: '' }])}>
         + Thêm tiền tệ
       </button>
 

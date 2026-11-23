@@ -17,6 +17,7 @@ const schema = z.object({
         rate: z.coerce.number().positive('Tỷ giá phải lớn hơn 0'),
         decimals: z.coerce.number().int().min(0).max(8),
         enabled: z.boolean(),
+        vndPer: z.union([z.literal(''), z.null(), z.coerce.number().positive('Số VND phải lớn hơn 0')]).optional(),
       }),
     )
     .min(1)
@@ -31,10 +32,16 @@ export const PUT = adminRoute(async (req, _ctx, user) => {
   if (dup) throw badRequest(`Mã tiền tệ ${dup} bị trùng`);
   if (!codes.includes('USD')) throw badRequest('Phải giữ USD (tiền gốc của hệ thống)');
 
-  const rates = Object.fromEntries(input.currencies.map((c) => [c.code, c.code === 'USD' ? 1 : c.rate]));
+  // Tiền tính theo VND: tỷ giá = tỷ giá VND / số VND của 1 đơn vị (VD VND 25400, 1 R$ = 5000 ₫ -> BRL 5.08)
+  const vndRate = input.currencies.find((c) => c.code === 'VND')?.rate;
+  const per = (c: (typeof input.currencies)[number]) => (typeof c.vndPer === 'number' && c.code !== 'VND' && c.code !== 'USD' ? c.vndPer : undefined);
+  if (input.currencies.some((c) => per(c)) && !vndRate) throw badRequest('Cần có tỷ giá VND để tính tiền tệ theo VND');
+  const rates = Object.fromEntries(
+    input.currencies.map((c) => [c.code, c.code === 'USD' ? 1 : per(c) ? Number((vndRate! / per(c)!).toPrecision(8)) : c.rate]),
+  );
   const display = {
     defaultCurrency: input.defaultCurrency === 'AUTO' || codes.includes(input.defaultCurrency) ? input.defaultCurrency : 'AUTO',
-    currencies: input.currencies.map(({ code, name, decimals, enabled }) => ({ code, name, decimals, enabled: code === 'USD' ? true : enabled })),
+    currencies: input.currencies.map((c) => ({ code: c.code, name: c.name, decimals: c.decimals, enabled: c.code === 'USD' ? true : c.enabled, ...(per(c) ? { vndPer: per(c) } : {}) })),
   };
 
   // Tài khoản ngân hàng nhận nạp cần tỷ giá của tiền tệ đó để quy đổi sang USD
