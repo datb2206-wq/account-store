@@ -96,6 +96,8 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
   const activeCoupon = coupon && coupon.qty === qty ? coupon : null;
   const total = activeCoupon ? Number(activeCoupon.total) : subtotal;
   const notEnough = Number(balance) < total;
+  // Khách chọn R$ thì số dư / nút thanh toán cũng hiện R$ (quy đổi theo tỷ giá), không hiện $
+  const local = (v: number | string) => (fx ? <span translate="no" className="tabular-nums">{formatFx(v, fx, locale, false)}</span> : <Money value={v} />);
   const validQty = Number.isInteger(qty) && qty >= product.minQty && qty <= maxBuy;
   // Đã trừ tiền: giao xong (COMPLETED) hoặc đang chờ nhà cung cấp xác nhận (PENDING)
   const paid = result?.order.status === 'COMPLETED' || result?.order.status === 'PENDING';
@@ -173,7 +175,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
                 <div className="flex items-start gap-3 rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900">
                   <span className="grid size-6 shrink-0 place-items-center rounded-full bg-emerald-600 text-xs font-bold text-white" aria-hidden>✓</span>
                   <div className="space-y-1">
-                    <p className="font-semibold">{rich(t.charged, { amount: <Money value={result.order.totalAmount} /> })}</p>
+                    <p className="font-semibold">{rich(t.charged, { amount: local(result.order.totalAmount) })}</p>
                     {result.order.status === 'PENDING' ? (
                       <p className="flex items-center gap-2">
                         <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-emerald-300 border-t-emerald-700" aria-hidden />
@@ -195,7 +197,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
                 </p>
               )}
               {result.balance && result.order.status !== 'REFUNDED' && (
-                <p className="text-sm text-zinc-500">{rich(t.remainingBalance, { amount: <b className="text-zinc-900"><Money value={result.balance} /></b> })}</p>
+                <p className="text-sm text-zinc-500">{rich(t.remainingBalance, { amount: <b className="text-zinc-900">{local(result.balance)}</b> })}</p>
               )}
               <div className="flex gap-2">
                 <Link href="/dashboard/orders" className="btn-primary flex-1">{t.openHistory}</Link>
@@ -209,7 +211,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-lg bg-zinc-50 p-3">
                   <p className="text-zinc-500">{t.price}</p>
-                  <p className="font-semibold">{fx ? <span translate="no" className="tabular-nums">{formatFx(product.price, fx, locale, false)}</span> : <Money value={product.price} />} <span className="font-normal text-zinc-400">{t.perItem}</span></p>
+                  <p className="text-lg font-bold">{fx ? <span translate="no" className="tabular-nums">{formatFx(product.price, fx, locale, false)}</span> : <Money value={product.price} />} <span className="font-normal text-zinc-400">{t.perItem}</span></p>
                   {fx && <p className="text-xs text-zinc-400 tabular-nums"><Money value={product.price} /></p>}
                 </div>
                 <div className="rounded-lg bg-zinc-50 p-3">
@@ -264,16 +266,16 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
                   <p className="text-sm text-zinc-500">{t.total}</p>
                   {activeCoupon && validQty && (
                     <p className="text-xs text-zinc-400 tabular-nums">
-                      <span className="line-through"><Money value={subtotal} /></span>{' '}
-                      <span className="text-emerald-600">−<Money value={activeCoupon.discount} /></span>
+                      <span className="line-through">{local(subtotal)}</span>{' '}
+                      <span className="text-emerald-600">−{local(activeCoupon.discount)}</span>
                     </p>
                   )}
-                  <p className="text-xl font-semibold tabular-nums">{validQty ? (fx ? <span translate="no">{formatFx(total, fx, locale, false)}</span> : <Money value={total} />) : <span>—</span>}</p>
+                  <p className="text-2xl font-bold tabular-nums">{validQty ? (fx ? <span translate="no">{formatFx(total, fx, locale, false)}</span> : <Money value={total} />) : <span>—</span>}</p>
                   {fx && validQty && <p className="text-xs text-zinc-400 tabular-nums"><Money value={total} /></p>}
                 </div>
                 <div className="text-right text-sm">
                   <p className="text-zinc-500">{t.yourBalance}</p>
-                  <p className={`font-medium tabular-nums ${notEnough ? 'text-red-600' : ''}`}><Money value={balance} /></p>
+                  <p className={`text-lg font-bold tabular-nums ${notEnough ? 'text-red-600' : ''}`}>{local(balance)}</p>
                 </div>
               </div>
 
@@ -284,7 +286,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
 
               <button type="button" onClick={pay} disabled={pending || !validQty || notEnough} className="btn-primary w-full">
                 {/* Mỗi trạng thái 1 <span> riêng: đổi chữ = thay cả thẻ, an toàn khi trang đang bị Google Dịch */}
-                {pending ? <span key="p">{t.processing}</span> : validQty ? <span key="v">{rich(t.pay, { amount: <Money value={total} /> })}</span> : <span key="i">{t.invalidQty}</span>}
+                {pending ? <span key="p">{t.processing}</span> : validQty ? <span key="v">{rich(t.pay, { amount: local(total) })}</span> : <span key="i">{t.invalidQty}</span>}
               </button>
             </>
           )}
