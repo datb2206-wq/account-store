@@ -9,6 +9,12 @@ export function formatUsd(value: DecimalLike) {
   return usd.format(Number(value?.toString() ?? 0));
 }
 
+// Dòng $ nhỏ tham khảo dưới giá R$: làm tròn 2 số lẻ, ghi "US$" để khỏi nhầm với R$ (giá dưới 1 cent thì giữ 4 số)
+export function formatUsdRef(value: DecimalLike) {
+  const n = Number(value?.toString() ?? 0);
+  return `US$ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: n > 0 && n < 0.01 ? 4 : 2 })}`;
+}
+
 export function formatDate(value: Date | null | undefined) {
   return value ? dateTime.format(value) : '—';
 }

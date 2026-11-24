@@ -18,7 +18,7 @@ import { getI18n } from '@/i18n/server';
 import { getCurrentUser } from '@/lib/auth';
 import { cached, SHOP_STOCK_CACHE } from '@/lib/cache';
 import { descendantIds, flattenTree } from '@/lib/category-tree';
-import { formatUsd, localized } from '@/lib/format';
+import { formatUsd, formatUsdRef, localized } from '@/lib/format';
 import { blockedByMaintenance, getSiteConfig } from '@/lib/site';
 import { getSiteAssets } from '@/lib/site-assets';
 import { getSiteExtras } from '@/lib/site-extras';
@@ -286,7 +286,7 @@ export default async function ShopPage({
                       <div>
                         {/* Khách chọn tiền tệ khác USD: giá quy đổi hiện đậm ở trên, USD nhỏ ở dưới */}
                         <p translate="no" className="text-base font-bold whitespace-nowrap text-zinc-900 tabular-nums">{local ?? formatUsd(p.price)}</p>
-                        {local && <p translate="no" className="text-[11px] whitespace-nowrap text-zinc-500 tabular-nums">{formatUsd(p.price)}</p>}
+                        {local && <p translate="no" className="text-[11px] whitespace-nowrap text-zinc-500 tabular-nums">{formatUsdRef(p.price)}</p>}
                         {minNote && <p className="text-[11px] text-zinc-500">{minNote}</p>}
                       </div>
                       <div className="flex justify-end">

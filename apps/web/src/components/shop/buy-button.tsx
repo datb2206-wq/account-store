@@ -8,6 +8,7 @@ import { CartIcon } from '@/components/icons';
 import { useI18n } from '@/i18n/client';
 import { fmt, formatFx, formatNum } from '@/i18n/config';
 import { Money } from '@/components/money';
+import { formatUsdRef } from '@/lib/format';
 import { translateError } from '@/i18n/errors';
 import { rich } from '@/i18n/rich';
 
@@ -212,7 +213,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
                 <div className="rounded-lg bg-zinc-50 p-3">
                   <p className="text-zinc-500">{t.price}</p>
                   <p className="text-lg font-bold">{fx ? <span translate="no" className="tabular-nums">{formatFx(product.price, fx, locale, false)}</span> : <Money value={product.price} />} <span className="font-normal text-zinc-400">{t.perItem}</span></p>
-                  {fx && <p className="text-xs text-zinc-400 tabular-nums"><Money value={product.price} /></p>}
+                  {fx && <p className="text-xs text-zinc-400 tabular-nums">{formatUsdRef(product.price)}</p>}
                 </div>
                 <div className="rounded-lg bg-zinc-50 p-3">
                   <p className="text-zinc-500">{t.inStock}</p>
@@ -271,7 +272,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
                     </p>
                   )}
                   <p className="text-2xl font-bold tabular-nums">{validQty ? (fx ? <span translate="no">{formatFx(total, fx, locale, false)}</span> : <Money value={total} />) : <span>—</span>}</p>
-                  {fx && validQty && <p className="text-xs text-zinc-400 tabular-nums"><Money value={total} /></p>}
+                  {fx && validQty && <p className="text-xs text-zinc-400 tabular-nums">{formatUsdRef(total)}</p>}
                 </div>
                 <div className="text-right text-sm">
                   <p className="text-zinc-500">{t.yourBalance}</p>
