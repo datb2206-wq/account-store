@@ -9,6 +9,7 @@
 //    (bỏ các bản dịch cũ để worker dịch lại). Tên nguồn không đổi -> giữ nguyên bản dịch (kể cả bản en đã dịch, gốc ở 'src').
 //  - stripHtml: lọc thẻ HTML khỏi tên & mô tả lấy từ nguồn.
 //  - Sản phẩm biến mất khỏi catalog -> externalStock = 0 (không xóa: có thể đã có đơn hàng).
+//  - autoHidden: sản phẩm ẩn vì hết hàng -> nguồn có hàng lại thì tự bật bán. Sản phẩm admin tự tay ẩn thì giữ ẩn.
 //  - Danh mục nguồn trùng tên với danh mục có sẵn của shop (cùng cấp cha) -> dùng luôn danh mục đó, không tạo bản trùng.
 import { createHash } from 'node:crypto';
 import { Prisma, prisma } from '@accszone/database';
@@ -134,7 +135,7 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
   // ---- Sản phẩm ----
   const existing = await prisma.product.findMany({
     where: { supplierId },
-    select: { id: true, externalId: true, price: true, name: true, description: true },
+    select: { id: true, externalId: true, price: true, name: true, description: true, autoHidden: true },
   });
   const products = new Map(existing.map((p) => [p.externalId!, p]));
   const clean = (s: string) => (supplier.stripHtml ? htmlToText(s) : s).trim();
@@ -162,6 +163,7 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
         data: {
           ...common,
           ...(!keepPrice && { price: price.toFixed(6) }),
+          ...(prev.autoHidden && item.stock > 0 && { isActive: true, autoHidden: false }),
           ...(supplier.autoUpdateInfo && {
             name: fromSource(prev.name, name),
             description: description ? fromSource(prev.description, description) : asObject(prev.description),
@@ -179,6 +181,7 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
           externalId: item.externalId,
           source: 'RESELLER',
           isActive: supplier.autoActivate && item.stock > 0,
+          autoHidden: supplier.autoActivate && item.stock <= 0, // tự bật khi có hàng
           slug: stableSlug(name, supplierId, item.externalId),
           categoryId: categoryIds.get(catOf(item)?.externalId ?? fallbackKey)!,
           name: { en: name },

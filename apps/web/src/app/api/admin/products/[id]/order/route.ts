@@ -29,7 +29,7 @@ export const PATCH = adminRoute<Ctx>(async (req, { params }, user) => {
   }
   const updated = await prisma.product.update({
     where: { id },
-    data: { ...(sortOrder !== undefined && { sortOrder }), ...(input.isFeatured !== undefined && { isFeatured: input.isFeatured }), ...(input.isActive !== undefined && { isActive: input.isActive }) },
+    data: { ...(sortOrder !== undefined && { sortOrder }), ...(input.isFeatured !== undefined && { isFeatured: input.isFeatured }), ...(input.isActive !== undefined && { isActive: input.isActive, autoHidden: false }) },
     select: { sortOrder: true, isFeatured: true, isActive: true },
   });
   await writeAudit({ actorId: user.id, action: 'product.order', entity: 'Product', entityId: id, before: { sortOrder: p.sortOrder, isFeatured: p.isFeatured, isActive: p.isActive }, after: updated, ip: getClientIp(req) });

@@ -29,7 +29,7 @@ export const POST = adminRoute(async (req, _ctx, user) => {
   let count = 0;
   let skipped = 0;
   if (action === 'enable' || action === 'disable') {
-    ({ count } = await prisma.product.updateMany({ where, data: { isActive: action === 'enable' } }));
+    ({ count } = await prisma.product.updateMany({ where, data: { isActive: action === 'enable', autoHidden: false } }));
   } else if (action === 'feature' || action === 'unfeature') {
     ({ count } = await prisma.product.updateMany({ where, data: { isFeatured: action === 'feature' } }));
   } else if (action === 'order') {
