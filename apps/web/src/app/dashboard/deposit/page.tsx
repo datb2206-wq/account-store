@@ -4,7 +4,7 @@ import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
 import { DepositForms, type BankOption, type CardOption, type ManualOption, type PixOption } from '@/components/deposit/deposit-forms';
 import { LocalTime } from '@/components/local-time';
-import { Money } from '@/components/money';
+import { LocalMoney } from '@/components/money';
 import { Pagination } from '@/components/pagination';
 import { requireUser } from '@/lib/auth';
 import { activeDepositBonuses, CARD_TELCO_LABEL, cardReady, expireStaleDeposits, getCardSettings, getConfig, getManualMethods, getPixSettings, pixReady } from '@accszone/core';
@@ -22,7 +22,7 @@ const PAGE_SIZE = 15;
 
 export default async function DepositPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const user = await requireUser();
-  const { d } = await getI18n();
+  const { d, fx, locale } = await getI18n();
   const t = d.deposit;
   const page = Math.max(1, Number.parseInt((await searchParams).page ?? '1', 10) || 1);
   await expireStaleDeposits();
@@ -74,7 +74,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">{t.title}</h1>
-        <p className="text-sm text-zinc-500">{rich(t.currentBalance, { amount: <b className="text-zinc-900"><Money value={user.balance} /></b> })}</p>
+        <p className="text-sm text-zinc-500">{rich(t.currentBalance, { amount: <b className="text-zinc-900"><LocalMoney value={user.balance} fx={fx} locale={locale} /></b> })}</p>
       </div>
 
       {bonuses.length > 0 && (
@@ -82,7 +82,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
           <p className="mb-1.5 text-sm font-semibold text-amber-900">🎁 {t.bonusTitle}</p>
           <ul className="space-y-0.5 text-sm text-amber-900">
             {bonuses.map((b) => (
-              <li key={b.minAmount.toString()}>{rich(t.bonusTier, { min: <b><Money value={b.minAmount} /></b>, percent: <b>{Number(b.bonusPercent)}</b> })}</li>
+              <li key={b.minAmount.toString()}>{rich(t.bonusTier, { min: <b><LocalMoney value={b.minAmount} fx={fx} locale={locale} /></b>, percent: <b>{Number(b.bonusPercent)}</b> })}</li>
             ))}
           </ul>
         </div>
@@ -108,7 +108,7 @@ export default async function DepositPage({ searchParams }: { searchParams: Prom
                   <td className="text-zinc-500"><LocalTime value={dep.createdAt} /></td>
                   <td>{d.method[dep.method] ?? dep.method}</td>
                   <td className="tabular-nums">{formatOriginal(dep.originalAmount, dep.originalCurrency)}</td>
-                  <td className="tabular-nums">{dep.status === 'COMPLETED' ? <Money value={dep.amount} /> : '—'}</td>
+                  <td className="tabular-nums">{dep.status === 'COMPLETED' ? (dep.method === 'PIX' && dep.originalAmount && dep.originalCurrency ? formatOriginal(dep.originalAmount, dep.originalCurrency) : <LocalMoney value={dep.amount} fx={fx} locale={locale} />) : '—'}</td>
                   <td><Badge value={dep.status} label={dep.status === 'PENDING' && dep.claimedAt ? d.bankClaim.awaitingTitle : d.status[dep.status]} /></td>
                   <td className="text-right">
                     <Link href={`/dashboard/deposit/${dep.id}`} className="text-sm font-medium text-blue-600 hover:underline">

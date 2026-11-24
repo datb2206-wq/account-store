@@ -12,7 +12,7 @@ import { BnbLogo, PixLogo, TronLogo, UsdtLogo } from '@/components/deposit/pay-l
 import { PixCopyButton, PixCountdown } from '@/components/deposit/pix-countdown';
 import { UsdtVerify } from '@/components/deposit/usdt-verify';
 import { LocalTime } from '@/components/local-time';
-import { Money } from '@/components/money';
+import { LocalMoney } from '@/components/money';
 import { requireUser } from '@/lib/auth';
 import { explorerTxUrl, shortHash } from '@/lib/chain-links';
 import { checkPixDeposit, expireStaleDeposits, getConfig, getPixSettings, pixAutoCredit } from '@accszone/core';
@@ -45,7 +45,7 @@ function Row({ label, value, copy, highlight }: { label: string; value: React.Re
 
 export default async function DepositDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
-  const { d } = await getI18n();
+  const { d, fx, locale } = await getI18n();
   const tr = d.depositDetail;
   const { id } = await params;
   await expireStaleDeposits();
@@ -88,7 +88,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
 
       {t.status === 'COMPLETED' && (
         <div className="card space-y-1 border-emerald-200 bg-emerald-50">
-          <p className="font-semibold text-emerald-800">{rich(tr.credited, { amount: <Money value={t.amount} /> })}</p>
+          <p className="font-semibold text-emerald-800">{rich(tr.credited, { amount: t.method === 'PIX' && t.originalAmount && t.originalCurrency ? <span translate="no">{formatOriginal(t.originalAmount, t.originalCurrency)}</span> : <LocalMoney value={t.amount} fx={fx} locale={locale} /> })}</p>
           {t.txHash && (
             <p className="text-sm text-emerald-700">
               TxID: <a href={explorerTxUrl(t.network, t.txHash)} target="_blank" rel="noreferrer" className="font-mono underline">{shortHash(t.txHash)}</a>
@@ -120,7 +120,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
             <p className="font-semibold">{tr.important}</p>
             <ul className="mt-1 list-disc space-y-1 pl-5">
               <li>{rich(tr.bankNote1, { code: <b className="font-mono">{t.transferCode}</b> })}</li>
-              <li>{rich(tr.bankNote2, { amount: <b><Money value={t.amount} /></b> })}</li>
+              <li>{rich(tr.bankNote2, { amount: <b><LocalMoney value={t.amount} fx={fx} locale={locale} /></b> })}</li>
             </ul>
           </div>
           <section className="card">
@@ -142,7 +142,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
             <p className="font-semibold">{tr.important}</p>
             <ul className="mt-1 list-disc space-y-1 pl-5">
               <li>{d.pay.noteContent}: <b className="font-mono">{t.transferCode}</b></li>
-              <li>{rich(tr.bankNote2, { amount: <b><Money value={t.amount} /></b> })}</li>
+              <li>{rich(tr.bankNote2, { amount: <b><LocalMoney value={t.amount} fx={fx} locale={locale} /></b> })}</li>
             </ul>
           </div>
           {manual.instructions.trim() && (
