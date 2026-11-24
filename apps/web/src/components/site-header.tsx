@@ -107,9 +107,9 @@ export async function SiteHeader({ user, q = '', category }: { user: CurrentUser
                     href={buildHref('/', { category: c.slug })}
                     role="listitem"
                     aria-current={c.slug === category || c.items.some((i) => i.slug === category) ? 'page' : undefined}
-                    className="flex h-9 shrink-0 items-center gap-2.5 border-r border-zinc-200 px-4 text-sm font-semibold whitespace-nowrap text-zinc-900 transition-colors first:pl-1 last:border-r-0 hover:text-orange-600 aria-[current=page]:text-orange-600"
+                    className="flex h-11 shrink-0 items-center gap-2.5 border-r border-zinc-200 px-4 text-[15px] font-bold sm:text-base whitespace-nowrap text-zinc-900 transition-colors first:pl-1 last:border-r-0 hover:text-orange-600 aria-[current=page]:text-orange-600"
                   >
-                    <CategoryIcon name={c.name} slug={c.slug} iconUrl={c.iconUrl} size="sm" />
+                    <CategoryIcon name={c.name} slug={c.slug} iconUrl={c.iconUrl} size="md" />
                     {c.name}
                   </Link>
                 ))}
