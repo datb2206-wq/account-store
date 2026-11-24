@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { formatFx } from '@/i18n/config';
 import { getI18n } from '@/i18n/server';
 import { STAFF_ROLES, type CurrentUser } from '@/lib/auth';
 import { contactHref } from '@/lib/contact';
@@ -37,7 +38,7 @@ function SearchForm({ q, placeholder, label, className = '' }: { q: string; plac
 // q: từ khóa đang tìm (trang chủ truyền vào để ô tìm kiếm giữ nguyên nội dung)
 // category: slug danh mục đang chọn, để tô sáng tab tương ứng
 export async function SiteHeader({ user, q = '', category }: { user: CurrentUser | null; q?: string; category?: string }) {
-  const [site, { locale, d }, assets] = await Promise.all([getSiteConfig(), getI18n(), getSiteAssets()]);
+  const [site, { locale, d, fx }, assets] = await Promise.all([getSiteConfig(), getI18n(), getSiteAssets()]);
   const menu = await getCategoryMenu(locale);
   const h = d.header;
   const action = 'hidden h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold whitespace-nowrap transition xl:inline-flex';
@@ -71,7 +72,8 @@ export async function SiteHeader({ user, q = '', category }: { user: CurrentUser
                   title={h.balanceHint}
                 >
                   <WalletIcon size={15} />
-                  <span translate="no">{formatUsd(user.balance)}</span>
+                  {/* Số dư lưu bằng USD, hiện theo tiền khách chọn (VD R$) */}
+                  <span translate="no">{formatFx(user.balance.toString(), fx, locale, false) ?? formatUsd(user.balance)}</span>
                   <span className="ml-0.5 text-emerald-500">+</span>
                 </Link>
                 <Link href="/dashboard" className="hidden max-w-36 truncate text-sm font-medium text-zinc-600 hover:text-zinc-900 2xl:inline">
