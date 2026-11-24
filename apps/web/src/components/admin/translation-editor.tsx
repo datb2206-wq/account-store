@@ -23,7 +23,8 @@ export function TranslationEditor({
   locales: { code: Locale; name: string }[];
 }) {
   const router = useRouter();
-  const [locale, setLocale] = useState<Locale>('en');
+  // Mở ngôn ngữ đầu tiên đang bật (VD web chỉ bật tiếng Bồ Đào Nha thì không có tab tiếng Anh)
+  const [locale, setLocale] = useState<Locale>(locales[0]?.code ?? 'en');
   const [drafts, setDrafts] = useState(
     () => Object.fromEntries(locales.map((l) => [l.code, { ...(overrides[l.code] ?? {}) }])) as Record<Locale, Record<string, string>>,
   );
@@ -35,7 +36,7 @@ export function TranslationEditor({
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const sections = useMemo(() => [...new Set(rows.map((r) => r.key.split('.')[0]!))], [rows]);
-  const draft = drafts[locale];
+  const draft = drafts[locale] ?? {};
   const needle = q.trim().toLowerCase();
   const visible = rows.filter(
     (r) =>
