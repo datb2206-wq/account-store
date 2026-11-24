@@ -513,7 +513,7 @@ export const pt: Dictionary = {
     pixScan: 'Escaneie este QR Code no app do seu banco ou copie o código PIX abaixo (Pix Copia e Cola).',
     pixCode: 'Código PIX (Copia e Cola)',
     pixWaiting: 'Aguardando pagamento… esta página atualiza sozinha.',
-    pixAfterPay: 'Pagou e o saldo não foi creditado após alguns minutos? Informe abaixo e vamos verificar.',
+    pixAfterPay: 'Se o saldo não cair na sua conta em até 2 minutos após o pagamento, envie o comprovante aqui para receber suporte.',
     pixPayTitle: 'Pague com PIX',
     pixExpiresIn: 'O código expira em',
     pixExpiredNow: 'Este código PIX expirou. Gere um novo depósito.',

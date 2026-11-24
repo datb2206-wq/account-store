@@ -509,7 +509,7 @@ export const zh: Dictionary = {
     pixScan: 'Scan this QR code with your bank app, or copy the PIX code below (Pix Copia e Cola).',
     pixCode: 'PIX code (copy and paste)',
     pixWaiting: 'Waiting for payment… this page updates automatically.',
-    pixAfterPay: 'Paid but your balance was not credited after a few minutes? Report it below and we will check.',
+    pixAfterPay: 'If your balance is not credited within 2 minutes after paying, upload the receipt here and we will help you.',
     pixPayTitle: 'Pay with PIX',
     pixExpiresIn: 'Code expires in',
     pixExpiredNow: 'This PIX code has expired. Please create a new deposit.',
