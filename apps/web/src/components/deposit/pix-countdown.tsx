@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 // Đếm ngược thời gian còn lại của mã PIX + thanh thời gian. Hết giờ thì tải lại trang (server chuyển lệnh sang hết hạn).
-export function PixCountdown({ startAt, expiresAt, label, expiredLabel }: { startAt: string; expiresAt: string; label: string; expiredLabel: string }) {
+export function PixCountdown({ startAt, expiresAt, label, expiredLabel, accent = '#32BCAD', accentDark = '#1f8f84' }: { startAt: string; expiresAt: string; label: string; expiredLabel: string; accent?: string; accentDark?: string }) {
   const router = useRouter();
   const start = new Date(startAt).getTime();
   const end = new Date(expiresAt).getTime();
@@ -31,8 +31,8 @@ export function PixCountdown({ startAt, expiresAt, label, expiredLabel }: { star
   const mm = String(Math.floor(sec / 60)).padStart(2, '0');
   const ss = String(sec % 60).padStart(2, '0');
   const tone = sec <= 60 ? 'red' : sec <= 300 ? 'amber' : 'teal';
-  const color = { red: 'text-red-600', amber: 'text-amber-600', teal: 'text-[#1f8f84]' }[tone];
-  const bar = { red: 'bg-red-500', amber: 'bg-amber-500', teal: 'bg-[#32BCAD]' }[tone];
+  const color = { red: 'text-red-600', amber: 'text-amber-600', teal: '' }[tone];
+  const bar = { red: 'bg-red-500', amber: 'bg-amber-500', teal: '' }[tone];
 
   return (
     <div className="space-y-2 px-5 py-3">
@@ -46,7 +46,7 @@ export function PixCountdown({ startAt, expiresAt, label, expiredLabel }: { star
               </svg>
               {label}
             </span>
-            <span className={`font-mono text-lg font-bold tabular-nums ${color}`} aria-live="off">
+            <span className={`font-mono text-lg font-bold tabular-nums ${color}`} style={tone === 'teal' ? { color: accentDark } : undefined} aria-live="off">
               {mm}:{ss}
             </span>
           </>
@@ -55,19 +55,19 @@ export function PixCountdown({ startAt, expiresAt, label, expiredLabel }: { star
         )}
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100">
-        <div className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${bar}`} style={{ width: `${pct}%` }} />
+        <div className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${bar}`} style={{ width: `${pct}%`, ...(tone === 'teal' && { background: accent }) }} />
       </div>
     </div>
   );
 }
 
 // Nút copy to cho mã PIX Copia e Cola
-export function PixCopyButton({ value, label, copiedLabel }: { value: string; label: string; copiedLabel: string }) {
+export function PixCopyButton({ value, label, copiedLabel, colors = 'bg-[#32BCAD] hover:bg-[#2aa497]' }: { value: string; label: string; copiedLabel: string; colors?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
       type="button"
-      className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition ${copied ? 'bg-emerald-600' : 'bg-[#32BCAD] hover:bg-[#2aa497] active:scale-[0.99]'}`}
+      className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition ${copied ? 'bg-emerald-600' : `${colors} active:scale-[0.99]`}`}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value);

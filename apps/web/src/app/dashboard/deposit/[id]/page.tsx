@@ -8,7 +8,7 @@ import { Badge } from '@/components/badge';
 import { BlogContent } from '@/components/blog-content';
 import { CopyButton } from '@/components/copy-button';
 import { DepositClaim } from '@/components/deposit/deposit-claim';
-import { PixLogo } from '@/components/deposit/pay-logos';
+import { BnbLogo, PixLogo, TronLogo, UsdtLogo } from '@/components/deposit/pay-logos';
 import { PixCopyButton, PixCountdown } from '@/components/deposit/pix-countdown';
 import { UsdtVerify } from '@/components/deposit/usdt-verify';
 import { LocalTime } from '@/components/local-time';
@@ -71,7 +71,8 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
   // Địa chỉ ví đã được kiểm tra định dạng ở cấu hình, SVG do thư viện sinh ra.
   const pix = (t.metadata as { pix?: { code: string } } | null)?.pix;
   const pixQr = open && t.method === 'PIX' && pix?.code ? await QRCode.toString(pix.code, { type: 'svg', margin: 1, errorCorrectionLevel: 'H' }) : null; // H: chịu được logo ở giữa
-  const qrSvg = open && isUsdt && t.toAddress ? await QRCode.toString(t.toAddress, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) : null;
+  const qrSvg = open && isUsdt && t.toAddress ? await QRCode.toString(t.toAddress, { type: 'svg', margin: 1, errorCorrectionLevel: 'H' }) : null; // H: chịu được logo ở giữa
+  const bep = t.network === 'BEP20';
 
   return (
     <div className="max-w-xl space-y-6">
@@ -268,25 +269,87 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
       {open && isUsdt && (
         <>
           <section className="card overflow-hidden p-0">
-            {qrSvg && (
-              <div className="flex flex-col items-center gap-4 border-b border-zinc-100 p-5 sm:flex-row">
-                <div
-                  role="img"
-                  aria-label={tr.qrAlt}
-                  className="size-44 shrink-0 rounded-xl border border-zinc-200 bg-white p-2 [&>svg]:size-full"
-                  dangerouslySetInnerHTML={{ __html: qrSvg }}
-                />
-                <p className="text-center text-sm text-zinc-600 sm:text-left">{tr.qrHint}</p>
+            {/* Đầu thẻ: logo USDT + mạng + số tiền chính xác */}
+            <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-[#26A17B] to-[#1a7a5c] px-5 py-4 text-white">
+              <div className="flex items-center gap-3">
+                <span className="relative grid size-11 place-items-center rounded-full bg-white shadow-sm">
+                  <UsdtLogo size={32} />
+                  <span className="absolute -right-1 -bottom-1 rounded-full bg-white p-0.5">{bep ? <BnbLogo size={16} /> : <TronLogo size={16} />}</span>
+                </span>
+                <div>
+                  <p className="leading-tight font-semibold">{d.pay.usdtPayTitle}</p>
+                  <p className="text-xs text-white/80">{bep ? 'BNB Smart Chain (BEP20)' : 'TRON (TRC20)'}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-white/80">{tr.exactAmount}</p>
+                <p className="text-2xl leading-tight font-bold tabular-nums">{exactUsdt} <span className="text-sm font-semibold">USDT</span></p>
+              </div>
+            </div>
+
+            {t.status === 'PENDING' && t.expiresAt && !t.txHash && !t.claimedAt && (
+              <div className="border-b border-zinc-100">
+                <PixCountdown startAt={t.createdAt.toISOString()} expiresAt={t.expiresAt.toISOString()} label={d.pay.usdtExpiresIn} expiredLabel={d.pay.usdtExpiredNow} accent="#26A17B" accentDark="#1a7a5c" />
               </div>
             )}
-            <div className="divide-y divide-zinc-100">
-              <Row label={tr.network} value={t.network === 'BEP20' ? 'BNB Smart Chain (BEP20)' : 'TRON (TRC20)'} />
-              <Row label={tr.wallet} value={<span className="font-mono text-xs">{t.toAddress}</span>} copy={t.toAddress ?? ''} />
-              <Row label={tr.exactAmount} value={`${exactUsdt} USDT`} copy={exactUsdt} highlight />
+
+            <div className="space-y-4 p-5">
+              {qrSvg && (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative rounded-2xl border-2 border-[#26A17B]/30 bg-white p-3 shadow-sm">
+                    <div role="img" aria-label={tr.qrAlt} className="size-52 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+                    <span className="pointer-events-none absolute top-1/2 left-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white shadow ring-2 ring-white">
+                      <UsdtLogo size={30} />
+                    </span>
+                  </div>
+                  <p className="max-w-sm text-center text-sm text-zinc-600">{tr.qrHint}</p>
+                </div>
+              )}
+              <div className="space-y-2">
+                <span className="text-xs font-medium tracking-wide text-zinc-500 uppercase">{tr.wallet}</span>
+                <p className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-3 text-center font-mono text-sm break-all text-zinc-700 select-all">{t.toAddress}</p>
+                <PixCopyButton value={t.toAddress ?? ''} label={d.pay.usdtCopyAddress} copiedLabel={d.common.copied} colors="bg-[#26A17B] hover:bg-[#1f8a69]" />
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
+                <div>
+                  <p className="text-xs text-emerald-700">{tr.exactAmount}</p>
+                  <p className="font-mono text-lg font-bold text-emerald-800 tabular-nums">{exactUsdt} USDT</p>
+                </div>
+                <CopyButton value={exactUsdt} />
+              </div>
             </div>
+
+            {/* 3 bước */}
+            <ol className="grid grid-cols-3 gap-2 border-t border-zinc-100 bg-zinc-50/60 px-4 py-4 text-center text-xs text-zinc-600">
+              {[
+                { t: d.pay.usdtHow1, i: <><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M16 12.5h2M3 10h18" strokeLinecap="round" /></> },
+                { t: d.pay.usdtHow2, i: <><path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" /></> },
+                { t: d.pay.usdtHow3, i: <><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" strokeLinecap="round" strokeLinejoin="round" /></> },
+              ].map((s, k) => (
+                <li key={k} className="flex flex-col items-center gap-1.5">
+                  <span className="relative grid size-9 place-items-center rounded-full bg-white text-[#1a7a5c] shadow-sm ring-1 ring-[#26A17B]/30">
+                    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{s.i}</svg>
+                    <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[#26A17B] text-[10px] font-bold text-white">{k + 1}</span>
+                  </span>
+                  <span className="leading-snug">{s.t}</span>
+                </li>
+              ))}
+            </ol>
+
+            {t.status === 'PENDING' && !t.txHash && !t.claimedAt && (
+              <div className="flex items-center gap-2.5 border-t border-zinc-100 px-5 py-3 text-sm text-zinc-700">
+                <AutoRefresh everyMs={15_000} />
+                <span className="relative flex size-2.5 shrink-0">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#26A17B] opacity-75" />
+                  <span className="relative inline-flex size-2.5 rounded-full bg-[#26A17B]" />
+                </span>
+                <p>{d.pay.usdtWaiting}</p>
+              </div>
+            )}
           </section>
-          <div className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
-            <ul className="list-disc space-y-1 pl-5">
+          <div className="flex gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+            <svg viewBox="0 0 24 24" className="mt-0.5 size-5 shrink-0 text-amber-500" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z" strokeLinejoin="round" /><path d="M12 10v4M12 17h.01" strokeLinecap="round" /></svg>
+            <ul className="list-disc space-y-1 pl-4">
               <li>{rich(tr.usdtNote1, { only: <b>{tr.onlyUsdt}</b>, network: <b>{t.network}</b> })}</li>
               <li>{rich(tr.usdtNote2, { amount: <b>{fmt(tr.exactlyUsdt, { amount: exactUsdt })}</b> })}</li>
               <li>{fmt(tr.usdtNote3, { n: required })}</li>
@@ -307,9 +370,15 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
           </section>
           {/* Không tự xác minh được (chuyển lệch số tiền, sàn không cho xem TxID…): gửi biên lai để admin duyệt tay */}
           {!t.txHash && (
-            <section className="card">
-              <DepositClaim kind="usdt" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
-            </section>
+            <details className="card group" open={!!t.claimedAt}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm text-zinc-600">
+                <span>{d.pay.usdtClaimSummary}</span>
+                <svg viewBox="0 0 24 24" className="size-4 shrink-0 transition group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" strokeLinecap="round" /></svg>
+              </summary>
+              <div className="mt-3">
+                <DepositClaim kind="usdt" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} />
+              </div>
+            </details>
           )}
         </>
       )}
