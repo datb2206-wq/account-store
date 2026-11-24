@@ -238,16 +238,16 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
             </p>
           </section>
 
-          {/* Gửi biên lai: thu gọn, chỉ cần khi trả rồi mà chưa được cộng */}
-          <details className="card group" open={!!t.claimedAt || !pixAuto}>
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm text-zinc-600">
-              <span>{d.pay.pixAfterPay}</span>
-              <svg viewBox="0 0 24 24" className="size-4 shrink-0 transition group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" strokeLinecap="round" /></svg>
-            </summary>
-            <div className="mt-3">
-              <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} proofOnly />
+          {/* Gửi biên lai chuyển khoản: luôn hiện, phòng khi đã trả mà chưa được cộng */}
+          <section className="card space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#32BCAD]/10 text-[#1f8f84]">
+                <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 3h7l5 5v13H7z" strokeLinejoin="round" /><path d="M14 3v5h5M10 13h6M10 17h6" strokeLinecap="round" /></svg>
+              </span>
+              <p className="text-sm text-zinc-600">{d.pay.pixAfterPay}</p>
             </div>
-          </details>
+            <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} proofOnly />
+          </section>
         </>
       )}
 
