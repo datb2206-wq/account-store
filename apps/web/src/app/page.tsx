@@ -11,6 +11,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { StatCard } from '@/components/stat-card';
 import { TelegramBanner } from '@/components/telegram-promo';
+import { TrustNotice } from '@/components/shop/trust-notice';
 import { formatFx, plural, fmt } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { getI18n } from '@/i18n/server';
@@ -153,6 +154,8 @@ export default async function ShopPage({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={assets.banner} alt={t.title} fetchPriority="high" className="block max-h-[400px] w-full rounded-xl object-cover" />
         )}
+        {/* Khung thông báo nổi bật của shop: chỉ ở trang tổng */}
+        {!q && !selected && <TrustNotice locale={locale} />}
         {/* ---------- TIÊU ĐỀ + THỐNG KÊ ---------- */}
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 sm:text-[26px]">{selected ? localized(selected.name, locale) : t.title}</h1>
