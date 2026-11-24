@@ -6,7 +6,7 @@ import { getSiteConfig } from '@/lib/site';
 import { ContactLink } from './contact-link';
 import { CurrencySwitcher } from './i18n/currency-switcher';
 import { LanguageSwitcher } from './i18n/language-switcher';
-import { BriefcaseIcon, ChatIcon, MegaphoneIcon, ShieldIcon, StoreIcon } from './icons';
+import { BookIcon, BriefcaseIcon, ChatIcon, MegaphoneIcon, ShieldIcon, StoreIcon } from './icons';
 
 // Thanh đen trên cùng: liên hệ (trái) + chọn tiền tệ & ngôn ngữ (phải).
 // Liên hệ lấy từ Admin > Cấu hình > site.general; mục chưa cấu hình sẽ mở widget hỗ trợ.
@@ -37,6 +37,12 @@ export async function AnnouncementBar() {
             <Link href="/pages/guia" className="inline-flex items-center gap-1.5 font-medium text-sky-300 transition-colors hover:text-sky-200">
               <ShieldIcon size={14} />
               {t.guide}
+            </Link>
+          </li>
+          <li className="px-3">
+            <Link href="/blog" className="inline-flex items-center gap-1.5 font-medium text-white transition-colors hover:text-amber-300">
+              <BookIcon size={14} />
+              {d.blog.title}
             </Link>
           </li>
         </ul>

@@ -166,7 +166,7 @@ export const pt: Dictionary = {
     faq2q: 'E se uma conta não funcionar?',
     faq2a: 'Fale conosco com o código do pedido. Substituímos contas com defeito do estoque ou reembolsamos no seu saldo.',
     faq3q: 'Quais formas de pagamento são aceitas?',
-    faq3a: 'Recarregue seu saldo com USDT (TRC20 / BEP20) ou transferência bancária e compre na hora com o saldo.',
+    faq3a: 'Recarregue seu saldo via PIX (24/7, crédito automático) ou USDT (TRC20 / BEP20) e compre na hora com o saldo.',
     viewOrders: 'Ver meus pedidos →',
     bubble: 'Precisa de ajuda? Estamos online',
     moreContacts: 'Mais contatos',
