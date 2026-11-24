@@ -8,6 +8,8 @@ import { Badge } from '@/components/badge';
 import { BlogContent } from '@/components/blog-content';
 import { CopyButton } from '@/components/copy-button';
 import { DepositClaim } from '@/components/deposit/deposit-claim';
+import { PixLogo } from '@/components/deposit/pay-logos';
+import { PixCopyButton, PixCountdown } from '@/components/deposit/pix-countdown';
 import { UsdtVerify } from '@/components/deposit/usdt-verify';
 import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
@@ -68,7 +70,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
   // QR chỉ chứa địa chỉ ví (chuẩn chung mọi ví đọc được). Số tiền khách tự nhập theo số lẻ hiển thị bên cạnh.
   // Địa chỉ ví đã được kiểm tra định dạng ở cấu hình, SVG do thư viện sinh ra.
   const pix = (t.metadata as { pix?: { code: string } } | null)?.pix;
-  const pixQr = open && t.method === 'PIX' && pix?.code ? await QRCode.toString(pix.code, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) : null;
+  const pixQr = open && t.method === 'PIX' && pix?.code ? await QRCode.toString(pix.code, { type: 'svg', margin: 1, errorCorrectionLevel: 'H' }) : null; // H: chịu được logo ở giữa
   const qrSvg = open && isUsdt && t.toAddress ? await QRCode.toString(t.toAddress, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }) : null;
 
   return (
@@ -157,33 +159,94 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
       {open && t.method === 'PIX' && pix && (
         <>
           <section className="card overflow-hidden p-0">
-            {pixQr && (
-              <div className="flex flex-col items-center gap-4 border-b border-zinc-100 p-5 sm:flex-row">
-                <div role="img" aria-label={d.pay.pixQrAlt} className="size-48 shrink-0 rounded-xl border border-zinc-200 bg-white p-2 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: pixQr }} />
-                <p className="text-center text-sm text-zinc-600 sm:text-left">{d.pay.pixScan}</p>
+            {/* Đầu thẻ: logo PIX + số tiền */}
+            <div className="flex items-center justify-between gap-3 bg-gradient-to-r from-[#32BCAD] to-[#1f8f84] px-5 py-4 text-white">
+              <div className="flex items-center gap-3">
+                <span className="grid size-11 place-items-center rounded-full bg-white shadow-sm"><PixLogo size={28} /></span>
+                <div>
+                  <p className="leading-tight font-semibold">{d.pay.pixPayTitle}</p>
+                  <p className="text-xs text-white/80">QR Code · Copia e Cola</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-white/80">{tr.amount}</p>
+                <p className="text-2xl leading-tight font-bold tabular-nums">{formatOriginal(t.originalAmount, t.originalCurrency)}</p>
+              </div>
+            </div>
+
+            {t.status === 'PENDING' && !t.claimedAt && (
+              <div className="border-b border-zinc-100">
+                <PixCountdown
+                  startAt={t.createdAt.toISOString()}
+                  expiresAt={(t.expiresAt ?? new Date(t.createdAt.getTime() + 30 * 60_000)).toISOString()}
+                  label={d.pay.pixExpiresIn}
+                  expiredLabel={d.pay.pixExpiredNow}
+                />
               </div>
             )}
-            <div className="divide-y divide-zinc-100">
-              <Row label={tr.amount} value={formatOriginal(t.originalAmount, t.originalCurrency)} highlight />
-              <div className="space-y-2 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-zinc-500">{d.pay.pixCode}</span>
-                  <CopyButton value={pix.code} />
+
+            <div className="space-y-4 p-5">
+              {pixQr && (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative rounded-2xl border-2 border-[#32BCAD]/30 bg-white p-3 shadow-sm">
+                    <div role="img" aria-label={d.pay.pixQrAlt} className="size-56 [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: pixQr }} />
+                    <span className="pointer-events-none absolute top-1/2 left-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg bg-white shadow ring-2 ring-white">
+                      <PixLogo size={28} />
+                    </span>
+                  </div>
+                  <p className="max-w-sm text-center text-sm text-zinc-600">{d.pay.pixScan}</p>
                 </div>
-                <p className="rounded-lg bg-zinc-50 p-2 font-mono text-xs break-all text-zinc-700">{pix.code}</p>
+              )}
+              <div className="space-y-2">
+                <span className="text-xs font-medium tracking-wide text-zinc-500 uppercase">{d.pay.pixCode}</span>
+                <p className="line-clamp-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-3 font-mono text-xs break-all text-zinc-600 select-all">{pix.code}</p>
+                <PixCopyButton value={pix.code} label={d.pay.pixCopyCode} copiedLabel={d.common.copied} />
               </div>
             </div>
+
+            {/* 3 bước */}
+            <ol className="grid grid-cols-3 gap-2 border-t border-zinc-100 bg-zinc-50/60 px-4 py-4 text-center text-xs text-zinc-600">
+              {[
+                { t: d.pay.pixHow1, i: <><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" strokeLinecap="round" /></> },
+                { t: d.pay.pixHow2, i: <><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" strokeLinecap="round" /><path d="M8 12h8" strokeLinecap="round" /></> },
+                { t: pixAuto ? d.pay.pixHow3 : d.pay.pixHow3Manual, i: <><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" strokeLinecap="round" strokeLinejoin="round" /></> },
+              ].map((s, k) => (
+                <li key={k} className="flex flex-col items-center gap-1.5">
+                  <span className="relative grid size-9 place-items-center rounded-full bg-white text-[#1f8f84] shadow-sm ring-1 ring-[#32BCAD]/30">
+                    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{s.i}</svg>
+                    <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[#32BCAD] text-[10px] font-bold text-white">{k + 1}</span>
+                  </span>
+                  <span className="leading-snug">{s.t}</span>
+                </li>
+              ))}
+            </ol>
+
+            {t.status === 'PENDING' && !t.claimedAt && (
+              <div className="flex items-center gap-2.5 border-t border-zinc-100 px-5 py-3 text-sm text-zinc-700">
+                {pixAuto && <AutoRefresh everyMs={8_000} />}
+                <span className="relative flex size-2.5 shrink-0">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#32BCAD] opacity-75" />
+                  <span className="relative inline-flex size-2.5 rounded-full bg-[#32BCAD]" />
+                </span>
+                <p>{pixAuto ? d.pay.pixWaiting : d.pay.pixManualWait}</p>
+              </div>
+            )}
+            <p className="flex items-center justify-center gap-1.5 border-t border-zinc-100 py-2.5 text-xs text-zinc-400">
+              <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+              {d.pay.pixSecure}
+            </p>
           </section>
-          {t.status === 'PENDING' && !t.claimedAt && (
-            <div className="card border-blue-200 bg-blue-50 text-sm text-blue-900">
-              {pixAuto && <AutoRefresh everyMs={8_000} />}
-              <p>{pixAuto ? d.pay.pixWaiting : d.pay.pixManualWait}</p>
+
+          {/* Gửi biên lai: thu gọn, chỉ cần khi trả rồi mà chưa được cộng */}
+          <details className="card group" open={!!t.claimedAt || !pixAuto}>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm text-zinc-600">
+              <span>{d.pay.pixAfterPay}</span>
+              <svg viewBox="0 0 24 24" className="size-4 shrink-0 transition group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" strokeLinecap="round" /></svg>
+            </summary>
+            <div className="mt-3">
+              <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} proofOnly />
             </div>
-          )}
-          <section className="card space-y-2">
-            <p className="text-sm text-zinc-500">{d.pay.pixAfterPay}</p>
-            <DepositClaim kind="bank" id={t.id} claimedAt={t.claimedAt ? formatDate(t.claimedAt) : null} hasProof={!!t.proofImageUrl} customerRef={t.customerRef} proofOnly />
-          </section>
+          </details>
         </>
       )}
 
