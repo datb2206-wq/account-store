@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { formatFx } from '@/i18n/config';
+import { PixLogo } from './deposit/pay-logos';
 import { getI18n } from '@/i18n/server';
 import { STAFF_ROLES, type CurrentUser } from '@/lib/auth';
 import { contactHref } from '@/lib/contact';
@@ -71,7 +72,7 @@ export async function SiteHeader({ user, q = '', category }: { user: CurrentUser
                   className="flex h-11 items-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 tabular-nums ring-1 ring-emerald-600/15 hover:bg-emerald-100"
                   title={h.balanceHint}
                 >
-                  <WalletIcon size={15} />
+                  {fx?.currency === 'BRL' ? <PixLogo size={16} /> : <WalletIcon size={15} />}
                   {/* Số dư lưu bằng USD, hiện theo tiền khách chọn (VD R$) */}
                   <span translate="no">{formatFx(user.balance.toString(), fx, locale, false) ?? formatUsd(user.balance)}</span>
                   <span className="ml-0.5 text-emerald-500">+</span>

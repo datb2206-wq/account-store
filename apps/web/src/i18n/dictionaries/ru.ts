@@ -36,6 +36,7 @@ export const ru: Dictionary = {
     search: 'Найти',
   },
   announce: {
+    support: 'Поддержка клиентов',
     label: 'Объявления',
     business: 'Деловые предложения',
     supplier: 'Поддержка поставщиков',
@@ -120,6 +121,7 @@ export const ru: Dictionary = {
     quantity: 'Количество',
     total: 'Итого',
     yourBalance: 'Ваш баланс',
+    zeroResale: 'Без перепродажи: аккаунт удаляется из системы сразу после покупки.',
     insufficient: 'Недостаточно средств.',
     topUpNow: 'Пополнить →',
     processing: 'Обработка…',

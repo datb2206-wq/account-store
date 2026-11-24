@@ -12,7 +12,7 @@ import { SiteHeader } from '@/components/site-header';
 import { StatCard } from '@/components/stat-card';
 import { TelegramBanner } from '@/components/telegram-promo';
 import { TrustNotice } from '@/components/shop/trust-notice';
-import { formatFx, plural, fmt } from '@/i18n/config';
+import { formatFx, formatNum, plural, fmt, type Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { getI18n } from '@/i18n/server';
 import { getCurrentUser } from '@/lib/auth';
@@ -164,10 +164,10 @@ export default async function ShopPage({
         </div>
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard label={t.statProducts} value={products.length.toLocaleString('en-US')} />
-          <StatCard label={t.statInStock} value={inStockTotal.toLocaleString('en-US')} />
-          <StatCard label={t.statSold} value={soldTotal.toLocaleString('en-US')} />
-          <StatCard label={t.categories} value={sections.length.toLocaleString('en-US')} />
+          <StatCard label={t.statProducts} value={formatNum(products.length, locale)} />
+          <StatCard label={t.statInStock} value={formatNum(inStockTotal, locale)} />
+          <StatCard label={t.statSold} value={formatNum(soldTotal, locale)} />
+          <StatCard label={t.categories} value={formatNum(sections.length, locale)} />
         </div>
 
         {/* Bot Telegram bán hàng: chỉ ở trang tổng */}
@@ -249,7 +249,7 @@ export default async function ShopPage({
                   const stock = stockOf(p);
                   const name = localized(p.name, locale);
                   const description = localized(p.description, locale);
-                  const soldN = (sold.get(p.id) ?? 0).toLocaleString('en-US');
+                  const soldN = formatNum((sold.get(p.id) ?? 0), locale);
                   const local = formatFx(p.price.toString(), fx, locale, false);
                   const minNote = p.minQty > 1 ? fmt(t.minQty, { n: p.minQty }) : null;
                   const category = catById.get(p.categoryId)!;
@@ -273,13 +273,13 @@ export default async function ShopPage({
                           {description && <p className="mt-0.5 line-clamp-2 text-[13px] leading-5 text-zinc-500">{description.split('\n')[0]}</p>}
                           {/* Mobile: tồn kho + đã bán dưới tên */}
                           <p className="mt-1.5 flex items-center gap-2 text-sm md:hidden">
-                            <StockCount stock={stock} t={t} />
+                            <StockCount stock={stock} t={t} locale={locale} />
                             <span className="text-xs text-zinc-500">{fmt(t.soldCount, { n: soldN })}</span>
                           </p>
                         </div>
                       </div>
                       <div className="hidden md:block">
-                        <p className="text-sm"><StockCount stock={stock} t={t} /></p>
+                        <p className="text-sm"><StockCount stock={stock} t={t} locale={locale} /></p>
                         <p className="mt-0.5 text-[13px] text-zinc-500 tabular-nums">{fmt(t.soldCount, { n: soldN })}</p>
                       </div>
                       <p className="hidden text-sm text-zinc-500 lg:block">{t.pricePerPc}</p>
@@ -335,7 +335,7 @@ export default async function ShopPage({
   );
 }
 
-function StockCount({ stock, t }: { stock: number; t: Dictionary['shop'] }) {
+function StockCount({ stock, t, locale }: { stock: number; t: Dictionary['shop']; locale: Locale }) {
   if (stock <= 0) return <span className="font-medium text-red-600">{t.outOfStock}</span>;
-  return <span className={`tabular-nums ${stock < LOW_STOCK ? 'font-medium text-amber-700' : 'text-zinc-900'}`}>{fmt(t.pcs, { n: stock.toLocaleString('en-US') })}</span>;
+  return <span className={`tabular-nums ${stock < LOW_STOCK ? 'font-medium text-amber-700' : 'text-zinc-900'}`}>{fmt(t.pcs, { n: formatNum(stock, locale) })}</span>;
 }

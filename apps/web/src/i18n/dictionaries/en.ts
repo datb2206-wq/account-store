@@ -40,6 +40,7 @@ export const en = {
     search: 'Search',
   },
   announce: {
+    support: 'Customer support',
     label: 'Announcements',
     business: 'Business Inquiries',
     supplier: 'Supplier Support',
@@ -124,6 +125,7 @@ export const en = {
     quantity: 'Quantity',
     total: 'Total',
     yourBalance: 'Your balance',
+    zeroResale: 'Zero resale: the account is removed from the system right after your purchase.',
     insufficient: 'Insufficient balance.',
     topUpNow: 'Top up now →',
     processing: 'Processing…',

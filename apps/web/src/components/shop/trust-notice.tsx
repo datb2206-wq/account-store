@@ -12,6 +12,7 @@ const CONTENT = {
       ['Recarga Instantânea', 'Saldo liberado na hora via PIX (24/7) e USDT/Crypto.'],
       ['Garantia Real & Suporte Rápido', 'Reposição garantida em caso de erro no 1º login, com atendimento direto no Telegram.'],
     ],
+    support: 'Tempo médio de suporte: < 15 min',
     tipLabel: 'Dica profissional',
     tip: 'Recomendamos testar de 1 a 3 unidades com proxy e antidetect limpos antes de comprar em grande volume.',
   },
@@ -25,6 +26,7 @@ const CONTENT = {
       ['Instant top-up', 'Balance credited instantly via PIX (24/7) and USDT/Crypto.'],
       ['Real warranty & fast support', 'Guaranteed replacement if the 1st login fails, with direct support on Telegram.'],
     ],
+    support: 'Average support time: < 15 min',
     tipLabel: 'Pro tip',
     tip: 'We recommend testing 1 to 3 units with a clean proxy and antidetect browser before buying in bulk.',
   },
@@ -42,6 +44,10 @@ export function TrustNotice({ locale }: { locale: Locale }) {
         <div>
           <h2 className="text-base leading-snug font-extrabold tracking-wide sm:text-lg">{c.title}</h2>
           <p className="mt-1 text-sm text-white/90">{c.intro}</p>
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold">
+            <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" strokeLinecap="round" /></svg>
+            {c.support}
+          </p>
         </div>
       </div>
       <ul className="grid gap-x-6 gap-y-3 px-5 py-4 sm:grid-cols-2">

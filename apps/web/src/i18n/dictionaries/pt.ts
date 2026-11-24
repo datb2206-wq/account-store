@@ -40,6 +40,7 @@ export const pt: Dictionary = {
     search: 'Buscar',
   },
   announce: {
+    support: 'Suporte ao Cliente',
     label: 'Avisos',
     business: 'Contato comercial',
     supplier: 'Suporte a fornecedores',
@@ -124,6 +125,7 @@ export const pt: Dictionary = {
     quantity: 'Quantidade',
     total: 'Total',
     yourBalance: 'Seu saldo',
+    zeroResale: 'Zero Revenda: a conta é removida do sistema logo após a sua compra.',
     insufficient: 'Saldo insuficiente.',
     topUpNow: 'Recarregar agora →',
     processing: 'Processando…',

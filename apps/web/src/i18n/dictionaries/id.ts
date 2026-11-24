@@ -36,6 +36,7 @@ export const id: Dictionary = {
     search: 'Cari',
   },
   announce: {
+    support: 'Dukungan pelanggan',
     label: 'Pengumuman',
     business: 'Kerja Sama Bisnis',
     supplier: 'Dukungan Supplier',
@@ -120,6 +121,7 @@ export const id: Dictionary = {
     quantity: 'Jumlah',
     total: 'Total',
     yourBalance: 'Saldo Anda',
+    zeroResale: 'Tanpa jual ulang: akun dihapus dari sistem segera setelah Anda membeli.',
     insufficient: 'Saldo tidak cukup.',
     topUpNow: 'Isi saldo sekarang →',
     processing: 'Memproses…',

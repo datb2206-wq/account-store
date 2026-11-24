@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiRequest, newIdempotencyKey } from '@/lib/client-api';
 import { CartIcon } from '@/components/icons';
 import { useI18n } from '@/i18n/client';
-import { fmt, formatFx } from '@/i18n/config';
+import { fmt, formatFx, formatNum } from '@/i18n/config';
 import { Money } from '@/components/money';
 import { translateError } from '@/i18n/errors';
 import { rich } from '@/i18n/rich';
@@ -216,7 +216,7 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
                 </div>
                 <div className="rounded-lg bg-zinc-50 p-3">
                   <p className="text-zinc-500">{t.inStock}</p>
-                  <p className="font-semibold">{product.stock.toLocaleString('en-US')}</p>
+                  <p className="font-semibold">{formatNum(product.stock, locale)}</p>
                 </div>
               </div>
 
@@ -283,6 +283,11 @@ export function BuyButton({ product, balance }: { product: ShopProduct; balance:
               {notEnough && validQty && (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{t.insufficient} <Link href="/dashboard/deposit" className="font-medium underline">{t.topUpNow}</Link></p>
               )}
+
+              <p className="flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800 ring-1 ring-emerald-200">
+                <svg viewBox="0 0 24 24" className="mt-px size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                <span>{t.zeroResale}</span>
+              </p>
 
               <button type="button" onClick={pay} disabled={pending || !validQty || notEnough} className="btn-primary w-full">
                 {/* Mỗi trạng thái 1 <span> riêng: đổi chữ = thay cả thẻ, an toàn khi trang đang bị Google Dịch */}

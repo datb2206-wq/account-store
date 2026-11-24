@@ -36,6 +36,7 @@ export const zh: Dictionary = {
     search: '搜索',
   },
   announce: {
+    support: '客户支持',
     label: '公告',
     business: '商务合作',
     supplier: '供应商支持',
@@ -120,6 +121,7 @@ export const zh: Dictionary = {
     quantity: '数量',
     total: '合计',
     yourBalance: '您的余额',
+    zeroResale: '零转售：购买后账号立即从系统中移除。',
     insufficient: '余额不足。',
     topUpNow: '立即充值 →',
     processing: '处理中…',

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronIcon, CloseIcon, GridIcon, SearchIcon } from '@/components/icons';
 import { useI18n } from '@/i18n/client';
-import { fmt, plural } from '@/i18n/config';
+import { fmt, formatNum, plural } from '@/i18n/config';
 import type { MenuColumn, MenuItem } from '@/lib/category-menu';
 import { buildHref } from '@/lib/url';
 import { CategoryIcon } from './category-icon';
@@ -112,7 +112,7 @@ export function CategoryMenu({ total, columns }: { total: number; columns: MenuC
                 className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-blue-700 ring-1 ring-blue-200 transition hover:bg-blue-50"
               >
                 <GridIcon size={15} /> {t.allProducts}
-                <span className="rounded-md bg-blue-100 px-1.5 text-[11px] tabular-nums">{total.toLocaleString('en-US')}</span>
+                <span className="rounded-md bg-blue-100 px-1.5 text-[11px] tabular-nums">{formatNum(total, locale)}</span>
               </Link>
               <button type="button" onClick={() => close(true)} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 md:hidden" aria-label={d.common.close}>
                 <CloseIcon size={18} />

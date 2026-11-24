@@ -5,7 +5,7 @@ import { getSiteConfig } from '@/lib/site';
 import { ContactLink } from './contact-link';
 import { CurrencySwitcher } from './i18n/currency-switcher';
 import { LanguageSwitcher } from './i18n/language-switcher';
-import { BriefcaseIcon, MegaphoneIcon, StoreIcon } from './icons';
+import { BriefcaseIcon, ChatIcon, MegaphoneIcon, StoreIcon } from './icons';
 
 // Thanh đen trên cùng: liên hệ (trái) + chọn tiền tệ & ngôn ngữ (phải).
 // Liên hệ lấy từ Admin > Cấu hình > site.general; mục chưa cấu hình sẽ mở widget hỗ trợ.
@@ -13,6 +13,8 @@ export async function AnnouncementBar() {
   const [site, { d }, currencies] = await Promise.all([getSiteConfig(), getI18n(), getCurrencyOptions()]);
   const t = d.announce;
   const items = [
+    // Hỗ trợ khách mua hàng (bảo hành, lỗi tài khoản): Telegram hỗ trợ, chưa cấu hình thì mở widget hỗ trợ
+    { key: 'support', icon: <ChatIcon size={14} />, label: t.support, href: contactHref(site.supportTelegram), tone: 'font-semibold text-emerald-400 hover:text-emerald-300' },
     { key: 'business', icon: <BriefcaseIcon size={14} />, label: t.business, href: contactHref(site.businessContact) ?? contactHref(site.supportTelegram), tone: 'text-white hover:text-amber-300' },
     { key: 'supplier', icon: <StoreIcon size={14} />, label: t.supplier, href: contactHref(site.supplierContact) ?? contactHref(site.supportTelegram), tone: 'text-white hover:text-amber-300' },
     { key: 'channel', icon: <MegaphoneIcon size={14} />, label: t.channel, href: contactHref(site.channelUrl), tone: 'text-amber-400 hover:text-amber-300' },

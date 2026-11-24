@@ -54,9 +54,12 @@ export interface Plural {
   other: string;
 }
 
+// Số nguyên theo kiểu của ngôn ngữ: pt-BR 493.856, en 493,856
+export const formatNum = (n: number, locale: Locale) => n.toLocaleString(LOCALE_META[locale].htmlLang);
+
 export function plural(locale: Locale, n: number, forms: Plural) {
   const category = new Intl.PluralRules(LOCALE_META[locale].htmlLang).select(n) as keyof Plural;
-  return fmt(forms[category] ?? forms.other, { n: n.toLocaleString('en-US') });
+  return fmt(forms[category] ?? forms.other, { n: formatNum(n, locale) });
 }
 
 // Tiền tệ hiển thị tham khảo mặc định theo ngôn ngữ (khi khách chưa chọn và admin để "Tự động").
