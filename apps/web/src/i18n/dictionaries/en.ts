@@ -40,6 +40,7 @@ export const en = {
     search: 'Search',
   },
   announce: {
+    guide: 'Tutorial / Warranty',
     support: 'Customer support',
     label: 'Announcements',
     business: 'Business Inquiries',

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getI18n } from '@/i18n/server';
 import { contactHref } from '@/lib/contact';
 import { getCurrencyOptions } from '@/lib/fx';
@@ -5,7 +6,7 @@ import { getSiteConfig } from '@/lib/site';
 import { ContactLink } from './contact-link';
 import { CurrencySwitcher } from './i18n/currency-switcher';
 import { LanguageSwitcher } from './i18n/language-switcher';
-import { BriefcaseIcon, ChatIcon, MegaphoneIcon, StoreIcon } from './icons';
+import { BriefcaseIcon, ChatIcon, MegaphoneIcon, ShieldIcon, StoreIcon } from './icons';
 
 // Thanh đen trên cùng: liên hệ (trái) + chọn tiền tệ & ngôn ngữ (phải).
 // Liên hệ lấy từ Admin > Cấu hình > site.general; mục chưa cấu hình sẽ mở widget hỗ trợ.
@@ -32,6 +33,12 @@ export async function AnnouncementBar() {
               </ContactLink>
             </li>
           ))}
+          <li className="px-3">
+            <Link href="/pages/guia" className="inline-flex items-center gap-1.5 font-medium text-sky-300 transition-colors hover:text-sky-200">
+              <ShieldIcon size={14} />
+              {t.guide}
+            </Link>
+          </li>
         </ul>
         <div className="flex shrink-0 items-center gap-1">
           <CurrencySwitcher options={currencies} dark />

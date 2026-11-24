@@ -36,6 +36,7 @@ export const id: Dictionary = {
     search: 'Cari',
   },
   announce: {
+    guide: 'Tutorial / Garansi',
     support: 'Dukungan pelanggan',
     label: 'Pengumuman',
     business: 'Kerja Sama Bisnis',

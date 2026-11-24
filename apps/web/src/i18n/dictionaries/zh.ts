@@ -36,6 +36,7 @@ export const zh: Dictionary = {
     search: '搜索',
   },
   announce: {
+    guide: '教程 / 保修',
     support: '客户支持',
     label: '公告',
     business: '商务合作',

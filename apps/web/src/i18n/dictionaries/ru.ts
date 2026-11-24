@@ -36,6 +36,7 @@ export const ru: Dictionary = {
     search: 'Найти',
   },
   announce: {
+    guide: 'Инструкция / Гарантия',
     support: 'Поддержка клиентов',
     label: 'Объявления',
     business: 'Деловые предложения',

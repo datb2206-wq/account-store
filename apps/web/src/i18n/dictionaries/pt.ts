@@ -40,6 +40,7 @@ export const pt: Dictionary = {
     search: 'Buscar',
   },
   announce: {
+    guide: 'Tutorial / Garantia',
     support: 'Suporte ao Cliente',
     label: 'Avisos',
     business: 'Contato comercial',
