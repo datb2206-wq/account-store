@@ -24,6 +24,7 @@ export const TRANSLATE_DEFAULTS: TranslateSettings = {
   targets: ['id'],
   description: false,
   autoNew: false,
+  glossary: {},
 };
 
 // Đã có key cho nhà cung cấp đang chọn chưa
@@ -197,10 +198,22 @@ const parseJson = (t: string): unknown => {
   }
 };
 
+// Yêu cầu gửi AI: ngôn ngữ đích + bảng thuật ngữ admin đặt cho ngôn ngữ đó (nếu có) + danh sách cần dịch
+function userPrompt(s: TranslateSettings, items: Item[], locale: TranslateLocale) {
+  const terms = (s.glossary?.[locale] ?? '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'));
+  const glossary = terms.length
+    ? `\n\nGlossary for this market (source term = term buyers here use). Always use these exact target terms, matching the source term case-insensitively, and keep the rest of the rules:\n${terms.join('\n')}`
+    : '';
+  return `Target language: ${TRANSLATE_LANG[locale]}${glossary}\n\nItems (JSON):\n${JSON.stringify(items)}`;
+}
+
 async function translateBatchGemini(s: TranslateSettings, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: SYSTEM }] },
-    contents: [{ role: 'user', parts: [{ text: `Target language: ${TRANSLATE_LANG[locale]}\n\nItems (JSON):\n${JSON.stringify(items)}` }] }],
+    contents: [{ role: 'user', parts: [{ text: userPrompt(s, items, locale) }] }],
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: {
@@ -244,17 +257,17 @@ async function translateBatchGemini(s: TranslateSettings, items: Item[], locale:
   }
 }
 
-async function translateBatch(client: Anthropic, model: string, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
+async function translateBatch(client: Anthropic, s: TranslateSettings, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
   const response = await client.beta.messages.parse({
-    model,
+    model: s.model,
     max_tokens: 16000,
     system: SYSTEM,
     output_config: { effort: 'low', format: betaZodOutputFormat(ResultSchema) },
-    ...(FALLBACK_MODELS.test(model) && { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }),
+    ...(FALLBACK_MODELS.test(s.model) && { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }),
     messages: [
       {
         role: 'user',
-        content: `Target language: ${TRANSLATE_LANG[locale]}\n\nItems (JSON):\n${JSON.stringify(items)}`,
+        content: userPrompt(s, items, locale),
       },
     ],
   });
@@ -287,7 +300,7 @@ export function withTranslation(v: unknown, locale: TranslateLocale, text: strin
 // Dịch 1 nhóm (sản phẩm hoặc chuyên mục) sang 1 ngôn ngữ, trả về bản dịch theo id
 function translateItems(client: Anthropic | null, s: TranslateSettings, items: Item[], locale: TranslateLocale) {
   if (s.provider === 'gemini') return translateBatchGemini(s, items, locale);
-  return s.provider === 'azure' || !client ? translateBatchAzure(s, items, locale) : translateBatch(client, s.model, items, locale);
+  return s.provider === 'azure' || !client ? translateBatchAzure(s, items, locale) : translateBatch(client, s, items, locale);
 }
 
 // Dịch 1 nhóm sản phẩm sang 1 ngôn ngữ. Trả về số sản phẩm đã ghi.

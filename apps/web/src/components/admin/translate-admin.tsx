@@ -113,6 +113,29 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiK
           ))}
         </div>
       </div>
+      {f.targets.length > 0 && (
+        <div className="space-y-2 text-sm">
+          <span className="block font-medium text-zinc-700">Bảng thuật ngữ MMO theo thị trường</span>
+          <p className="text-xs text-zinc-500">
+            Mỗi dòng <code>từ gốc = từ dân MMO ở nước đó dùng</code>. AI luôn dịch đúng các từ này thay vì tự đoán. Dòng bắt đầu bằng # là ghi chú.
+            {f.provider === 'azure' && <b className="text-amber-700"> Azure dịch máy, không dùng được bảng thuật ngữ: chọn Gemini hoặc Claude.</b>}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {f.targets.map((l) => (
+              <label key={l} className="block">
+                <span className="mb-1 block text-xs font-medium text-zinc-600">{LOCALE_LABEL[l]}</span>
+                <textarea
+                  className="input min-h-32 font-mono text-xs"
+                  maxLength={4000}
+                  placeholder={l === 'pt' ? '# Mỗi dòng: từ gốc = từ dân MMO ở thị trường này dùng\nvia = perfil antigo\nclone = perfil novo\nTKQC = conta de anúncio\nngâm = aquecido' : 'via = ...'}
+                  value={f.glossary?.[l] ?? ''}
+                  onChange={(e) => setF((s) => ({ ...s, glossary: { ...s.glossary, [l]: e.target.value } }))}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.description} onChange={(e) => setF((s) => ({ ...s, description: e.target.checked }))} />Dịch cả mô tả (dài hơn tên khoảng 5–10 lần: tốn hạn mức / chi phí hơn)</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.autoNew} onChange={(e) => setF((s) => ({ ...s, autoNew: e.target.checked }))} />Tự dịch sản phẩm mới / chưa có bản dịch (worker kiểm tra mỗi phút)</label>
