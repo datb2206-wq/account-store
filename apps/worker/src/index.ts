@@ -1,6 +1,6 @@
 // Worker BullMQ: chạy song song với web (pnpm dev chạy cả 2).
 //   expire-deposits  mỗi 1 phút  -> đánh dấu yêu cầu nạp hết hạn
-//   scan-usdt        mỗi 1 phút  -> tự phát hiện / xác nhận giao dịch USDT
+//   scan-usdt        mỗi 30 giây  -> tự phát hiện / xác nhận giao dịch USDT
 //   sync-suppliers   mỗi N phút  -> tạo job sync-supplier cho từng nhà cung cấp đang bật
 //   sweep-reseller-orders mỗi 1 phút -> đơn RESELLER còn PENDING: kiểm tra lại web gốc / hoàn tiền sau 24h
 //   update-fx-rates  mỗi FX_UPDATE_HOURS giờ (chỉ khi đặt FX_RATES_URL) -> cập nhật tỷ giá currency.rates
@@ -179,7 +179,7 @@ async function main() {
   // upsertJobScheduler: idempotent, khởi động lại worker không tạo lịch trùng
   // Redis gói free (Upstash) tính theo số lệnh: job không gấp chạy thưa hơn để tiết kiệm hạn mức
   await queue.upsertJobScheduler(JOBS.expireDeposits, { every: 5 * 60_000 }, { name: JOBS.expireDeposits });
-  await queue.upsertJobScheduler(JOBS.scanUsdt, { every: 60_000 }, { name: JOBS.scanUsdt });
+  await queue.upsertJobScheduler(JOBS.scanUsdt, { every: 30_000 }, { name: JOBS.scanUsdt });
   await queue.upsertJobScheduler(JOBS.syncSuppliers, { every: SYNC_MINUTES * 60_000 }, { name: JOBS.syncSuppliers });
   await queue.upsertJobScheduler(JOBS.sweepOrders, { every: 2 * 60_000 }, { name: JOBS.sweepOrders });
   await queue.upsertJobScheduler(JOBS.emailCampaigns, { every: 2 * 60_000 }, { name: JOBS.emailCampaigns });

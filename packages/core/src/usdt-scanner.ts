@@ -51,7 +51,8 @@ async function tryVerify(id: string, txHash: string | undefined, result: ScanRes
 async function incomingTransfers(network: UsdtNetwork, wallet: string, contract: string, sinceMs: number, log: ScanLogger) {
   if (network === 'TRC20') return listIncomingTrc20(wallet, contract, sinceMs);
 
-  const head = await bscBlockNumber();
+  // Chừa 3 block: RPC công khai gồm nhiều node, node chậm hơn báo "block range extends beyond current head"
+  const head = (await bscBlockNumber()) - 3n;
   let from = bscCursor === null ? head - BSC_LOOKBACK : bscCursor + 1n;
   if (head - from > BSC_MAX_PER_RUN) from = head - BSC_MAX_PER_RUN;
   const out: IncomingTransfer[] = [];

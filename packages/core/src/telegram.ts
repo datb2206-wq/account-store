@@ -119,13 +119,21 @@ export async function notifyDeposit(transactionId: string) {
   const bonus = await prisma.transaction
     .findFirst({ where: { userId: t.userId, type: 'BONUS', note: { contains: transactionId } }, select: { amount: true, balanceAfter: true } })
     .catch(() => null);
+  // Shop bán cho Brazil: kèm số tiền quy ra R$ theo tỷ giá Admin > Tiền tệ (PIX thì lấy đúng số R$ khách trả)
+  const rate = await getConfig('currency.rates').then((r) => r.BRL).catch(() => undefined);
+  const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const withBrl = (v: { toString(): string } | null | undefined, exactBrl?: number) => {
+    if (exactBrl != null) return `${usd(v)} (${brl(exactBrl)})`;
+    return rate ? `${usd(v)} (≈ ${brl(Number(v?.toString() ?? 0) * rate)})` : usd(v);
+  };
+  const paidBrl = t.originalCurrency === 'BRL' && t.originalAmount ? Number(t.originalAmount.toString()) : undefined;
   await notify('deposit', {
     username: who(t.user),
     method: METHOD_LABEL[t.method] ?? t.method,
-    amount: usd(t.amount),
+    amount: withBrl(t.amount, paidBrl),
     received: t.originalAmount && t.originalCurrency ? `${Number(t.originalAmount.toString()).toLocaleString('en-US', { maximumFractionDigits: 6 })} ${t.originalCurrency}` : usd(t.amount),
-    bonus: usd(bonus?.amount),
-    balance: usd(bonus?.balanceAfter ?? t.balanceAfter),
+    bonus: withBrl(bonus?.amount),
+    balance: withBrl(bonus?.balanceAfter ?? t.balanceAfter),
   });
 }
 

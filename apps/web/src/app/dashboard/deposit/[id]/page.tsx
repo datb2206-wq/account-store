@@ -355,11 +355,16 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
               <li>{fmt(tr.usdtNote3, { n: required })}</li>
             </ul>
           </div>
-          <section className="card space-y-3">
-            <div>
-              <p className="font-semibold">{tr.verifyTitle}</p>
-              <p className="text-sm text-zinc-500">{tr.verifyHint}</p>
-            </div>
+          {/* TxID chỉ cần khi tự dò không ra (gửi lệch số tiền...): thu gọn, đã gắn TxID thì mở sẵn */}
+          <details className="card group space-y-3" open={!!t.txHash}>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+              <span>
+                <span className="block font-semibold">{tr.verifyTitle}</span>
+                <span className="block text-sm text-zinc-500">{tr.verifyHint}</span>
+              </span>
+              <svg viewBox="0 0 24 24" className="size-4 shrink-0 text-zinc-500 transition group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" strokeLinecap="round" /></svg>
+            </summary>
+            <div className="mt-3">
             <UsdtVerify
               endpoint={`/api/deposits/${t.id}/verify`}
               network={t.network ?? 'TRC20'}
@@ -367,7 +372,8 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
               confirmations={t.confirmations}
               required={required}
             />
-          </section>
+            </div>
+          </details>
           {/* Không tự xác minh được (chuyển lệch số tiền, sàn không cho xem TxID…): gửi biên lai để admin duyệt tay */}
           {!t.txHash && (
             <details className="card group" open={!!t.claimedAt}>
