@@ -16,12 +16,12 @@ const MODELS = [
   ['claude-haiku-5-5', 'Claude Haiku 5.5 (rẻ nhất, ~40 lần)'],
 ] as const;
 
-export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiKey, geminiKeyCount = 0 }: { initial: Omit<TranslateSettings, 'apiKey' | 'azureKey' | 'geminiKey'>; hasKey: boolean; hasAzureKey: boolean; hasGeminiKey: boolean; geminiKeyCount?: number }) {
+export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiKey, hasProxy = false, geminiKeyCount = 0 }: { initial: Omit<TranslateSettings, 'apiKey' | 'azureKey' | 'geminiKey' | 'proxy'>; hasKey: boolean; hasAzureKey: boolean; hasGeminiKey: boolean; hasProxy?: boolean; geminiKeyCount?: number }) {
   const router = useRouter();
   // Ngôn ngữ đã ẩn khỏi web thì không dịch nữa (lưu lại cấu hình sẽ bỏ chúng khỏi danh sách)
   const { locales } = useI18n();
   const isActiveLocale = (l: string) => (locales as readonly string[]).includes(l);
-  const [f, setF] = useState({ ...initial, targets: initial.targets.filter((l) => isActiveLocale(l)), apiKey: '', azureKey: '', geminiKey: '' });
+  const [f, setF] = useState({ ...initial, targets: initial.targets.filter((l) => isActiveLocale(l)), apiKey: '', azureKey: '', geminiKey: '', proxy: '', clearProxy: false });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiK
     setPending(false);
     if (!res.ok) return setError(res.data.error ?? 'Lưu thất bại');
     setSuccess('Đã lưu cấu hình dịch.');
-    setF((s) => ({ ...s, apiKey: '', azureKey: '', geminiKey: '' }));
+    setF((s) => ({ ...s, apiKey: '', azureKey: '', geminiKey: '', proxy: '', clearProxy: false }));
     router.refresh();
   }
 
@@ -92,6 +92,17 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiK
           </ol>
         </div>
       )}
+
+      <label className="block text-sm">
+        <span className="mb-1 block font-medium text-zinc-700">Proxy HTTP {hasProxy && !f.clearProxy && <span className="font-normal text-emerald-600">(đang dùng proxy)</span>}</span>
+        <input className="input font-mono" type="password" autoComplete="new-password" placeholder={hasProxy ? '•••••••• (để trống = giữ nguyên)' : 'ip:port:user:pass hoặc user:pass@ip:port'} value={f.proxy} disabled={f.clearProxy} onChange={(e) => setF((s) => ({ ...s, proxy: e.target.value.trim() }))} />
+        <span className="mt-1 block text-xs text-zinc-400">Máy chủ ở Hồng Kông bị Gemini / Claude chặn khu vực: dán proxy HTTP (IP Việt Nam, Mỹ, Singapore...) để gọi API dịch qua proxy. Không dùng Socks5. Proxy chỉ lưu trên server.</span>
+        {hasProxy && (
+          <span className="mt-1 flex items-center gap-2 text-xs text-zinc-600">
+            <input type="checkbox" checked={f.clearProxy} onChange={(e) => setF((s) => ({ ...s, clearProxy: e.target.checked, proxy: '' }))} /> Bỏ proxy (gọi thẳng)
+          </span>
+        )}
+      </label>
 
       <div className={`grid gap-4 sm:grid-cols-2 ${f.provider === 'claude' ? '' : 'hidden'}`}>
         <label className="block text-sm">

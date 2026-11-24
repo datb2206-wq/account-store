@@ -45,8 +45,12 @@ let undici: Promise<Undici> | null = null;
 const agents = new Map<string, InstanceType<Undici['ProxyAgent']>>();
 
 // fetch dùng trong adapter: có proxy -> đi qua proxy (undici), không có -> fetch thường
-export async function supplierFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const proxy = supplierRuntime()?.proxy;
+export function supplierFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  return proxyFetch(supplierRuntime()?.proxy ?? null, url, init);
+}
+
+// fetch qua 1 proxy HTTP cụ thể (proxy = URL đã qua parseProxy); null -> fetch thường
+export async function proxyFetch(proxy: string | null, url: string, init: RequestInit = {}): Promise<Response> {
   if (!proxy) return fetch(url, init);
   const u = await (undici ??= import('undici'));
   let agent = agents.get(proxy);

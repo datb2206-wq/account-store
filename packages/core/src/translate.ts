@@ -9,6 +9,7 @@ import { z as z4 } from 'zod/v4';
 import { prisma, type Prisma } from '@accszone/database';
 import { CONFIG_SCHEMAS, type ConfigValue } from './config';
 import { domainError } from './errors';
+import { parseProxy, proxyFetch } from './suppliers/context';
 
 export type TranslateSettings = ConfigValue<'translate'>;
 export type TranslateLocale = TranslateSettings['targets'][number];
@@ -20,6 +21,7 @@ export const TRANSLATE_DEFAULTS: TranslateSettings = {
   geminiKey: '',
   geminiModel: 'gemini-flash-latest',
   apiKey: '',
+  proxy: '',
   model: 'claude-opus-5-5',
   targets: ['id'],
   description: false,
@@ -68,6 +70,12 @@ export async function getTranslateSettings(): Promise<TranslateSettings> {
   const parsed = CONFIG_SCHEMAS.translate.safeParse(row?.value);
   return parsed.success ? parsed.data : TRANSLATE_DEFAULTS;
 }
+
+// Mọi lệnh gọi API dịch đi qua proxy đã cài (nếu có)
+const proxyOf = (s: TranslateSettings) => (s.proxy ? parseProxy(s.proxy) : null);
+const tFetch = (s: TranslateSettings, url: string, init: RequestInit) => proxyFetch(proxyOf(s), url, init);
+export const anthropicClient = (s: TranslateSettings) =>
+  new Anthropic({ apiKey: s.apiKey, maxRetries: 3, ...(s.proxy && { fetch: ((url: string | URL | Request, init?: RequestInit) => tFetch(s, String(url instanceof Request ? url.url : url), init ?? {})) as typeof fetch }) });
 
 export interface TranslateJob {
   id: string;
@@ -158,7 +166,7 @@ async function azureTranslate(s: TranslateSettings, texts: string[], locale: Tra
       chars += texts[i]!.length;
       i++;
     }
-    const res = await fetch(`${AZURE_URL}&to=${AZURE_LANG[locale]}`, {
+    const res = await tFetch(s, `${AZURE_URL}&to=${AZURE_LANG[locale]}`, {
       method: 'POST',
       headers: {
         'Ocp-Apim-Subscription-Key': s.azureKey,
@@ -257,7 +265,7 @@ async function geminiCall(s: TranslateSettings, items: Item[], locale: Translate
     const now = Date.now();
     const key = keys.find((k) => (geminiCooldown.get(k) ?? 0) <= now);
     if (!key) throw new QuotaWaitError(`Tất cả ${keys.length} key Gemini đã hết lượt free, hệ thống tự dịch tiếp khi có lượt lại (thường sau 15h giờ VN). Thêm key từ Gmail khác để dịch nhanh hơn.`);
-    const res = await fetch(`${GEMINI_BASE}/v1beta/models/${encodeURIComponent(s.geminiModel)}:generateContent`, {
+    const res = await tFetch(s, `${GEMINI_BASE}/v1beta/models/${encodeURIComponent(s.geminiModel)}:generateContent`, {
       method: 'POST',
       headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
       body,
@@ -416,7 +424,7 @@ export async function processTranslations(log: Log) {
 async function runTranslations(log: Log) {
   const s = await getTranslateSettings();
   if (!translateReady(s)) return { skipped: 'no api key' };
-  const client = s.provider === 'claude' ? new Anthropic({ apiKey: s.apiKey, maxRetries: 3 }) : null;
+  const client = s.provider === 'claude' ? anthropicClient(s) : null;
   const started = Date.now();
   let job = await getTranslateJob();
 

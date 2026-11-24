@@ -30,7 +30,7 @@ export default async function TranslatePage() {
     workerOnline().catch(() => false),
   ]);
   // Không gửi key ra trình duyệt
-  const { apiKey, azureKey, geminiKey, ...publicSettings } = settings;
+  const { apiKey, azureKey, geminiKey, proxy, ...publicSettings } = settings;
   const running = job?.status === 'RUNNING';
   const pct = job ? Math.round((job.cursor / Math.max(1, job.productIds.length)) * 100) : 0;
   const cov = coverage[0] ?? { en: 0, id: 0, ru: 0, zh: 0, pt: 0 };
@@ -72,7 +72,7 @@ export default async function TranslatePage() {
 
       {can(user, 'settings.edit') && (
         <Panel title="Cấu hình">
-          <TranslateSettingsForm initial={publicSettings} hasKey={!!apiKey} hasAzureKey={!!azureKey} hasGeminiKey={!!geminiKey} geminiKeyCount={geminiKeys(settings).length} />
+          <TranslateSettingsForm initial={publicSettings} hasKey={!!apiKey} hasAzureKey={!!azureKey} hasGeminiKey={!!geminiKey} hasProxy={!!proxy} geminiKeyCount={geminiKeys(settings).length} />
         </Panel>
       )}
     </div>

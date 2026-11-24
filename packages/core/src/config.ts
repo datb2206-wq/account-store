@@ -179,6 +179,8 @@ export const CONFIG_SCHEMAS = {
     azureKey: z.string().trim().max(300).default(''),
     azureRegion: z.string().trim().regex(/^[a-z0-9]{0,40}$/, 'Region dạng southeastasia, eastasia, global…').default(''),
     apiKey: z.string().trim().max(300),
+    // Proxy HTTP cho mọi lệnh gọi API dịch (máy chủ ở HK bị Gemini/Claude chặn khu vực). Bí mật như key.
+    proxy: z.string().trim().max(500).default(''),
     model: z.string().trim().regex(/^claude-[a-z0-9.-]{3,60}$/, 'Model dạng claude-...'),
     targets: z.array(z.enum(['en', 'id', 'ru', 'zh', 'pt'])).max(5),
     description: z.boolean(), // dịch cả mô tả (tốn hơn tên)
