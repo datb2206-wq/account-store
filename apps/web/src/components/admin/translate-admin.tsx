@@ -16,7 +16,7 @@ const MODELS = [
   ['claude-haiku-5-5', 'Claude Haiku 5.5 (rẻ nhất, ~40 lần)'],
 ] as const;
 
-export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiKey }: { initial: Omit<TranslateSettings, 'apiKey' | 'azureKey' | 'geminiKey'>; hasKey: boolean; hasAzureKey: boolean; hasGeminiKey: boolean }) {
+export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiKey, geminiKeyCount = 0 }: { initial: Omit<TranslateSettings, 'apiKey' | 'azureKey' | 'geminiKey'>; hasKey: boolean; hasAzureKey: boolean; hasGeminiKey: boolean; geminiKeyCount?: number }) {
   const router = useRouter();
   // Ngôn ngữ đã ẩn khỏi web thì không dịch nữa (lưu lại cấu hình sẽ bỏ chúng khỏi danh sách)
   const { locales } = useI18n();
@@ -74,8 +74,9 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiK
         <div className="space-y-3">
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm">
-              <span className="mb-1 block font-medium text-zinc-700">API key Gemini</span>
-              <input className="input font-mono" type="password" autoComplete="new-password" placeholder={hasGeminiKey ? '•••••••• (để trống = giữ nguyên)' : 'AIza...'} value={f.geminiKey} onChange={(e) => setF((s) => ({ ...s, geminiKey: e.target.value.trim() }))} />
+              <span className="mb-1 block font-medium text-zinc-700">API key Gemini {hasGeminiKey && <span className="font-normal text-emerald-600">(đang lưu {geminiKeyCount} key)</span>}</span>
+              <input className="input font-mono" type="password" autoComplete="new-password" placeholder={hasGeminiKey ? '•••••••• (để trống = giữ nguyên)' : 'AIza..., AIza...'} value={f.geminiKey} onChange={(e) => setF((s) => ({ ...s, geminiKey: e.target.value.trim() }))} />
+              <span className="mt-1 block text-xs text-zinc-400">Nhiều key thì cách nhau dấu phẩy. Nhập mới sẽ thay toàn bộ key cũ, nên dán lại đủ tất cả key.</span>
             </label>
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-zinc-700">Model</span>
@@ -86,7 +87,8 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiK
           <ol className="list-decimal space-y-0.5 rounded-lg bg-zinc-50 py-3 pr-3 pl-8 text-xs text-zinc-600">
             <li>Vào aistudio.google.com/api-keys, đăng nhập Gmail → <b>Create API key</b> (hoặc bấm nút copy ở key có sẵn).</li>
             <li>Dán key vào ô trên → Lưu. Key chỉ lưu trên server, không hiện ra trình duyệt.</li>
-            <li>Gói free giới hạn số lượt/phút và /ngày: hệ thống tự chờ khi bị giới hạn; hết lượt trong ngày thì hôm sau bấm dịch tiếp.</li>
+            <li>Gói free giới hạn lượt/ngày theo từng Gmail: tạo key ở nhiều Gmail khác nhau rồi dán hết vào (cách nhau dấu phẩy) để dịch được nhiều hơn. Key cùng 1 Gmail dùng chung lượt.</li>
+            <li>Mỗi lượt gửi 200 sản phẩm (50 nếu dịch cả mô tả). Hết lượt thì hệ thống tự chờ và dịch tiếp khi có lượt lại, không cần bấm lại.</li>
           </ol>
         </div>
       )}

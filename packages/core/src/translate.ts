@@ -28,7 +28,7 @@ export const TRANSLATE_DEFAULTS: TranslateSettings = {
 };
 
 // Đã có key cho nhà cung cấp đang chọn chưa
-export const translateReady = (s: TranslateSettings) => (s.provider === 'azure' ? !!s.azureKey : s.provider === 'gemini' ? !!s.geminiKey : !!s.apiKey);
+export const translateReady = (s: TranslateSettings) => (s.provider === 'azure' ? !!s.azureKey : s.provider === 'gemini' ? !!s.geminiKey.trim() : !!s.apiKey);
 
 // Mã ngôn ngữ của Azure Translator
 const AZURE_LANG: Record<TranslateLocale, string> = { en: 'en', id: 'id', ru: 'ru', zh: 'zh-Hans', pt: 'pt' };
@@ -40,6 +40,8 @@ const AZURE_MAX_TEXTS = 500;
 
 // Lỗi không nên thử lại (sai key, hết hạn mức miễn phí, sai region): dừng lượt dịch, hiện lỗi cho admin
 class FatalTranslateError extends Error {}
+// Tất cả key Gemini đều hết lượt free: giữ lượt dịch, tự dịch tiếp khi có lượt lại (không đánh dấu lỗi sản phẩm)
+class QuotaWaitError extends Error {}
 
 export const TRANSLATE_LANG: Record<TranslateLocale, string> = {
   en: 'English',
@@ -52,6 +54,10 @@ export const TRANSLATE_LANG: Record<TranslateLocale, string> = {
 // Model hỗ trợ server-side fallback khi bị từ chối (Haiku không có)
 const FALLBACK_MODELS = /^claude-(opus-5-5|opus-5|fable-5|sonnet-5-5)/;
 const BATCH = 25;
+// Gemini free giới hạn số lượt/ngày -> gửi nhiều sản phẩm mỗi lượt (kết quả quá dài thì tự chia đôi)
+const GEMINI_BATCH = 200;
+const GEMINI_BATCH_DESC = 50;
+const batchSize = (s: TranslateSettings, description: boolean) => (s.provider === 'gemini' ? (description ? GEMINI_BATCH_DESC : GEMINI_BATCH) : BATCH);
 const TICK_BUDGET_MS = 40_000;
 const JOB_KEY = 'translate.job';
 // Tự dịch: "productId:locale" đã lỗi trong phiên worker này -> bỏ qua đến khi khởi động lại (tránh tốn tiền gọi lặp)
@@ -210,7 +216,28 @@ function userPrompt(s: TranslateSettings, items: Item[], locale: TranslateLocale
   return `Target language: ${TRANSLATE_LANG[locale]}${glossary}\n\nItems (JSON):\n${JSON.stringify(items)}`;
 }
 
-async function translateBatchGemini(s: TranslateSettings, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
+// Nhiều key Gemini (mỗi Gmail / project có lượt free riêng). Key hết lượt -> nghỉ 1 giờ rồi thử lại (lượt bị từ chối không bị tính).
+export const geminiKeys = (s: TranslateSettings) => [...new Set(s.geminiKey.split(/[\s,;]+/).filter(Boolean))];
+const geminiCooldown = new Map<string, number>();
+const GEMINI_COOLDOWN_MS = 60 * 60_000;
+
+export async function translateBatchGemini(s: TranslateSettings, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
+  try {
+    return await geminiCall(s, items, locale);
+  } catch (err) {
+    // Kết quả quá dài / JSON hỏng với nhóm lớn -> chia đôi, dịch từng nửa
+    if (err instanceof GeminiTooLong && items.length > 1) {
+      const half = Math.ceil(items.length / 2);
+      const a = await translateBatchGemini(s, items.slice(0, half), locale);
+      const b = await translateBatchGemini(s, items.slice(half), locale);
+      return new Map([...a, ...b]);
+    }
+    throw err;
+  }
+}
+class GeminiTooLong extends Error {}
+
+async function geminiCall(s: TranslateSettings, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: SYSTEM }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt(s, items, locale) }] }],
@@ -221,35 +248,52 @@ async function translateBatchGemini(s: TranslateSettings, items: Item[], locale:
         properties: { items: { type: 'ARRAY', items: { type: 'OBJECT', properties: { id: { type: 'STRING' }, name: { type: 'STRING' }, description: { type: 'STRING' } }, required: ['id', 'name', 'description'] } } },
         required: ['items'],
       },
-      maxOutputTokens: 32000,
+      maxOutputTokens: 65536,
       temperature: 0.2,
     },
   });
+  const keys = geminiKeys(s);
   for (let attempt = 0; ; attempt++) {
+    const now = Date.now();
+    const key = keys.find((k) => (geminiCooldown.get(k) ?? 0) <= now);
+    if (!key) throw new QuotaWaitError(`Tất cả ${keys.length} key Gemini đã hết lượt free, hệ thống tự dịch tiếp khi có lượt lại (thường sau 15h giờ VN). Thêm key từ Gmail khác để dịch nhanh hơn.`);
     const res = await fetch(`${GEMINI_BASE}/v1beta/models/${encodeURIComponent(s.geminiModel)}:generateContent`, {
       method: 'POST',
-      headers: { 'x-goog-api-key': s.geminiKey, 'Content-Type': 'application/json' },
+      headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
       body,
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(240_000),
     });
     if (res.ok) {
       const data = (await res.json()) as { candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[]; promptFeedback?: { blockReason?: string } };
       if (data.promptFeedback?.blockReason) throw new Error(`Gemini chặn nhóm này: ${data.promptFeedback.blockReason}`);
       const c = data.candidates?.[0];
-      if (c?.finishReason === 'MAX_TOKENS') throw new Error('Kết quả quá dài (MAX_TOKENS)');
+      if (c?.finishReason === 'MAX_TOKENS') throw new GeminiTooLong('Kết quả quá dài (MAX_TOKENS)');
       const text = (c?.content?.parts ?? []).filter((p) => !p.thought).map((p) => p.text ?? '').join('');
       const parsed = ResultSchema.safeParse(parseJson(text));
-      if (!parsed.success) throw new Error(`Gemini trả về JSON không đúng (${c?.finishReason ?? 'không có kết quả'})`);
+      if (!parsed.success) throw new GeminiTooLong(`Gemini trả về JSON không đúng (${c?.finishReason ?? 'không có kết quả'})`);
       return new Map(parsed.data.items.map((i) => [i.id, i]));
     }
     const detail = (await res.text().catch(() => '')).slice(0, 300);
     // Hết lượt trong phút -> chờ rồi thử lại; hết lượt trong ngày -> dừng (hôm sau bấm dịch tiếp, phần đã dịch được giữ)
-    if (res.status === 429 || res.status === 503) {
-      if (/PerDay|per day/i.test(detail)) throw new FatalTranslateError(`Gemini hết lượt miễn phí hôm nay, mai bấm dịch tiếp: ${detail}`);
-      if (attempt < 2) {
+    if (res.status === 429) {
+      // Hết lượt trong ngày (hoặc key không có lượt free) -> nghỉ key này, dùng key kế
+      if (/PerDay|per day|limit: 0/i.test(detail)) {
+        geminiCooldown.set(key, Date.now() + GEMINI_COOLDOWN_MS);
+        continue;
+      }
+      // Hết lượt trong phút: còn key khác thì đổi key, không thì chờ
+      if (keys.length > 1 && attempt < keys.length * 2) {
+        geminiCooldown.set(key, Date.now() + 60_000);
+        continue;
+      }
+      if (attempt < 3) {
         await sleep(20_000);
         continue;
       }
+    }
+    if (res.status === 503 && attempt < 3) {
+      await sleep(20_000);
+      continue;
     }
     // 400 sai key / 403 không có quyền / 404 sai tên model -> dừng hẳn
     if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) throw new FatalTranslateError(`Gemini ${res.status}: ${detail}`);
@@ -377,13 +421,19 @@ async function runTranslations(log: Log) {
 
   if (job?.status === 'RUNNING') {
     while (job.cursor < job.productIds.length && Date.now() - started < TICK_BUDGET_MS) {
-      const ids = job.productIds.slice(job.cursor, job.cursor + BATCH);
+      const ids = job.productIds.slice(job.cursor, job.cursor + batchSize(s, job.description));
       for (const locale of job.locales) {
         try {
           const r = await translateProducts(client, s, ids, locale, { description: job.description, overwrite: job.overwrite });
           job.translated += r.written;
           job.skipped += r.skipped;
         } catch (err) {
+          // Hết lượt free: giữ nguyên vị trí, lần sau dịch tiếp đúng nhóm này
+          if (err instanceof QuotaWaitError) {
+            await saveJob({ ...job, error: err.message });
+            log.warn(`translate waiting: ${err.message}`);
+            return { waiting: true };
+          }
           if (isFatal(err)) {
             await saveJob({ ...job, status: 'FAILED', error: errText(err) });
             log.warn(`translate stopped: ${errText(err)}`);
@@ -395,6 +445,7 @@ async function runTranslations(log: Log) {
         }
       }
       job.cursor += ids.length;
+      job.error = job.error?.startsWith('Tất cả ') ? null : job.error;
       // Admin bấm Dừng giữa chừng -> tôn trọng
       const latest = await getTranslateJob();
       if (latest?.id !== job.id || latest.status !== 'RUNNING') return { stopped: true };
@@ -414,6 +465,7 @@ async function runTranslations(log: Log) {
     try {
       written += await translateCategories(client, s, locale);
     } catch (err) {
+      if (err instanceof QuotaWaitError) break;
       log.warn(`auto translate categories (${locale}) failed: ${errText(err)}`);
       if (isFatal(err)) break;
     }
@@ -422,10 +474,10 @@ async function runTranslations(log: Log) {
       locale === 'en'
         ? await prisma.$queryRaw<{ id: string }[]>`
             SELECT id FROM products WHERE "isActive" = true AND name->>'src' IS NULL AND id <> ALL(${skip})
-            ORDER BY "createdAt" DESC LIMIT ${BATCH}`
+            ORDER BY "createdAt" DESC LIMIT ${batchSize(s, s.description)}`
         : await prisma.$queryRaw<{ id: string }[]>`
             SELECT id FROM products WHERE "isActive" = true AND coalesce(name->>${locale}, '') = '' AND id <> ALL(${skip})
-            ORDER BY "createdAt" DESC LIMIT ${BATCH}`;
+            ORDER BY "createdAt" DESC LIMIT ${batchSize(s, s.description)}`;
     if (!rows.length) continue;
     const ids = rows.map((r) => r.id);
     try {
@@ -434,6 +486,7 @@ async function runTranslations(log: Log) {
       const still = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
       for (const p of still) if (!hasTranslation(p.name, locale)) autoSkip.add(`${p.id}:${locale}`);
     } catch (err) {
+      if (err instanceof QuotaWaitError) break;
       log.warn(`auto translate (${locale}) failed: ${errText(err)}`);
       if (isFatal(err)) break;
       for (const id of ids) autoSkip.add(`${id}:${locale}`);

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getTranslateJob, getTranslateSettings, translateReady } from '@accszone/core';
+import { geminiKeys, getTranslateJob, getTranslateSettings, translateReady } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { LOCALE_LABEL, TranslateActions, TranslateSettingsForm } from '@/components/admin/translate-admin';
 import { PageHeader, Panel } from '@/components/admin/ui';
@@ -72,7 +72,7 @@ export default async function TranslatePage() {
 
       {can(user, 'settings.edit') && (
         <Panel title="Cấu hình">
-          <TranslateSettingsForm initial={publicSettings} hasKey={!!apiKey} hasAzureKey={!!azureKey} hasGeminiKey={!!geminiKey} />
+          <TranslateSettingsForm initial={publicSettings} hasKey={!!apiKey} hasAzureKey={!!azureKey} hasGeminiKey={!!geminiKey} geminiKeyCount={geminiKeys(settings).length} />
         </Panel>
       )}
     </div>

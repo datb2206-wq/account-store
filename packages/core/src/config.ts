@@ -174,7 +174,7 @@ export const CONFIG_SCHEMAS = {
   translate: z.object({
     // azure = Microsoft Translator (gói F0 miễn phí 2 triệu ký tự / tháng); gemini = Google AI Studio (gói free, không cần thẻ); claude = Anthropic API (trả phí)
     provider: z.enum(['azure', 'gemini', 'claude']).default('azure'),
-    geminiKey: z.string().trim().max(300).default(''),
+    geminiKey: z.string().trim().max(3000).default(''), // nhiều key cách nhau dấu phẩy / xuống dòng: key này hết lượt thì dùng key kế
     geminiModel: z.string().trim().regex(/^gemini-[a-z0-9.-]{2,60}$/, 'Model dạng gemini-...').default('gemini-flash-latest'),
     azureKey: z.string().trim().max(300).default(''),
     azureRegion: z.string().trim().regex(/^[a-z0-9]{0,40}$/, 'Region dạng southeastasia, eastasia, global…').default(''),
