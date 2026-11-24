@@ -10,7 +10,7 @@ export async function middleware(req: NextRequest) {
 
   if (pathname === '/login' || pathname === '/register') {
     if (!session) return NextResponse.next();
-    return NextResponse.redirect(new URL(session.role === 'USER' ? '/dashboard' : '/admin', req.url));
+    return NextResponse.redirect(new URL(session.role === 'USER' ? '/' : '/admin', req.url));
   }
 
   if (!session) {

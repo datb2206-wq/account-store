@@ -4,7 +4,7 @@ import { getAffiliateSettings, getCtvSettings } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { Badge } from '@/components/badge';
 import { LocalTime } from '@/components/local-time';
-import { Money } from '@/components/money';
+import { LocalMoney } from '@/components/money';
 import { StatCard } from '@/components/stat-card';
 import { fmt } from '@/i18n/config';
 import { rich } from '@/i18n/rich';
@@ -30,7 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const { locale, d } = await getI18n();
+  const { locale, d, fx } = await getI18n();
   const t = d.dashboard;
   const affiliateOn = (await getAffiliateSettings()).enabled;
   // Kênh CTV: hiện khi đang mở đăng ký, hoặc user đã là CTV
@@ -82,9 +82,9 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label={t.balance} value={<Money value={user.balance} />} />
+        <StatCard label={t.balance} value={<LocalMoney value={user.balance} fx={fx} locale={locale} />} />
         <StatCard label={t.completedOrders} value={completed._count} />
-        <StatCard label={t.totalSpent} value={<Money value={completed._sum.totalAmount} />} />
+        <StatCard label={t.totalSpent} value={<LocalMoney value={completed._sum.totalAmount} fx={fx} locale={locale} />} />
       </div>
 
       {shopBot.enabled && shopBot.botUsername && (
@@ -112,7 +112,7 @@ export default async function DashboardPage() {
                   <tr key={o.id}>
                     <td><Link href={`/dashboard/orders/${o.code}`} className="font-mono text-xs text-blue-600 hover:underline">{o.code}</Link></td>
                     <td>{localized(o.product.name, locale)} × {o.quantity}</td>
-                    <td className="tabular-nums"><Money value={o.totalAmount} /></td>
+                    <td className="tabular-nums"><LocalMoney value={o.totalAmount} fx={fx} locale={locale} /></td>
                     <td><Badge value={o.status} label={d.orders.status[o.status] ?? d.status[o.status]} /></td>
                   </tr>
                 ))}
@@ -135,7 +135,7 @@ export default async function DashboardPage() {
                   <tr key={tx.id}>
                     <td>{d.txType[tx.type] ?? tx.type}</td>
                     <td className={`tabular-nums ${tx.amount.isNegative() ? 'text-red-600' : 'text-emerald-600'}`}>
-                      <Money value={tx.amount} />
+                      <LocalMoney value={tx.amount} fx={fx} locale={locale} />
                     </td>
                     <td><Badge value={tx.status} label={d.status[tx.status]} /></td>
                     <td className="text-zinc-500"><LocalTime value={tx.createdAt} /></td>

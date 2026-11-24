@@ -57,7 +57,8 @@ export function AuthForm({ mode, next, captchaSiteKey }: { mode: 'login' | 'regi
         );
         return;
       }
-      router.replace(next ?? (data.user.role === 'USER' ? '/dashboard' : '/admin'));
+      // Khách đăng ký / đăng nhập xong về thẳng trang chủ (danh sách sản phẩm), nhân viên vào admin
+      router.replace(next ?? (data.user.role === 'USER' ? '/' : '/admin'));
       router.refresh();
     } catch {
       setError(d.errors.network);
