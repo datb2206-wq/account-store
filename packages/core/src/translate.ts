@@ -273,11 +273,12 @@ async function geminiCall(s: TranslateSettings, items: Item[], locale: Translate
       if (!parsed.success) throw new GeminiTooLong(`Gemini trả về JSON không đúng (${c?.finishReason ?? 'không có kết quả'})`);
       return new Map(parsed.data.items.map((i) => [i.id, i]));
     }
-    const detail = (await res.text().catch(() => '')).slice(0, 300);
-    // Hết lượt trong phút -> chờ rồi thử lại; hết lượt trong ngày -> dừng (hôm sau bấm dịch tiếp, phần đã dịch được giữ)
+    const full = await res.text().catch(() => '');
+    const detail = (/"message":\s*"([^"]{1,300})/.exec(full)?.[1] ?? full).slice(0, 300);
+    // Hết lượt trong phút -> chờ rồi thử lại; hết lượt trong ngày -> nghỉ key đó (Google ghi loại giới hạn ở cuối lỗi: đọc cả lỗi)
     if (res.status === 429) {
       // Hết lượt trong ngày (hoặc key không có lượt free) -> nghỉ key này, dùng key kế
-      if (/PerDay|per day|limit: 0/i.test(detail)) {
+      if (/PerDay|per day|limit: 0/i.test(full)) {
         geminiCooldown.set(key, Date.now() + GEMINI_COOLDOWN_MS);
         continue;
       }
