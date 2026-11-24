@@ -13,7 +13,7 @@ import { LocalTime } from '@/components/local-time';
 import { Money } from '@/components/money';
 import { requireUser } from '@/lib/auth';
 import { explorerTxUrl, shortHash } from '@/lib/chain-links';
-import { checkPixDeposit, expireStaleDeposits, getConfig, getPixSettings } from '@accszone/core';
+import { checkPixDeposit, expireStaleDeposits, getConfig, getPixSettings, pixAutoCredit } from '@accszone/core';
 import { formatDate, formatOriginal } from '@/lib/format';
 import { fmt } from '@/i18n/config';
 import { rich } from '@/i18n/rich';
@@ -51,7 +51,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
   let t = await prisma.transaction.findFirst({ where: { id, userId: user.id, type: 'DEPOSIT' } });
   if (!t) notFound();
   // PIX: mỗi lần trang tự tải lại thì hỏi cổng PIX xem khách trả chưa (nếu admin có đặt link kiểm tra)
-  const pixAuto = t.method === 'PIX' && !!(await getPixSettings()).statusUrl;
+  const pixAuto = t.method === 'PIX' && pixAutoCredit(await getPixSettings(), t.metadata);
   if (pixAuto && (t.status === 'PENDING' || t.status === 'EXPIRED')) {
     const before = t.status;
     if ((await checkPixDeposit(t.id)) !== before) t = (await prisma.transaction.findFirst({ where: { id, userId: user.id, type: 'DEPOSIT' } }))!;

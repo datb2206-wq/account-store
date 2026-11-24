@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createPixDeposit } from '@accszone/core';
 import { parseBody, userRoute } from '@/lib/admin-route';
-import { getClientIp, tooManyRequests } from '@/lib/http';
+import { getClientIp, publicUrl, tooManyRequests } from '@/lib/http';
 import { blockedIpResponse } from '@/lib/ip-block';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -17,6 +17,7 @@ export const POST = userRoute(async (req, _ctx, user) => {
   const limit = await rateLimit(`deposit:pix:${user.id}`, 10, 60 * 60);
   if (!limit.ok) return tooManyRequests(limit.retryAfter);
   const input = await parseBody(req, schema, 'Please check the highlighted fields');
-  const deposit = await createPixDeposit(user.id, input);
+  // Link callback theo tên miền khách đang mở (VD https://acc04.com): cổng PIX gọi lại khi khách trả xong -> tự cộng tiền
+  const deposit = await createPixDeposit(user.id, input, { callbackBase: publicUrl(req, '/').origin });
   return NextResponse.json({ deposit }, { status: 201 });
 });
