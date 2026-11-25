@@ -108,7 +108,7 @@ export const userStatusSchema = z.object({ status: z.enum(['ACTIVE', 'BANNED']) 
 
 export const supplierSchema = z.object({
   name: z.string().trim().min(1, 'Bắt buộc').max(100),
-  adapter: z.enum(['generic', 'accszone', 'via79', 'buyaccfb']).default('generic'),
+  adapter: z.enum(['generic', 'accszone', 'via79', 'buyaccfb', 'acckit']).default('generic'),
   baseUrl: z
     .string()
     .trim()

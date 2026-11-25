@@ -81,7 +81,7 @@ export async function vndToUsd() {
 const cleanText = (s: string) => s.replace(/\r\n?/g, '\n').trim();
 
 // Danh sách tài khoản giao trong `data`: mảng chuỗi, hoặc object có 1 trường là mảng chuỗi
-function accountsOf(data: unknown): string[] | null {
+export function accountsOf(data: unknown): string[] | null {
   const lines = (v: unknown) => (Array.isArray(v) && v.every((x) => typeof x === 'string') ? (v as string[]) : null);
   const direct = lines(data);
   if (direct) return direct.map((a) => a.trim()).filter(Boolean);

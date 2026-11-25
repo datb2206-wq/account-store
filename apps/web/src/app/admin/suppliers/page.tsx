@@ -13,11 +13,12 @@ import { workerOnline } from '@/lib/queue';
 
 export const metadata: Metadata = { title: 'Kết nối API' };
 
-const ADAPTER_LABEL: Record<string, string> = { accszone: 'AccsZone API v1', via79: 'SHOPCLONE7', buyaccfb: 'BuyAccFB', generic: 'API khác' };
+const ADAPTER_LABEL: Record<string, string> = { accszone: 'AccsZone API v1', via79: 'SHOPCLONE7', buyaccfb: 'BuyAccFB', acckit: 'Acckit', generic: 'API khác' };
 const ADAPTER_TONE: Record<string, string> = {
   accszone: 'bg-sky-100 text-sky-700',
   via79: 'bg-violet-100 text-violet-700',
   buyaccfb: 'bg-blue-100 text-blue-700',
+  acckit: 'bg-amber-100 text-amber-700',
   generic: 'bg-zinc-100 text-zinc-700',
 };
 const BALANCE_TIMEOUT_MS = 8_000;

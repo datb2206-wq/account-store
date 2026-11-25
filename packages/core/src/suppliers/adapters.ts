@@ -1,6 +1,7 @@
 // Chọn adapter theo Supplier.adapter (Admin > Nhà cung cấp).
 import { Prisma } from '@accszone/database';
 import { decrypt } from '../crypto';
+import { acckitAdapter } from './acckit-adapter';
 import { accszoneAdapter } from './accszone-adapter';
 import { buyaccfbAdapter } from './buyaccfb-adapter';
 import { runtimeOf, runWithSupplier } from './context';
@@ -11,11 +12,12 @@ export function getAdapter(kind: string): SupplierAdapter {
   if (kind === 'accszone') return accszoneAdapter;
   if (kind === 'via79') return via79Adapter;
   if (kind === 'buyaccfb') return buyaccfbAdapter;
+  if (kind === 'acckit') return acckitAdapter;
   return genericAdapter;
 }
 
 // Nguồn tính giá VND: adapter tự quy đổi (và tự dùng tỷ giá riêng nếu có)
-const VND_ADAPTERS = new Set(['via79', 'buyaccfb']);
+const VND_ADAPTERS = new Set(['via79', 'buyaccfb', 'acckit']);
 
 export interface SupplierConnection {
   adapter: string;

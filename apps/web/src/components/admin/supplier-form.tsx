@@ -24,7 +24,7 @@ export interface SupplierFormValues {
   isActive: boolean;
 }
 
-const DEFAULT_URL: Record<string, string> = { accszone: 'https://accszone.com/api/v1', via79: 'https://via79.com/api', buyaccfb: 'https://graph.buyaccfb.com/api', generic: '' };
+const DEFAULT_URL: Record<string, string> = { accszone: 'https://accszone.com/api/v1', via79: 'https://via79.com/api', buyaccfb: 'https://graph.buyaccfb.com/api', acckit: 'https://b2b.acckit.com/', generic: '' };
 
 const EMPTY: SupplierFormValues = {
   name: '',
@@ -139,10 +139,11 @@ export function SupplierForm({ supplierId, initial, hasProxy = false }: { suppli
               <option value="accszone">AccsZone API v1</option>
               <option value="via79">SHOPCLONE7 / CMSNT: Via79, CloneMMO247… (giá VND)</option>
               <option value="buyaccfb">BuyAccFB (giá VND)</option>
+              <option value="acckit">Acckit: b2b.acckit.com (giá VND)</option>
               <option value="generic">API khác (chuẩn chung)</option>
             </select>
           </FormField>
-          <FormField label="Domain / API URL *" htmlFor="sp-url" error={fields.baseUrl} hint={values.adapter === 'via79' ? 'Nhập tên miền web nguồn kèm https://, VD: https://via79.com/' : 'Nhập đầy đủ URL kèm https://'}>
+          <FormField label="Domain / API URL *" htmlFor="sp-url" error={fields.baseUrl} hint={values.adapter === 'via79' || values.adapter === 'acckit' ? 'Nhập tên miền web nguồn kèm https://, VD: https://via79.com/' : 'Nhập đầy đủ URL kèm https://'}>
             <input id="sp-url" className="input font-mono text-xs" placeholder="VD: https://domain.com/api" value={values.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} />
           </FormField>
           <FormField label={isEdit ? 'API key' : 'API key *'} htmlFor="sp-key" error={fields.apiKey} hint={isEdit ? 'Để trống = giữ key hiện tại. Key được lưu mã hóa.' : 'Lấy ở trang API của web nguồn. Key được lưu mã hóa.'}>
@@ -181,7 +182,7 @@ export function SupplierForm({ supplierId, initial, hasProxy = false }: { suppli
             htmlFor="sp-rate"
             error={fields.priceRate}
             hint={
-              values.adapter === 'via79' || values.adapter === 'buyaccfb'
+              values.adapter === 'via79' || values.adapter === 'buyaccfb' || values.adapter === 'acckit'
                 ? 'Để trống = tự dùng tỷ giá VND ở Cấu hình. Nhập để đặt riêng: 1 VND = ? USD, VD 0.000038.'
                 : 'Để trống = giá API đã là USD. Nếu API tính bằng tiền khác, nhập 1 đơn vị tiền đó = ? USD, VD API giá VND thì nhập 0.000038.'
             }
