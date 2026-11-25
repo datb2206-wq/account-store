@@ -1,6 +1,7 @@
 // Hiển thị nội dung bài viết dạng văn bản đơn giản, KHÔNG dùng HTML thô (tránh chèn mã độc):
 // dòng trống = đoạn mới, "## " = tiêu đề, "- " = gạch đầu dòng, link https:// tự thành liên kết.
-const URL_RE = /(https:\/\/[^\s<>"')]+)/g;
+// Link không ăn dấu câu ở cuối ("https://2fa.live," -> "https://2fa.live")
+const URL_RE = /(https:\/\/[^\s<>"')]*[^\s<>"').,;:!?])/g;
 
 function linkify(text: string) {
   return text.split(URL_RE).map((part, i) =>

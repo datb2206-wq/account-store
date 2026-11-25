@@ -7,7 +7,7 @@ import { buildHref } from '@/lib/url';
 
 export async function generateMetadata(): Promise<Metadata> {
   const { d } = await getI18n();
-  return { title: d.blog.title, description: d.blog.subtitle };
+  return { title: d.blog.title, description: d.blog.subtitle, alternates: { canonical: '/blog' } };
 }
 
 export default async function BlogListPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {

@@ -7,6 +7,7 @@ import { getI18n } from '@/i18n/server';
 const BODY = {
   pt: {
     title: 'Tutorial e Garantia',
+    description: 'Como pegar o código 2FA, ler o e-mail da conta, fazer login sem checkpoint e pedir reposição na garantia.',
     body: `Leia este guia rápido antes de usar suas contas. Ele responde às dúvidas mais comuns de quem compra pela primeira vez.
 
 ## 1. Como pegar o código 2FA
@@ -40,6 +41,7 @@ const BODY = {
   },
   en: {
     title: 'Tutorial & Warranty',
+    description: 'How to get the 2FA code, read the account e-mail, log in safely and request a warranty replacement.',
     body: `A quick guide to using your accounts.
 
 ## 1. Getting the 2FA code
@@ -64,7 +66,7 @@ const content = (locale: string) => (locale === 'pt' ? BODY.pt : BODY.en);
 
 export async function generateMetadata(): Promise<Metadata> {
   const { locale } = await getI18n();
-  return { title: content(locale).title, alternates: { canonical: '/pages/guia' } };
+  return { title: content(locale).title, description: content(locale).description, alternates: { canonical: '/pages/guia' } };
 }
 
 export default async function GuidePage() {

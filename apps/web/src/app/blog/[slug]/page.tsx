@@ -11,7 +11,7 @@ import { getI18n } from '@/i18n/server';
 const getPost = cache((slug: string) =>
   prisma.blogPost.findFirst({
     where: { slug, isPublished: true },
-    select: { id: true, title: true, excerpt: true, content: true, coverUrl: true, views: true, createdAt: true, category: { select: { name: true, slug: true } } },
+    select: { id: true, slug: true, title: true, excerpt: true, content: true, coverUrl: true, views: true, createdAt: true, category: { select: { name: true, slug: true } } },
   }),
 );
 
@@ -21,6 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: post.title,
     description: post.excerpt ?? undefined,
+    alternates: { canonical: `/blog/${post.slug}` },
     openGraph: { type: 'article', title: post.title, description: post.excerpt ?? undefined, images: post.coverUrl ? [post.coverUrl] : undefined },
   };
 }

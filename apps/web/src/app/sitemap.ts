@@ -20,6 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     })),
     { url: `${base}/blog`, changeFrequency: 'daily', priority: 0.6 },
+    { url: `${base}/pages/guia`, changeFrequency: 'monthly', priority: 0.5 },
     ...publishedPages(extras).map((p) => ({ url: `${base}/pages/${p.slug}`, changeFrequency: 'monthly' as const, priority: 0.4 })),
     ...posts.map((p) => ({ url: `${base}/blog/${p.slug}`, lastModified: p.updatedAt, changeFrequency: 'weekly' as const, priority: 0.5 })),
   ];
