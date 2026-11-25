@@ -329,6 +329,8 @@ async function geminiCall(s: TranslateSettings, items: Item[], locale: Translate
       await sleep(20_000);
       continue;
     }
+    // Gemini quá tải tạm thời: giữ nguyên vị trí lượt dịch, phút sau thử lại nhóm này (không đánh dấu lỗi / bỏ qua sản phẩm)
+    if (res.status === 503) throw new QuotaWaitError('Gemini đang quá tải (503), hệ thống tự thử lại nhóm này sau 1 phút.');
     // 400 sai key / 403 không có quyền / 404 sai tên model -> dừng hẳn
     if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) throw new FatalTranslateError(`Gemini ${res.status}: ${detail}`);
     throw new Error(`Gemini ${res.status}: ${detail}`);
