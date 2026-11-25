@@ -20,6 +20,7 @@ export interface ProductFormValues {
   sortOrder: number;
   isActive: boolean;
   isFeatured: boolean;
+  lockTranslation?: boolean;
 }
 
 const EMPTY: ProductFormValues = {
@@ -151,6 +152,12 @@ export function ProductForm({
             <input type="checkbox" checked={values.isFeatured} onChange={(e) => set('isFeatured', e.target.checked)} />
             📌 Nổi bật (lên đầu danh mục + hàng &quot;Nổi bật&quot; ở trang chủ)
           </label>
+          {isEdit && (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={!!values.lockTranslation} onChange={(e) => set('lockTranslation', e.target.checked)} />
+              <span>🔒 Khóa bản dịch <span className="block text-xs text-zinc-500">Đồng bộ từ nguồn API và &quot;Dịch lại tất cả&quot; không ghi đè tên / mô tả đã duyệt chuẩn</span></span>
+            </label>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-2">

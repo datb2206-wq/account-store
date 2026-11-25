@@ -10,7 +10,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export const PATCH = adminRoute<Ctx>(async (req, { params }, user) => {
   const { id } = await params;
-  const data = await parseBody(req, productSchema);
+  const { lockTranslation, ...data } = await parseBody(req, productSchema);
   const before = await prisma.product.findUnique({ where: { id } });
   if (!before) throw notFound('Sản phẩm không tồn tại');
   if (!(await prisma.category.findUnique({ where: { id: data.categoryId }, select: { id: true } }))) {
@@ -19,7 +19,7 @@ export const PATCH = adminRoute<Ctx>(async (req, { params }, user) => {
 
   const product = await prisma.product.update({
     where: { id },
-    data: { ...data, ...(data.isActive !== before.isActive && { autoHidden: false }), name: keepSource(before.name, data.name), description: keepSource(before.description, data.description) },
+    data: { ...data, ...(data.isActive !== before.isActive && { autoHidden: false }), name: keepSource(before.name, data.name, lockTranslation), description: keepSource(before.description, data.description) },
   });
   await writeAudit({
     actorId: user.id,

@@ -213,6 +213,21 @@ const parseJson = (t: string): unknown => {
 };
 
 // Yêu cầu gửi AI: ngôn ngữ đích + bảng thuật ngữ admin đặt cho ngôn ngữ đó (nếu có) + danh sách cần dịch
+// Văn phong dân chạy Ads / contingência ở Brazil (cố định trong code, không tính vào giới hạn bảng thuật ngữ)
+const STYLE: Partial<Record<TranslateLocale, string>> = {
+  pt: `Style guide for Brazilian contingency / paid-traffic buyers (follow strictly):
+- Never write "Clone" in pt-BR (it sounds fake/hacked). clone = "Perfil". clone ngoại / clone nước ngoài = "Perfil Gringo".
+- "Simples" only for cheap new profiles. Old profiles (UID 1000x / 10000x, or "cổ" / "old") are "Perfil Antigo", never "Simples".
+- change full / changer full code mail = "Acesso Total (Troca de Senha e E-mail)". Never "Troca Completa" (sounds like a full refund/exchange).
+- very / veri hotmail trust, hotmail ngâm = "Hotmail Confiável" (only profiles are "Aquecido"; never "Hotmail Aquecido"). Write "Acesso ao Hotmail" / "Acesso ao Gmail" only when the mail login is delivered; "veri gmail ... gmail no login" = "Verificado por Gmail (Sem Acesso ao Gmail)".
+- qua 282 / kháng 282 / gỡ 282 / RD 282 = "Checkpoint 282 Resolvido". qua 956 = "Checkpoint 956 Resolvido". Never "Restabelecido".
+- chuẩn <country> (e.g. chuẩn Pháp, Slovakia chuẩn) = "Origem <country>" (Origem França). Never "Padrão".
+- nuôi / farm bài đăng nhiều ngày = "Aquecido com Postagens Reais". page tạo tay không share = "Página Própria (Criada no Perfil)".
+- sll inbox admin / mua số lượng ib admin = "Para compras no atacado, fale com o suporte".
+- Keep names short (ideally under 95 characters): type + age + friends + strongest feature. Do not repeat words.
+- In descriptions write delivery formats like "UID | Senha | 2FA | E-mail | Senha E-mail" (PASS = Senha, MAIL = E-mail, PASS MAIL = Senha E-mail).`,
+};
+
 function userPrompt(s: TranslateSettings, items: Item[], locale: TranslateLocale) {
   const terms = (s.glossary?.[locale] ?? '')
     .split(/\r?\n/)
@@ -221,7 +236,8 @@ function userPrompt(s: TranslateSettings, items: Item[], locale: TranslateLocale
   const glossary = terms.length
     ? `\n\nGlossary for this market (source term = term buyers here use). Always use these exact target terms, matching the source term case-insensitively, and keep the rest of the rules:\n${terms.join('\n')}`
     : '';
-  return `Target language: ${TRANSLATE_LANG[locale]}${glossary}\n\nItems (JSON):\n${JSON.stringify(items)}`;
+  const style = STYLE[locale] ? `\n\n${STYLE[locale]}` : '';
+  return `Target language: ${TRANSLATE_LANG[locale]}${style}${glossary}\n\nItems (JSON):\n${JSON.stringify(items)}`;
 }
 
 // Nhiều key Gemini (mỗi Gmail / project có lượt free riêng). Key hết lượt -> nghỉ 1 giờ rồi thử lại (lượt bị từ chối không bị tính).
@@ -339,6 +355,9 @@ export const sourceText = (v: unknown) => {
   return m.src ?? m.en ?? Object.values(m)[0] ?? '';
 };
 // Đã có bản dịch cho locale chưa. Riêng 'en': chỉ coi là đã dịch khi có 'src' (bản en ban đầu là tên gốc chưa dịch)
+// Bản dịch đã khóa (admin duyệt chuẩn): không dịch lại, đồng bộ nguồn không ghi đè. Cờ lưu ở khóa 'lock' trong JSON tên.
+export const isTranslationLocked = (v: unknown) => !!v && typeof v === 'object' && !Array.isArray(v) && !!(v as Record<string, unknown>).lock;
+
 export const hasTranslation = (v: unknown, locale: TranslateLocale) => {
   const m = asMap(v);
   return locale === 'en' ? m.src !== undefined : !!m[locale]?.trim();
@@ -359,7 +378,7 @@ function translateItems(client: Anthropic | null, s: TranslateSettings, items: I
 // Dịch 1 nhóm sản phẩm sang 1 ngôn ngữ. Trả về số sản phẩm đã ghi.
 async function translateProducts(client: Anthropic | null, s: TranslateSettings, ids: string[], locale: TranslateLocale, opts: { description: boolean; overwrite: boolean }) {
   const products = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, description: true } });
-  const todo = products.filter((p) => opts.overwrite || !hasTranslation(p.name, locale));
+  const todo = products.filter((p) => !isTranslationLocked(p.name) && (opts.overwrite || !hasTranslation(p.name, locale)));
   const items: Item[] = todo
     .map((p) => ({
       id: p.id,

@@ -20,7 +20,10 @@ import { supplierClient } from './adapters';
 // Nguồn giữ nguyên văn bản -> giữ mọi bản dịch; nguồn đổi -> lấy văn bản mới, bỏ bản dịch cũ (đã sai nghĩa) để dịch lại
 function fromSource(prev: Prisma.JsonValue | null, text: string): Record<string, Prisma.JsonValue> {
   const m = asObject(prev);
-  return (m.src ?? m.en) === text ? m : { en: text };
+  if ((m.src ?? m.en) === text) return m;
+  // Bản dịch đã khóa: giữ nguyên các bản dịch, chỉ cập nhật tên gốc của nguồn
+  if (m.lock) return { ...m, src: text };
+  return { en: text };
 }
 
 export const PRICE_ROUNDINGS = ['none', '0.01', '0.1', '1'] as const;

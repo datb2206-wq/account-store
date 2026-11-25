@@ -139,7 +139,7 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiK
                 <span className="mb-1 block text-xs font-medium text-zinc-600">{LOCALE_LABEL[l]}</span>
                 <textarea
                   className="input min-h-32 font-mono text-xs"
-                  maxLength={4000}
+                  maxLength={8000}
                   placeholder={l === 'pt' ? '# Mỗi dòng: từ gốc = từ dân MMO ở thị trường này dùng\nvia = perfil antigo\nclone = perfil novo\nTKQC = conta de anúncio\nngâm = aquecido' : 'via = ...'}
                   value={f.glossary?.[l] ?? ''}
                   onChange={(e) => setF((s) => ({ ...s, glossary: { ...s.glossary, [l]: e.target.value } }))}

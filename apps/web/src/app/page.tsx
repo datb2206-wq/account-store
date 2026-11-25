@@ -222,7 +222,8 @@ export default async function ShopPage({
             const parent = parentOf(category.parentId);
             return {
               id: category.id,
-              title: parent ? `${localized(parent.name, locale)} - ${categoryName}` : categoryName,
+              // Tên con đã chứa tên cha ("Perfis X - Hotmail") thì không ghép lại tên cha (tránh lặp 2 lần)
+              title: parent && !categoryName.toLowerCase().startsWith(localized(parent.name, locale).toLowerCase()) ? `${localized(parent.name, locale)} - ${categoryName}` : categoryName,
               href: buildHref('/', { ...keep, category: category.slug }),
               list: byCategory.get(category.id)!,
             };

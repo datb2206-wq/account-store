@@ -32,6 +32,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     sortOrder: product.sortOrder,
     isActive: product.isActive,
     isFeatured: product.isFeatured,
+    lockTranslation: !!(product.name as Record<string, unknown> | null)?.lock,
   };
 
   return <ProductForm productId={product.id} initial={initial} categoryOptions={treeOptions(categories)} />;
