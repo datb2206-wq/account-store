@@ -7,7 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z as z4 } from 'zod/v4';
 import { prisma, type Prisma } from '@accszone/database';
-import { CONFIG_SCHEMAS, type ConfigValue } from './config';
+import { CONFIG_SCHEMAS, getConfig, type ConfigValue } from './config';
 import { domainError } from './errors';
 import { parseProxy, proxyFetch } from './suppliers/context';
 
@@ -27,6 +27,7 @@ export const TRANSLATE_DEFAULTS: TranslateSettings = {
   description: false,
   autoNew: false,
   glossary: {},
+  prompt: {},
 };
 
 // Đã có key cho nhà cung cấp đang chọn chưa
@@ -152,7 +153,11 @@ Rules:
 - If the text is already in the target language, return it unchanged.
 - Return every item with its original id. If a description is empty, return an empty string for it.`;
 
-type Item = { id: string; name: string; description: string };
+// category / priceBrl chỉ là ngữ cảnh gửi kèm (giúp AI chọn văn phong theo loại hàng và tầm giá), kết quả chỉ có name + description
+type Item = { id: string; name: string; description: string; category?: string; priceBrl?: number };
+
+const customPrompt = (s: TranslateSettings, locale: TranslateLocale) => s.prompt?.[locale]?.trim() || '';
+const systemText = (s: TranslateSettings, locale: TranslateLocale) => customPrompt(s, locale) || SYSTEM;
 
 async function azureTranslate(s: TranslateSettings, texts: string[], locale: TranslateLocale): Promise<string[]> {
   const out: string[] = [];
@@ -229,6 +234,10 @@ const STYLE: Partial<Record<TranslateLocale, string>> = {
 };
 
 function userPrompt(s: TranslateSettings, items: Item[], locale: TranslateLocale) {
+  if (customPrompt(s, locale)) {
+    const input = items.map((i) => ({ id: i.id, category: i.category ?? '', price_brl: i.priceBrl ?? null, raw_title: i.name, raw_bio: i.description }));
+    return `Target language: ${TRANSLATE_LANG[locale]}\n\nRewrite every item below following the system instruction. Return JSON {"items": [{"id", "name", "description"}]} with the same ids: name = final title, description = final bio (empty string if raw_bio is empty). category and price_brl are context only.\n\nItems (JSON):\n${JSON.stringify(input)}`;
+  }
   const terms = (s.glossary?.[locale] ?? '')
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -263,7 +272,7 @@ class GeminiTooLong extends Error {}
 
 async function geminiCall(s: TranslateSettings, items: Item[], locale: TranslateLocale): Promise<Map<string, Item>> {
   const body = JSON.stringify({
-    systemInstruction: { parts: [{ text: SYSTEM }] },
+    systemInstruction: { parts: [{ text: systemText(s, locale) }] },
     contents: [{ role: 'user', parts: [{ text: userPrompt(s, items, locale) }] }],
     generationConfig: {
       responseMimeType: 'application/json',
@@ -273,7 +282,7 @@ async function geminiCall(s: TranslateSettings, items: Item[], locale: Translate
         required: ['items'],
       },
       maxOutputTokens: 65536,
-      temperature: 0.2,
+      temperature: customPrompt(s, locale) ? 0.15 : 0.2,
     },
   });
   const keys = geminiKeys(s);
@@ -330,7 +339,7 @@ async function translateBatch(client: Anthropic, s: TranslateSettings, items: It
   const response = await client.beta.messages.parse({
     model: s.model,
     max_tokens: 16000,
-    system: SYSTEM,
+    system: systemText(s, locale),
     output_config: { effort: 'low', format: betaZodOutputFormat(ResultSchema) },
     ...(FALLBACK_MODELS.test(s.model) && { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }),
     messages: [
@@ -375,17 +384,51 @@ function translateItems(client: Anthropic | null, s: TranslateSettings, items: I
   return s.provider === 'azure' || !client ? translateBatchAzure(s, items, locale) : translateBatch(client, s, items, locale);
 }
 
+const PRODUCT_SELECT = { id: true, name: true, description: true, price: true, category: { select: { name: true } } } as const;
+type ProductRow = Prisma.ProductGetPayload<{ select: typeof PRODUCT_SELECT }>;
+
+// Dữ liệu gửi AI: tên + mô tả gốc, kèm tên chuyên mục (ngôn ngữ đích) và giá theo R$
+async function buildItems(rows: ProductRow[], locale: TranslateLocale, description: boolean): Promise<Item[]> {
+  const brl = Number((await getConfig('currency.rates'))?.BRL ?? 0);
+  return rows
+    .map((p) => {
+      const cat = (p.category?.name ?? {}) as Record<string, string>;
+      return {
+        id: p.id,
+        name: sourceText(p.name).slice(0, 300),
+        description: description ? sourceText(p.description).slice(0, 3000) : '',
+        category: cat[locale] ?? sourceText(p.category?.name),
+        ...(brl > 0 && { priceBrl: Math.round(Number(p.price) * brl * 100) / 100 }),
+      };
+    })
+    .filter((i) => i.name.trim());
+}
+
+// Dịch thử (không ghi vào web): trả về bản gốc + bản dịch để admin duyệt trước khi chạy hàng loạt
+export async function previewTranslation(ids: string[], locale: TranslateLocale) {
+  const s = await getTranslateSettings();
+  if (!translateReady(s)) throw domainError(400, 'Chưa nhập key dịch (Admin > Dịch sản phẩm > Cấu hình)');
+  const rows = await prisma.product.findMany({ where: { id: { in: ids.slice(0, 20) } }, select: PRODUCT_SELECT });
+  const items = await buildItems(rows, locale, true);
+  const result = await translateItems(s.provider === 'claude' ? anthropicClient(s) : null, s, items, locale);
+  return items.map((i) => ({ id: i.id, category: i.category ?? '', priceBrl: i.priceBrl ?? null, rawTitle: i.name, rawBio: i.description, name: result.get(i.id)?.name ?? '', description: result.get(i.id)?.description ?? '' }));
+}
+
+// Chọn ~10 sản phẩm mẫu đại diện (Matriz, 282, có Page, Gmail/Hotmail, Instagram) để dịch thử
+export async function sampleProductIds(): Promise<string[]> {
+  const rows = await prisma.product.findMany({ where: { isActive: true }, select: { id: true, name: true, category: { select: { name: true } } } });
+  const text = (r: (typeof rows)[number]) => `${sourceText(r.name)} ${Object.values((r.category?.name ?? {}) as Record<string, string>).join(' ')}`;
+  const groups = [/matriz|via cổ|via/i, /282/, /page|página/i, /gmail|hotmail/i, /instagram|\big\b/i];
+  const out: string[] = [];
+  for (const g of groups) for (const r of rows.filter((r) => g.test(text(r)) && !out.includes(r.id)).slice(0, 2)) out.push(r.id);
+  return out;
+}
+
 // Dịch 1 nhóm sản phẩm sang 1 ngôn ngữ. Trả về số sản phẩm đã ghi.
 async function translateProducts(client: Anthropic | null, s: TranslateSettings, ids: string[], locale: TranslateLocale, opts: { description: boolean; overwrite: boolean }) {
-  const products = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, description: true } });
+  const products = await prisma.product.findMany({ where: { id: { in: ids } }, select: PRODUCT_SELECT });
   const todo = products.filter((p) => !isTranslationLocked(p.name) && (opts.overwrite || !hasTranslation(p.name, locale)));
-  const items: Item[] = todo
-    .map((p) => ({
-      id: p.id,
-      name: sourceText(p.name).slice(0, 300),
-      description: opts.description ? sourceText(p.description).slice(0, 3000) : '',
-    }))
-    .filter((i) => i.name.trim());
+  const items = await buildItems(todo, locale, opts.description);
   if (!items.length) return { written: 0, skipped: products.length };
   const result = await translateItems(client, s, items, locale);
   let written = 0;

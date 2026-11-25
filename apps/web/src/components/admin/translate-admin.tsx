@@ -149,12 +149,79 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiK
           </div>
         </div>
       )}
+      {f.targets.length > 0 && f.provider !== 'azure' && (
+        <div className="space-y-2 text-sm">
+          <span className="block font-medium text-zinc-700">Prompt dịch riêng (System Instruction)</span>
+          <p className="text-xs text-zinc-500">
+            Dán bản Master Prompt vào đây. Có prompt thì AI dùng prompt này <b>thay cho</b> quy tắc mặc định và bảng thuật ngữ ở trên, mỗi sản phẩm gửi kèm <code>category</code>, <code>price_brl</code>, <code>raw_title</code>, <code>raw_bio</code> (temperature 0.15). Để trống = dùng mặc định.
+          </p>
+          {f.targets.map((l) => (
+            <label key={l} className="block">
+              <span className="mb-1 block text-xs font-medium text-zinc-600">{LOCALE_LABEL[l]} {f.prompt?.[l]?.trim() ? <span className="text-emerald-600">(đang dùng prompt riêng · {f.prompt[l]!.length.toLocaleString('en-US')} ký tự)</span> : null}</span>
+              <textarea
+                className="input min-h-48 font-mono text-xs"
+                maxLength={30000}
+                placeholder="You are a Senior Brazilian Copywriter and Localization Specialist..."
+                value={f.prompt?.[l] ?? ''}
+                onChange={(e) => setF((s) => ({ ...s, prompt: { ...s.prompt, [l]: e.target.value } }))}
+              />
+            </label>
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.description} onChange={(e) => setF((s) => ({ ...s, description: e.target.checked }))} />Dịch cả mô tả (dài hơn tên khoảng 5–10 lần: tốn hạn mức / chi phí hơn)</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.autoNew} onChange={(e) => setF((s) => ({ ...s, autoNew: e.target.checked }))} />Tự dịch sản phẩm mới / chưa có bản dịch (worker kiểm tra mỗi phút)</label>
       </div>
       <FormAlert error={error} success={success} />
       <button type="button" className="btn-primary" disabled={pending} onClick={save}>{pending ? 'Đang lưu…' : 'Lưu cấu hình'}</button>
+    </div>
+  );
+}
+
+type PreviewRow = { id: string; category: string; priceBrl: number | null; rawTitle: string; rawBio: string; name: string; description: string };
+
+// Dịch thử ~10 sản phẩm mẫu với cấu hình đã LƯU, chỉ hiển thị kết quả, không ghi vào web
+export function TranslatePreview() {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [rows, setRows] = useState<PreviewRow[] | null>(null);
+  async function run() {
+    setPending(true);
+    setError(null);
+    const res = await apiRequest<{ items: PreviewRow[] }>('/api/admin/translate/preview', 'POST', { locale: 'pt' });
+    setPending(false);
+    if (!res.ok) return setError(res.data.error ?? 'Dịch thử thất bại');
+    setRows(res.data.items);
+  }
+  const brl = (n: number | null) => (n == null ? '' : `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-zinc-500">Tự chọn khoảng 10 sản phẩm đại diện (Matriz, 282, có Page, Gmail/Hotmail, Instagram) và dịch sang tiếng Bồ bằng cấu hình đã lưu. <b>Không ghi vào web</b>: ưng kết quả rồi mới bấm &quot;Dịch lại tất cả&quot;. Mất khoảng 30–90 giây.</p>
+      <button type="button" className="btn-primary" disabled={pending} onClick={run}>{pending ? 'Đang dịch thử…' : '🧪 Dịch thử 10 sản phẩm mẫu'}</button>
+      <FormAlert error={error} success={null} />
+      {rows && (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="text-xs text-zinc-500"><tr><th className="py-2 pr-3">Gốc (tiếng Việt)</th><th className="py-2">Bản dịch thử (tiếng Bồ)</th></tr></thead>
+            <tbody className="divide-y divide-zinc-100 align-top">
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td className="w-1/2 py-3 pr-3">
+                    <p className="text-xs text-zinc-400">{r.category} · {brl(r.priceBrl)}</p>
+                    <p className="font-medium text-zinc-800">{r.rawTitle}</p>
+                    {r.rawBio && <p className="mt-1 text-xs whitespace-pre-line text-zinc-500">{r.rawBio}</p>}
+                  </td>
+                  <td className="w-1/2 py-3">
+                    <p className="font-medium text-emerald-800">{r.name || <span className="text-red-600">(AI không trả về)</span>} <span className="text-xs font-normal text-zinc-400">{r.name.length} ký tự</span></p>
+                    {r.description && <p className="mt-1 text-xs whitespace-pre-line text-zinc-600">{r.description}</p>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

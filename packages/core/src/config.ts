@@ -187,6 +187,8 @@ export const CONFIG_SCHEMAS = {
     autoNew: z.boolean(), // sản phẩm mới đồng bộ từ nguồn API tự được dịch
     // Bảng thuật ngữ MMO theo từng ngôn ngữ: mỗi dòng "từ gốc = từ dùng ở thị trường đó" (chỉ AI dùng: Gemini / Claude)
     glossary: z.record(z.enum(['en', 'id', 'ru', 'zh', 'pt']), z.string().max(8000)).default({}),
+    // Prompt riêng (System Instruction) theo ngôn ngữ: có thì thay prompt mặc định + văn phong + bảng thuật ngữ
+    prompt: z.record(z.enum(['en', 'id', 'ru', 'zh', 'pt']), z.string().max(30000)).default({}),
   }),
   // CTV: người bán ngoài đăng sản phẩm, web giữ phí sàn, phần còn lại cộng cho người bán
   ctv: z.object({
