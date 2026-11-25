@@ -534,7 +534,8 @@ async function runTranslations(log: Log) {
   let written = 0;
   for (const locale of s.targets) {
     try {
-      written += await translateCategories(client, s, locale);
+      // Đang dùng prompt riêng (chỉ viết lại sản phẩm): tên chuyên mục là phần tĩnh, admin tự đặt, AI không đụng vào
+      if (!customPrompt(s, locale)) written += await translateCategories(client, s, locale);
     } catch (err) {
       if (err instanceof QuotaWaitError) break;
       log.warn(`auto translate categories (${locale}) failed: ${errText(err)}`);
