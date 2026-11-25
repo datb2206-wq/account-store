@@ -1,4 +1,6 @@
 import type { Locale } from '@/i18n/config';
+import { contactHref } from '@/lib/contact';
+import { getSiteConfig } from '@/lib/site';
 
 // Khung thông báo nổi bật đầu trang chủ (nội dung do chủ shop cung cấp). Chỉ hiện ở trang tổng.
 const CONTENT = {
@@ -15,6 +17,9 @@ const CONTENT = {
     support: 'Tempo médio de suporte: < 15 min',
     tipLabel: 'Dica profissional',
     tip: 'Recomendamos testar de 1 a 3 unidades com proxy e antidetect limpos antes de comprar em grande volume.',
+    tgLabel: 'Suporte no Telegram',
+    tgText: 'Dúvidas, reposição ou pedidos em volume? Fale direto com a nossa equipe.',
+    tgCta: 'Abrir Telegram',
   },
   en: {
     title: 'OFFICIAL CONTINGENCY SUPPLIER | MARKET REFERENCE SINCE 2021',
@@ -29,11 +34,17 @@ const CONTENT = {
     support: 'Average support time: < 15 min',
     tipLabel: 'Pro tip',
     tip: 'We recommend testing 1 to 3 units with a clean proxy and antidetect browser before buying in bulk.',
+    tgLabel: 'Telegram support',
+    tgText: 'Questions, replacements or bulk orders? Talk directly to our team.',
+    tgCta: 'Open Telegram',
   },
 };
 
-export function TrustNotice({ locale }: { locale: Locale }) {
+export async function TrustNotice({ locale }: { locale: Locale }) {
   const c = locale === 'pt' ? CONTENT.pt : CONTENT.en;
+  const site = await getSiteConfig();
+  const tg = contactHref(site.supportTelegram);
+  const tgName = site.supportTelegram.trim().replace(/^https?:\/\/t\.me\//i, '').replace(/^@?/, '@');
   return (
     <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-orange-200">
       <div className="flex items-start gap-3 bg-gradient-to-r from-orange-600 to-amber-500 px-5 py-4 text-white">
@@ -68,6 +79,17 @@ export function TrustNotice({ locale }: { locale: Locale }) {
           <b>{c.tipLabel}:</b> {c.tip}
         </p>
       </div>
+      {tg && (
+        <a href={tg} target="_blank" rel="noopener noreferrer" className="flex flex-wrap items-center gap-3 border-t border-sky-100 bg-sky-50 px-5 py-3 text-sm text-sky-900 transition hover:bg-sky-100">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[#229ED9] text-white" aria-hidden>
+            <svg viewBox="0 0 24 24" className="size-4.5" fill="currentColor"><path d="M21.9 4.6 18.7 19.7c-.2 1.1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9-8.2c.4-.4-.1-.6-.6-.2L6.3 13.3l-4.8-1.5c-1-.3-1.1-1 .2-1.5L20.5 3.1c.9-.3 1.6.2 1.4 1.5Z" /></svg>
+          </span>
+          <p className="min-w-0 flex-1">
+            <b>{c.tgLabel}:</b> {c.tgText} <b className="whitespace-nowrap text-[#1b87bb]">{tgName}</b>
+          </p>
+          <span className="rounded-lg bg-[#229ED9] px-3 py-1.5 text-xs font-bold whitespace-nowrap text-white">{c.tgCta} →</span>
+        </a>
+      )}
     </section>
   );
 }
