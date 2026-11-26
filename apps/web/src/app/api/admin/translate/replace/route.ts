@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prisma } from '@accszone/database';
+import { getTranslateSettings, parseFixRules } from '@accszone/core';
+import { prisma, type Prisma } from '@accszone/database';
 import { adminRoute, parseBody } from '@/lib/admin-route';
 import { writeAudit } from '@/lib/audit';
+import { can } from '@/lib/permissions';
 import { getClientIp } from '@/lib/http';
 
 const schema = z.object({
@@ -13,6 +15,7 @@ const schema = z.object({
   locale: z.enum(['en', 'id', 'ru', 'zh', 'pt']).default('pt'),
   apply: z.boolean().default(false), // false = chỉ xem trước
   lock: z.boolean().default(true), // khóa bản dịch sau khi sửa để "Dịch lại" / đồng bộ không ghi đè
+  saveRule: z.boolean().default(false), // thêm vào "Quy tắc sửa tự động" để AI dịch sau này tự sửa
 });
 
 type Change = { id: string; field: 'name' | 'description'; before: string; after: string };
@@ -72,12 +75,25 @@ export const POST = adminRoute(async (req, _ctx, user) => {
   });
   for (let i = 0; i < ops.length; i += 200) await prisma.$transaction(ops.slice(i, i + 200));
 
+  // Lưu thành quy tắc sửa tự động (cần quyền sửa cấu hình)
+  let ruleSaved = false;
+  if (input.saveRule && can(user, 'settings.edit') && !input.find.includes('=>')) {
+    const s = await getTranslateSettings();
+    const current = s.fixRules?.[input.locale] ?? '';
+    if (!parseFixRules(current).some((r) => r.find.toLowerCase() === input.find.trim().toLowerCase())) {
+      const next = `${current.trimEnd()}${current.trim() ? String.fromCharCode(10) : ''}${input.find.trim()} => ${input.replace.trim()}`.slice(0, 8000);
+      const value = { ...s, fixRules: { ...s.fixRules, [input.locale]: next } } as Prisma.InputJsonValue;
+      await prisma.systemConfig.update({ where: { key: 'translate' }, data: { value, updatedById: user.id } });
+    }
+    ruleSaved = true;
+  }
+
   await writeAudit({
     actorId: user.id,
     action: 'translate.replace',
     entity: 'Product',
-    after: { find: input.find, replace: input.replace, field: input.field, locale: input.locale, products: updates.size, changes: changes.length, lock: input.lock },
+    after: { find: input.find, replace: input.replace, field: input.field, locale: input.locale, products: updates.size, changes: changes.length, lock: input.lock, ruleSaved },
     ip: getClientIp(req),
   });
-  return NextResponse.json({ products: updates.size, changes: changes.length });
+  return NextResponse.json({ products: updates.size, changes: changes.length, ruleSaved });
 });

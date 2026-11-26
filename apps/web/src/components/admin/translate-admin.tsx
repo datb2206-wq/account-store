@@ -169,6 +169,26 @@ export function TranslateSettingsForm({ initial, hasKey, hasAzureKey, hasGeminiK
           ))}
         </div>
       )}
+      {f.targets.length > 0 && (
+        <div className="space-y-2 text-sm">
+          <span className="block font-medium text-zinc-700">Quy tắc sửa tự động (sau khi AI dịch)</span>
+          <p className="text-xs text-zinc-500">
+            Mỗi dòng <code>cụm sai =&gt; cụm đúng</code>. Mỗi lần AI dịch xong (dịch hàng loạt, dịch sản phẩm đã chọn, AI gợi ý), web tự thay theo danh sách này <b>trước khi ghi</b>, nên lỗi đã sửa 1 lần không quay lại. Không phân biệt hoa / thường; để trống bên phải = xóa cụm đó. Không dùng AI, không tốn tiền.
+          </p>
+          {f.targets.map((l) => (
+            <label key={l} className="block">
+              <span className="mb-1 block text-xs font-medium text-zinc-600">{LOCALE_LABEL[l]}</span>
+              <textarea
+                className="input min-h-28 font-mono text-xs"
+                maxLength={8000}
+                placeholder={'# Ví dụ\nReg Celular => Criado no Celular\nClone => Perfil\nGarantia de Saúde => Alta Estabilidade'}
+                value={f.fixRules?.[l] ?? ''}
+                onChange={(e) => setF((s) => ({ ...s, fixRules: { ...s.fixRules, [l]: e.target.value } }))}
+              />
+            </label>
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.description} onChange={(e) => setF((s) => ({ ...s, description: e.target.checked }))} />Dịch cả mô tả (dài hơn tên khoảng 5–10 lần: tốn hạn mức / chi phí hơn)</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.autoNew} onChange={(e) => setF((s) => ({ ...s, autoNew: e.target.checked }))} />Tự dịch sản phẩm mới / chưa có bản dịch (worker kiểm tra mỗi phút)</label>
@@ -226,12 +246,112 @@ export function TranslatePreview() {
   );
 }
 
+type FileCheck = {
+  rows: number;
+  errors: number;
+  changes: number;
+  unchanged: number;
+  errorList?: { row: number; id: string; reason: string }[];
+  items?: { id: string; row: number; src: string; oldName: string; newName: string | null; oldBio: string; newBio: string | null }[];
+  written?: number;
+};
+
+// Xuất file CSV bản dịch -> sửa ngoài web (Excel / Google Sheets / Gemini) -> nhập lại: kiểm tra lệch dòng, xem trước, ghi + khóa
+export function TranslateFile() {
+  const router = useRouter();
+  const [csv, setCsv] = useState<string | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [check, setCheck] = useState<FileCheck | null>(null);
+
+  async function pick(file: File | undefined) {
+    setCheck(null);
+    setError(null);
+    setSuccess(null);
+    if (!file) return;
+    if (file.size > 8_000_000) return setError('File quá lớn (tối đa 8 MB)');
+    setFileName(file.name);
+    const text = await file.text();
+    setCsv(text);
+    call(text, false);
+  }
+
+  async function call(text: string, apply: boolean) {
+    setPending(true);
+    setError(null);
+    const res = await apiRequest<FileCheck>('/api/admin/translate/file', 'POST', { csv: text, apply });
+    setPending(false);
+    if (!res.ok) return setError(res.data.error ?? 'Không đọc được file');
+    if (!apply) return setCheck(res.data);
+    setCheck(null);
+    setCsv(null);
+    setSuccess(`Đã nhập ${res.data.written?.toLocaleString('en-US') ?? 0} sản phẩm và khóa bản dịch.${res.data.errors ? ` Bỏ qua ${res.data.errors} dòng lỗi.` : ''}`);
+    router.refresh();
+  }
+
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-zinc-500">
+        <b>B1.</b> Tải file CSV mọi sản phẩm đang bán (tên + mô tả gốc và bản tiếng Bồ). <b>B2.</b> Sửa 2 cột cuối <code>title_pt</code>, <code>bio_pt</code> bằng Excel / Google Sheets / Gemini, <b>giữ nguyên cột id và tên gốc</b>. <b>B3.</b> Chọn file đã sửa: web kiểm tra từng dòng (đúng id, tên gốc khớp id để không lộn sản phẩm), hiện bảng thay đổi, bấm Nhập mới ghi. Sản phẩm được nhập tự khóa bản dịch.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <a href="/api/admin/translate/file" className="btn-ghost border border-zinc-200">⬇️ Tải file CSV</a>
+        <label className="btn-ghost cursor-pointer border border-zinc-200">
+          📤 Chọn file đã sửa…
+          <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
+        </label>
+        {fileName && <span className="text-xs text-zinc-500">{fileName}</span>}
+        {pending && <span className="text-xs text-zinc-500">Đang xử lý…</span>}
+      </div>
+      <FormAlert error={error} success={success} />
+      {check && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg bg-zinc-50 px-4 py-3">
+            <span>Tổng <b>{check.rows}</b> dòng</span>
+            <span className="text-emerald-700">Sẽ cập nhật <b>{check.changes}</b></span>
+            <span className="text-zinc-500">Không đổi {check.unchanged}</span>
+            <span className={check.errors ? 'text-red-600' : 'text-zinc-500'}>Lỗi (bỏ qua) <b>{check.errors}</b></span>
+          </div>
+          {!!check.errorList?.length && (
+            <div className="max-h-56 overflow-auto rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {check.errorList.map((e) => <p key={`${e.row}-${e.id}`}>Dòng {e.row} {e.id && <code>{e.id}</code>}: {e.reason}</p>)}
+            </div>
+          )}
+          {check.changes > 0 && (
+            <>
+              <div className="max-h-[480px] overflow-auto rounded-lg border border-zinc-200">
+                <table className="w-full min-w-[860px] text-left text-sm">
+                  <thead className="sticky top-0 bg-zinc-50 text-xs text-zinc-500"><tr><th className="px-3 py-2">Tên gốc</th><th className="px-3 py-2">Đang trên web</th><th className="px-3 py-2">Sẽ ghi</th></tr></thead>
+                  <tbody className="divide-y divide-zinc-100 align-top">
+                    {check.items?.map((c) => (
+                      <tr key={c.id}>
+                        <td className="w-1/4 px-3 py-2 text-xs text-zinc-500"><span className="text-zinc-400">Dòng {c.row} · </span>{c.src}</td>
+                        <td className="px-3 py-2 text-xs text-zinc-600">{c.newName !== null && <p className="font-medium">{c.oldName}</p>}{c.newBio !== null && <p className="mt-1 whitespace-pre-line">{c.oldBio}</p>}</td>
+                        <td className="px-3 py-2 text-xs text-emerald-800">{c.newName !== null && <p className="font-medium">{c.newName}</p>}{c.newBio !== null && <p className="mt-1 whitespace-pre-line">{c.newBio}</p>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="btn-primary" disabled={pending || !csv} onClick={() => csv && window.confirm(`Nhập ${check.changes} sản phẩm vào web và khóa bản dịch?`) && call(csv, true)}>
+                {pending ? 'Đang nhập…' : `✅ Nhập ${check.changes.toLocaleString('en-US')} sản phẩm`}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type ReplaceRow = { id: string; field: 'name' | 'description'; before: string; after: string };
 
 // Tìm & thay thế 1 cụm trong bản dịch tiếng Bồ (không dùng AI, không tốn tiền): xem trước rồi mới áp dụng
 export function TranslateReplace() {
   const router = useRouter();
-  const [f, setF] = useState({ find: '', replace: '', field: 'both' as 'name' | 'description' | 'both', matchCase: false, lock: true });
+  const [f, setF] = useState({ find: '', replace: '', field: 'both' as 'name' | 'description' | 'both', matchCase: false, lock: true, saveRule: true });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -242,12 +362,12 @@ export function TranslateReplace() {
     setPending(true);
     setError(null);
     setSuccess(null);
-    const res = await apiRequest<{ products: number; changes: number; items?: ReplaceRow[] }>('/api/admin/translate/replace', 'POST', { ...f, locale: 'pt', apply });
+    const res = await apiRequest<{ products: number; changes: number; items?: ReplaceRow[]; ruleSaved?: boolean }>('/api/admin/translate/replace', 'POST', { ...f, locale: 'pt', apply });
     setPending(false);
     if (!res.ok) return setError(res.data.error ?? 'Lỗi');
     if (!apply) return setPreview({ products: res.data.products, changes: res.data.changes, items: res.data.items ?? [], key });
     setPreview(null);
-    setSuccess(`Đã sửa ${res.data.products.toLocaleString('en-US')} sản phẩm${f.lock ? ' và khóa bản dịch' : ''}.`);
+    setSuccess(`Đã sửa ${res.data.products.toLocaleString('en-US')} sản phẩm${f.lock ? ' và khóa bản dịch' : ''}.${res.data.ruleSaved ? ' Đã lưu vào Quy tắc sửa tự động: lần dịch sau AI tự sửa cụm này.' : ''}`);
     router.refresh();
   }
 
@@ -286,6 +406,7 @@ export function TranslateReplace() {
         </select>
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.matchCase} onChange={(e) => setF((s) => ({ ...s, matchCase: e.target.checked }))} /> Phân biệt hoa / thường</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={f.lock} onChange={(e) => setF((s) => ({ ...s, lock: e.target.checked }))} /> 🔒 Khóa bản dịch các sản phẩm đã sửa</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={f.saveRule} onChange={(e) => setF((s) => ({ ...s, saveRule: e.target.checked }))} /> ♻️ Lưu thành quy tắc sửa tự động (AI dịch sau này tự sửa)</label>
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn-ghost border border-zinc-200" disabled={pending || !f.find.trim()} onClick={() => call(false)}>{pending && !preview ? 'Đang tìm…' : '🔍 Xem trước'}</button>

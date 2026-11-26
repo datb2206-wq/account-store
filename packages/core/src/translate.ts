@@ -28,6 +28,7 @@ export const TRANSLATE_DEFAULTS: TranslateSettings = {
   autoNew: false,
   glossary: {},
   prompt: {},
+  fixRules: {},
 };
 
 // Đã có key cho nhà cung cấp đang chọn chưa
@@ -380,10 +381,55 @@ export function withTranslation(v: unknown, locale: TranslateLocale, text: strin
   return { ...m, [locale]: text };
 }
 
-// Dịch 1 nhóm (sản phẩm hoặc chuyên mục) sang 1 ngôn ngữ, trả về bản dịch theo id
-function translateItems(client: Anthropic | null, s: TranslateSettings, items: Item[], locale: TranslateLocale) {
-  if (s.provider === 'gemini') return translateBatchGemini(s, items, locale);
-  return s.provider === 'azure' || !client ? translateBatchAzure(s, items, locale) : translateBatch(client, s, items, locale);
+// ---- Quy tắc sửa tự động (không dùng AI) ----
+export type FixRule = { find: string; replace: string };
+
+// Mỗi dòng "cụm sai => cụm đúng" (dòng # là ghi chú). Bên phải để trống = xóa cụm đó.
+export function parseFixRules(text: string | undefined): FixRule[] {
+  return (text ?? '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#') && l.includes('=>'))
+    .map((l) => {
+      const i = l.indexOf('=>');
+      return { find: l.slice(0, i).trim(), replace: l.slice(i + 2).trim() };
+    })
+    .filter((r) => r.find.length > 0)
+    .slice(0, 300);
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// Dọn dấu " - " / khoảng trắng thừa khi xóa 1 cụm trong tên
+export const tidyName = (s: string) =>
+  s
+    .replace(/(\s*-\s*){2,}/g, ' - ')
+    .replace(/^\s*-\s*|\s*-\s*$/g, '')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+const tidyText = (s: string) => s.replace(/[ \t]{2,}/g, ' ').replace(/ +\n/g, '\n').trim();
+
+// Thay theo quy tắc, không phân biệt hoa / thường. name = true thì dọn dấu gạch nối thừa.
+export function applyFixRules(text: string, rules: FixRule[], name: boolean) {
+  if (!text || !rules.length) return text;
+  let out = text;
+  for (const r of rules) out = out.replace(new RegExp(escapeRe(r.find), 'gi'), () => r.replace);
+  if (out === text) return text;
+  return name ? tidyName(out) : tidyText(out);
+}
+
+// Dịch 1 nhóm (sản phẩm hoặc chuyên mục) sang 1 ngôn ngữ, trả về bản dịch theo id.
+// Sau khi AI trả về: áp quy tắc sửa tự động, để lỗi đã sửa 1 lần không quay lại.
+async function translateItems(client: Anthropic | null, s: TranslateSettings, items: Item[], locale: TranslateLocale) {
+  const result =
+    s.provider === 'gemini'
+      ? await translateBatchGemini(s, items, locale)
+      : s.provider === 'azure' || !client
+        ? await translateBatchAzure(s, items, locale)
+        : await translateBatch(client, s, items, locale);
+  const rules = parseFixRules(s.fixRules?.[locale]);
+  if (!rules.length) return result;
+  for (const [id, t] of result) result.set(id, { ...t, name: applyFixRules(t.name, rules, true), description: applyFixRules(t.description ?? '', rules, false) });
+  return result;
 }
 
 const PRODUCT_SELECT = { id: true, name: true, description: true, price: true, category: { select: { name: true } } } as const;

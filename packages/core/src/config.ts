@@ -189,6 +189,8 @@ export const CONFIG_SCHEMAS = {
     glossary: z.record(z.enum(['en', 'id', 'ru', 'zh', 'pt']), z.string().max(8000)).default({}),
     // Prompt riêng (System Instruction) theo ngôn ngữ: có thì thay prompt mặc định + văn phong + bảng thuật ngữ
     prompt: z.record(z.enum(['en', 'id', 'ru', 'zh', 'pt']), z.string().max(30000)).default({}),
+    // Quy tắc sửa tự động sau mỗi lần AI dịch (không dùng AI): mỗi dòng "cụm sai => cụm đúng", để trống bên phải = xóa cụm
+    fixRules: z.record(z.enum(['en', 'id', 'ru', 'zh', 'pt']), z.string().max(8000)).default({}),
   }),
   // CTV: người bán ngoài đăng sản phẩm, web giữ phí sàn, phần còn lại cộng cho người bán
   ctv: z.object({

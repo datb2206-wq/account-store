@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { geminiKeys, getTranslateJob, getTranslateSettings, translateReady } from '@accszone/core';
 import { prisma } from '@accszone/database';
-import { LOCALE_LABEL, TranslateActions, TranslatePreview, TranslateReplace, TranslateSettingsForm } from '@/components/admin/translate-admin';
+import { LOCALE_LABEL, TranslateActions, TranslateFile, TranslatePreview, TranslateReplace, TranslateSettingsForm } from '@/components/admin/translate-admin';
 import { PageHeader, Panel } from '@/components/admin/ui';
 import { AutoRefresh } from '@/components/auto-refresh';
 import { LocalTime } from '@/components/local-time';
@@ -69,6 +69,12 @@ export default async function TranslatePage() {
         )}
         <p className="mt-3 text-xs text-zinc-400">Dịch theo từng sản phẩm đã chọn: vào <Link href="/admin/products" className="text-indigo-600 hover:underline">Sản phẩm</Link>, tích chọn rồi bấm &quot;🌐 Dịch&quot;. Xem tên gốc cạnh bản dịch và sửa tay: <Link href="/admin/translate/review" className="text-indigo-600 hover:underline">Duyệt bản dịch</Link>.</p>
       </Panel>
+
+      {can(user, 'products.edit') && (
+        <Panel title="Xuất / nhập file bản dịch (CSV)">
+          <TranslateFile />
+        </Panel>
+      )}
 
       {can(user, 'products.edit') && (
         <Panel title="Sửa cụm từ sai trong bản dịch (tìm & thay thế)">
