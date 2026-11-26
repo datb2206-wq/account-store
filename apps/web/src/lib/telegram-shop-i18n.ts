@@ -268,13 +268,3 @@ export const SHOP_TEXT: Record<Locale, ShopText> = { en, id, ru, zh, pt };
 export function tr(t: ShopText, key: keyof ShopText, vars: Record<string, string | number> = {}) {
   return t[key].replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 }
-
-// Ngôn ngữ Telegram của khách -> ngôn ngữ của web
-export function localeFromTelegram(code: string | undefined): Locale {
-  const c = (code ?? '').toLowerCase();
-  if (c.startsWith('id') || c.startsWith('ms')) return 'id';
-  if (c.startsWith('ru') || c.startsWith('uk') || c.startsWith('be') || c.startsWith('kk')) return 'ru';
-  if (c.startsWith('zh')) return 'zh';
-  if (c.startsWith('pt')) return 'pt';
-  return 'en';
-}

@@ -25,7 +25,7 @@ import {
   type TgUpdate,
   type TgUser,
 } from './telegram-bot';
-import { localeFromTelegram, SHOP_TEXT, tr, type ShopText } from './telegram-shop-i18n';
+import { SHOP_TEXT, tr, type ShopText } from './telegram-shop-i18n';
 
 const BOT = 'shop';
 const CAT_PAGE = 10;
@@ -110,7 +110,8 @@ async function buildCtx(settings: ShopBotSettings, siteUrl: string, chatId: numb
   const saved = user ? null : await getRedis().get(`tg:lang:${from.id}`).catch(() => null);
   const { enabled, defaultLocale } = await getLanguages();
   const isLocale = (v: unknown): v is Locale => typeof v === 'string' && (enabled as readonly string[]).includes(v);
-  const wanted = user ? user.locale : isLocale(saved) ? saved : localeFromTelegram(from.language_code);
+  // Khách chưa liên kết tài khoản và chưa chọn /language -> ngôn ngữ mặc định của web (không theo ngôn ngữ app Telegram)
+  const wanted = user ? user.locale : isLocale(saved) ? saved : defaultLocale;
   const locale: Locale = isLocale(wanted) ? wanted : defaultLocale; // ngôn ngữ admin đã tắt -> ngôn ngữ mặc định
   let site = 'Shop';
   try {
