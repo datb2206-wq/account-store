@@ -60,7 +60,7 @@ export default async function AdminProductsPage({
         <h1 className="text-2xl font-semibold">Sản phẩm <span className="text-base font-normal text-zinc-400">({total})</span></h1>
         <div className="flex flex-wrap gap-2">
           {/* Thẻ a thường (không prefetch): tải file CSV theo đúng bộ lọc đang xem */}
-          {editable && <a href={buildHref('/api/admin/products/export', { q: q || undefined, category: category || undefined, status: status || undefined })} className="btn-ghost border border-zinc-200" title="Tải file CSV (Excel / Google Sheets) các sản phẩm theo bộ lọc đang xem">⬇️ Xuất file ({total.toLocaleString('en-US')})</a>}
+          {editable && <a href={buildHref('/api/admin/products/export', { q: q || undefined, category: category || undefined, status: status || undefined })} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700" title="Tải file CSV (Excel / Google Sheets) các sản phẩm theo bộ lọc đang xem">⬇️ Xuất file ({total.toLocaleString('en-US')})</a>}
           <Link href="/admin/products/new" className="btn-primary">+ Thêm sản phẩm</Link>
         </div>
       </div>
