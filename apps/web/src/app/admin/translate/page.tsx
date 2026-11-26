@@ -67,7 +67,7 @@ export default async function TranslatePage() {
             {job.error && <p className="text-xs text-red-600">{job.error}</p>}
           </div>
         )}
-        <p className="mt-3 text-xs text-zinc-400">Dịch theo từng sản phẩm đã chọn: vào <Link href="/admin/products" className="text-indigo-600 hover:underline">Sản phẩm</Link>, tích chọn rồi bấm &quot;🌐 Dịch&quot;.</p>
+        <p className="mt-3 text-xs text-zinc-400">Dịch theo từng sản phẩm đã chọn: vào <Link href="/admin/products" className="text-indigo-600 hover:underline">Sản phẩm</Link>, tích chọn rồi bấm &quot;🌐 Dịch&quot;. Xem tên gốc cạnh bản dịch và sửa tay: <Link href="/admin/translate/review" className="text-indigo-600 hover:underline">Duyệt bản dịch</Link>.</p>
       </Panel>
 
       {can(user, 'products.edit') && (

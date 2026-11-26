@@ -65,6 +65,7 @@ function buildMenu({ pendingDeposits, stuckOrders }: Pick<ShellProps, 'pendingDe
             { label: 'Chuyên mục', href: '/admin/categories' },
             { label: 'Tất cả sản phẩm', href: '/admin/products' },
             { label: 'Dịch sản phẩm', href: '/admin/translate' },
+            { label: 'Duyệt bản dịch', href: '/admin/translate/review' },
             { label: 'Kết nối API', href: '/admin/suppliers' },
             { label: 'Đơn hàng', href: '/admin/orders', badge: stuckOrders, badgeTone: 'red' },
             { label: 'Tài khoản đã bán', href: '/admin/stock/sold' },
