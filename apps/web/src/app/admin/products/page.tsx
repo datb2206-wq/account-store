@@ -21,7 +21,7 @@ const PAGE_SIZES = [20, 50, 100, 200, 500, 1000] as const;
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; status?: string; page?: string; per?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; status?: string; supplier?: string; page?: string; per?: string }>;
 }) {
   const user = await requireStaff();
   const editable = can(user, 'products.edit');
@@ -29,14 +29,15 @@ export default async function AdminProductsPage({
   const q = params.q?.trim() ?? '';
   const category = params.category ?? '';
   const status = params.status === 'active' || params.status === 'inactive' || params.status === 'featured' ? params.status : '';
+  const supplier = params.supplier?.trim().slice(0, 50) ?? '';
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1);
   const perNum = Number(params.per);
   const PAGE_SIZE: number = (PAGE_SIZES as readonly number[]).includes(perNum) ? perNum : 20;
   const per = PAGE_SIZE === 20 ? undefined : PAGE_SIZE;
 
-  const where = productWhere({ q, category, status });
+  const where = productWhere({ q, category, status, supplier });
 
-  const [total, products, categories] = await Promise.all([
+  const [total, products, categories, suppliers] = await Promise.all([
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
@@ -47,6 +48,7 @@ export default async function AdminProductsPage({
       include: { category: { select: { name: true } }, seller: { select: { shopName: true } }, supplier: { select: { name: true } } },
     }),
     prisma.category.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }], select: { id: true, parentId: true, name: true } }),
+    prisma.supplier.findMany({ orderBy: { createdAt: 'asc' }, select: { id: true, name: true, _count: { select: { products: true } } } }),
   ]);
 
   const ids = products.map((p) => p.id);
@@ -65,7 +67,7 @@ export default async function AdminProductsPage({
         <h1 className="text-2xl font-semibold">Sản phẩm <span className="text-base font-normal text-zinc-400">({total})</span></h1>
         <div className="flex flex-wrap gap-2">
           {/* Thẻ a thường (không prefetch): tải file CSV theo đúng bộ lọc đang xem */}
-          {editable && <a href={buildHref('/api/admin/products/export', { q: q || undefined, category: category || undefined, status: status || undefined })} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700" title="Tải file CSV (Excel / Google Sheets) các sản phẩm theo bộ lọc đang xem">⬇️ Xuất file ({total.toLocaleString('en-US')})</a>}
+          {editable && <a href={buildHref('/api/admin/products/export', { q: q || undefined, category: category || undefined, status: status || undefined, supplier: supplier || undefined })} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700" title="Tải file CSV (Excel / Google Sheets) các sản phẩm theo bộ lọc đang xem">⬇️ Xuất file ({total.toLocaleString('en-US')})</a>}
           <Link href="/admin/products/new" className="btn-primary">+ Thêm sản phẩm</Link>
         </div>
       </div>
@@ -82,13 +84,20 @@ export default async function AdminProductsPage({
           <option value="inactive">Đã ẩn</option>
           <option value="featured">📌 Nổi bật</option>
         </select>
+        <select name="supplier" defaultValue={supplier} className="input w-56">
+          <option value="">Tất cả nguồn hàng (API)</option>
+          <option value="local">Sản phẩm hệ thống (admin tự nhập)</option>
+          <option value="seller">Sản phẩm CTV (người bán)</option>
+          {suppliers.map((s) => <option key={s.id} value={s.id}>API - {s.name} ({s._count.products})</option>)}
+          <option value="deleted">API đã xóa kết nối</option>
+        </select>
         <AutoSelect name="per" defaultValue={String(PAGE_SIZE)} className="input w-40" options={PAGE_SIZES.map((n) => ({ value: String(n), label: `Hiển thị ${n} / trang` }))} />
         <button className="btn-primary">Lọc</button>
-        {(q || category || status || per) && <Link href="/admin/products" className="btn-ghost">Xóa lọc</Link>}
+        {(q || category || status || supplier || per) && <Link href="/admin/products" className="btn-ghost">Xóa lọc</Link>}
       </form>
 
       <ProductBulkProvider ids={editable ? products.map((p) => p.id) : []}>
-      {editable && <ProductBulkBar total={total} filter={{ q, category, status }} categories={treeOptions(categories)} />}
+      {editable && <ProductBulkBar total={total} filter={{ q, category, status, supplier }} categories={treeOptions(categories)} />}
       <div className="card overflow-x-auto p-0">
         <table className="table min-w-[1100px]">
           <thead>
@@ -176,7 +185,7 @@ export default async function AdminProductsPage({
       <Pagination
         page={page}
         totalPages={totalPages}
-        hrefFor={(p) => buildHref('/admin/products', { q, category, status, per, page: p > 1 ? p : undefined })}
+        hrefFor={(p) => buildHref('/admin/products', { q, category, status, supplier: supplier || undefined, per, page: p > 1 ? p : undefined })}
       />
     </div>
   );

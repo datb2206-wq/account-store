@@ -14,7 +14,7 @@ const schema = z
     sortOrder: z.number().int().min(-100_000).max(100_000).optional(),
     ids: z.array(id).min(1).max(1000).optional(),
     // Áp dụng cho TẤT CẢ sản phẩm khớp bộ lọc (không chỉ trang đang xem)
-    filter: z.object({ q: z.string().max(200).optional(), category: z.string().max(50).optional(), status: z.string().max(20).optional() }).optional(),
+    filter: z.object({ q: z.string().max(200).optional(), category: z.string().max(50).optional(), status: z.string().max(20).optional(), supplier: z.string().max(50).optional() }).optional(),
     categoryId: id.optional(),
   })
   .refine((d) => !!d.ids !== !!d.filter, 'Chọn sản phẩm HOẶC áp dụng theo bộ lọc')

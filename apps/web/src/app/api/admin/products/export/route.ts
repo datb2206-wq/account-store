@@ -76,7 +76,7 @@ export const GET = adminRoute(async (req, _ctx, user) => {
   const status = sp.get('status') ?? '';
   const where = ids.length
     ? { id: { in: ids } }
-    : productWhere({ q: sp.get('q')?.trim() ?? '', category: sp.get('category') ?? '', status: ['active', 'inactive', 'featured'].includes(status) ? status : '' });
+    : productWhere({ q: sp.get('q')?.trim() ?? '', category: sp.get('category') ?? '', status: ['active', 'inactive', 'featured'].includes(status) ? status : '', supplier: sp.get('supplier')?.trim().slice(0, 50) ?? '' });
 
   const [products, rates] = await Promise.all([
     prisma.product.findMany({
