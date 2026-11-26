@@ -9,7 +9,8 @@
 //    (bỏ các bản dịch cũ để worker dịch lại). Tên nguồn không đổi -> giữ nguyên bản dịch (kể cả bản en đã dịch, gốc ở 'src').
 //  - stripHtml: lọc thẻ HTML khỏi tên & mô tả lấy từ nguồn.
 //  - Sản phẩm biến mất khỏi catalog -> externalStock = 0 (không xóa: có thể đã có đơn hàng).
-//  - autoHidden: sản phẩm ẩn vì hết hàng -> nguồn có hàng lại thì tự bật bán. Sản phẩm admin tự tay ẩn thì giữ ẩn.
+//  - Sản phẩm đang bán mà nguồn hết hàng (hoặc không còn trong catalog) -> tự ẩn (autoHidden).
+//    autoHidden: nguồn có hàng lại thì tự bật bán. Sản phẩm admin tự tay ẩn thì giữ ẩn.
 //  - Danh mục nguồn trùng tên với danh mục có sẵn của shop (cùng cấp cha) -> dùng luôn danh mục đó, không tạo bản trùng.
 import { createHash } from 'node:crypto';
 import { Prisma, prisma } from '@accszone/database';
@@ -138,7 +139,7 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
   // ---- Sản phẩm ----
   const existing = await prisma.product.findMany({
     where: { supplierId },
-    select: { id: true, externalId: true, price: true, name: true, description: true, autoHidden: true },
+    select: { id: true, externalId: true, price: true, name: true, description: true, autoHidden: true, isActive: true },
   });
   const products = new Map(existing.map((p) => [p.externalId!, p]));
   const clean = (s: string) => (supplier.stripHtml ? htmlToText(s) : s).trim();
@@ -166,7 +167,9 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
         data: {
           ...common,
           ...(!keepPrice && { price: price.toFixed(6) }),
+          // Hết hàng -> tự ẩn; có hàng lại -> tự bật (admin tự tay ẩn thì giữ ẩn)
           ...(prev.autoHidden && item.stock > 0 && { isActive: true, autoHidden: false }),
+          ...(prev.isActive && item.stock <= 0 && { isActive: false, autoHidden: true }),
           ...(supplier.autoUpdateInfo && {
             name: fromSource(prev.name, name),
             description: description ? fromSource(prev.description, description) : asObject(prev.description),
@@ -202,6 +205,11 @@ export async function syncSupplier(supplierId: string): Promise<SyncResult> {
       data: { externalStock: 0, lastSyncedAt: now },
     });
     result.productsMissing = res.count;
+    // Đang bán mà nguồn không còn -> tự ẩn, nguồn bán lại thì tự bật
+    await prisma.product.updateMany({
+      where: { id: { in: [...products.values()].map((p) => p.id) }, isActive: true },
+      data: { isActive: false, autoHidden: true },
+    });
   }
 
   await prisma.supplier.update({ where: { id: supplierId }, data: { lastSyncAt: now } });
