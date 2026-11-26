@@ -146,6 +146,7 @@ export function ProductBulkBar({ total, filter, categories }: { total: number; f
       <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('unfeature')}>Bỏ ghim</button>
       <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={() => run('order')}>Đặt thứ tự</button>
       <button type="button" className="btn-ghost px-2 py-1 text-xs" disabled={pending} onClick={translate}>🌐 Dịch</button>
+      {!everything && <a className="btn-ghost px-2 py-1 text-xs" href={`/api/admin/products/export?ids=${[...selected].join(',')}`} title="Tải file CSV các sản phẩm đã chọn">⬇️ Xuất file</a>}
       {!everything && selected.size <= 500 && (
         <button type="button" className="btn-ghost px-2 py-1 text-xs" title="Mở các sản phẩm đã chọn ở trang Duyệt bản dịch: AI gợi ý, duyệt từng dòng rồi mới ghi" onClick={() => router.push(`/admin/translate/review?ids=${[...selected].join(',')}`)}>🔍 Dịch &amp; duyệt</button>
       )}
