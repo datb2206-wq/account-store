@@ -294,7 +294,7 @@ export function TranslateFile() {
   return (
     <div className="space-y-3 text-sm">
       <p className="text-zinc-500">
-        <b>B1.</b> Tải file CSV mọi sản phẩm đang bán (tên + mô tả gốc và bản tiếng Bồ). <b>B2.</b> Sửa 2 cột cuối <code>title_pt</code>, <code>bio_pt</code> bằng Excel / Google Sheets / Gemini, <b>giữ nguyên cột id và tên gốc</b>. <b>B3.</b> Chọn file đã sửa: web kiểm tra từng dòng (đúng id, tên gốc khớp id để không lộn sản phẩm), hiện bảng thay đổi, bấm Nhập mới ghi. Sản phẩm được nhập tự khóa bản dịch.
+        <b>B1.</b> Tải file CSV toàn bộ sản phẩm, cả đang bán lẫn đang ẩn (tên + mô tả gốc, bản tiếng Bồ, cột trang_thai). <b>B2.</b> Sửa 2 cột <code>title_pt</code>, <code>bio_pt</code> bằng Excel / Google Sheets / Gemini, <b>giữ nguyên cột id và tên gốc</b>. <b>B3.</b> Chọn file đã sửa: web kiểm tra từng dòng (đúng id, tên gốc khớp id để không lộn sản phẩm), hiện bảng thay đổi, bấm Nhập mới ghi. Sản phẩm được nhập tự khóa bản dịch.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <a href="/api/admin/translate/file" className="btn-ghost border border-zinc-200">⬇️ Tải file CSV</a>

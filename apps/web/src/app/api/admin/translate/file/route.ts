@@ -8,8 +8,8 @@ import { csvCell, parseCsv } from '@/lib/csv';
 import { getClientIp } from '@/lib/http';
 
 // Xuất / nhập file CSV bản dịch tiếng Bồ để duyệt ngoài web (Excel, Google Sheets, Gemini...).
-// Cột cố định: id | category | price_brl | raw_title | raw_bio | title_pt | bio_pt. Chỉ nhập 2 cột cuối.
-const HEADER = ['id', 'category', 'price_brl', 'raw_title (VN goc)', 'raw_bio (VN goc)', 'title_pt (sua cot nay)', 'bio_pt (sua cot nay)'];
+// Cột cố định: id | category | price_brl | raw_title | raw_bio | title_pt | bio_pt | trang_thai. Chỉ nhập title_pt, bio_pt (trang_thai chỉ để xem).
+const HEADER = ['id', 'category', 'price_brl', 'raw_title (VN goc)', 'raw_bio (VN goc)', 'title_pt (sua cot nay)', 'bio_pt (sua cot nay)', 'trang_thai'];
 const LOCALE = 'pt';
 
 const asMap = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, string>) : {});
@@ -20,15 +20,14 @@ const srcOf = (v: unknown) => {
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
 const clean = (s: string) => s.replace(/\r\n?/g, '\n').trim();
 
-const productSelect = { id: true, name: true, description: true, price: true, category: { select: { name: true } } } as const;
+const productSelect = { id: true, name: true, description: true, price: true, isActive: true, autoHidden: true, category: { select: { name: true } } } as const;
 
-// Tải file: mọi sản phẩm đang bán
+// Tải file: toàn bộ sản phẩm (đang bán trước, rồi đang ẩn)
 export const GET = adminRoute(async (_req, _ctx, user) => {
   const brl = Number((await getConfig('currency.rates'))?.BRL ?? 0);
   const products = await prisma.product.findMany({
-    where: { isActive: true },
     select: productSelect,
-    orderBy: [{ category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+    orderBy: [{ isActive: 'desc' }, { category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
   });
   const lines = [HEADER.join(',')];
   for (const p of products) {
@@ -42,6 +41,7 @@ export const GET = adminRoute(async (_req, _ctx, user) => {
         clean(srcOf(p.description)),
         asMap(p.name)[LOCALE] ?? '',
         clean(asMap(p.description)[LOCALE] ?? ''),
+        p.isActive ? 'Dang ban' : p.autoHidden ? 'An - het hang' : 'An - chua mo ban',
       ]
         .map(csvCell)
         .join(','),
