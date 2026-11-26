@@ -226,6 +226,100 @@ export function TranslatePreview() {
   );
 }
 
+type ReplaceRow = { id: string; field: 'name' | 'description'; before: string; after: string };
+
+// Tìm & thay thế 1 cụm trong bản dịch tiếng Bồ (không dùng AI, không tốn tiền): xem trước rồi mới áp dụng
+export function TranslateReplace() {
+  const router = useRouter();
+  const [f, setF] = useState({ find: '', replace: '', field: 'both' as 'name' | 'description' | 'both', matchCase: false, lock: true });
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ products: number; changes: number; items: ReplaceRow[]; key: string } | null>(null);
+  const key = JSON.stringify([f.find, f.replace, f.field, f.matchCase]);
+
+  async function call(apply: boolean) {
+    setPending(true);
+    setError(null);
+    setSuccess(null);
+    const res = await apiRequest<{ products: number; changes: number; items?: ReplaceRow[] }>('/api/admin/translate/replace', 'POST', { ...f, locale: 'pt', apply });
+    setPending(false);
+    if (!res.ok) return setError(res.data.error ?? 'Lỗi');
+    if (!apply) return setPreview({ products: res.data.products, changes: res.data.changes, items: res.data.items ?? [], key });
+    setPreview(null);
+    setSuccess(`Đã sửa ${res.data.products.toLocaleString('en-US')} sản phẩm${f.lock ? ' và khóa bản dịch' : ''}.`);
+    router.refresh();
+  }
+
+  function apply() {
+    if (!preview) return;
+    if (!window.confirm(`Thay "${f.find}" → "${f.replace || '(xóa)'}" trong ${preview.products} sản phẩm?`)) return;
+    call(true);
+  }
+
+  // Tô màu cụm tìm thấy trong bản cũ
+  const mark = (text: string) => {
+    const re = new RegExp(`(${f.find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, f.matchCase ? 'g' : 'gi');
+    return text.split(re).map((part, i) => (i % 2 ? <mark key={i} className="rounded bg-red-100 px-0.5 text-red-700">{part}</mark> : part));
+  };
+
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-zinc-500">
+        Sửa đúng 1 cụm từ sai trong <b>bản tiếng Bồ</b> của mọi sản phẩm, VD <code>Reg Celular</code> → <code>Criado no Celular</code>. <b>Không dùng AI, không tốn tiền</b>, phần còn lại của tên / mô tả giữ nguyên. Để trống ô &quot;Thay bằng&quot; = xóa cụm đó.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-zinc-600">Tìm cụm sai</span>
+          <input className="input" maxLength={300} value={f.find} placeholder="Reg Celular" onChange={(e) => setF((s) => ({ ...s, find: e.target.value }))} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-zinc-600">Thay bằng</span>
+          <input className="input" maxLength={300} value={f.replace} placeholder="Criado no Celular" onChange={(e) => setF((s) => ({ ...s, replace: e.target.value }))} />
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <select className="input h-9 w-auto py-0" value={f.field} onChange={(e) => setF((s) => ({ ...s, field: e.target.value as typeof s.field }))}>
+          <option value="both">Tên + mô tả</option>
+          <option value="name">Chỉ tên</option>
+          <option value="description">Chỉ mô tả</option>
+        </select>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={f.matchCase} onChange={(e) => setF((s) => ({ ...s, matchCase: e.target.checked }))} /> Phân biệt hoa / thường</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={f.lock} onChange={(e) => setF((s) => ({ ...s, lock: e.target.checked }))} /> 🔒 Khóa bản dịch các sản phẩm đã sửa</label>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn-ghost border border-zinc-200" disabled={pending || !f.find.trim()} onClick={() => call(false)}>{pending && !preview ? 'Đang tìm…' : '🔍 Xem trước'}</button>
+        {preview && preview.key === key && preview.products > 0 && (
+          <button type="button" className="btn-primary" disabled={pending} onClick={apply}>{pending ? 'Đang sửa…' : `✅ Áp dụng cho ${preview.products.toLocaleString('en-US')} sản phẩm`}</button>
+        )}
+      </div>
+      <FormAlert error={error} success={success} />
+      {preview && preview.key === key && (
+        preview.products === 0 ? (
+          <p className="text-zinc-500">Không tìm thấy &quot;{f.find}&quot; trong bản tiếng Bồ nào.</p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-zinc-600">Tìm thấy trong <b>{preview.products}</b> sản phẩm ({preview.changes} chỗ){preview.items.length < preview.changes ? `, hiện ${preview.items.length} chỗ đầu` : ''}:</p>
+            <div className="max-h-[480px] overflow-auto rounded-lg border border-zinc-200">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="sticky top-0 bg-zinc-50 text-xs text-zinc-500"><tr><th className="px-3 py-2">Hiện tại</th><th className="px-3 py-2">Sau khi sửa</th></tr></thead>
+                <tbody className="divide-y divide-zinc-100 align-top">
+                  {preview.items.map((r) => (
+                    <tr key={`${r.id}-${r.field}`}>
+                      <td className="w-1/2 px-3 py-2 whitespace-pre-line text-zinc-700"><span className="mr-1 text-xs text-zinc-400">{r.field === 'name' ? 'Tên' : 'Mô tả'}:</span>{mark(r.before)}</td>
+                      <td className="w-1/2 px-3 py-2 whitespace-pre-line text-emerald-800">{r.after}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 export function TranslateActions({ running, canStart }: { running: boolean; canStart: boolean }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
