@@ -297,9 +297,9 @@ export function TranslateFile() {
         <b>B1.</b> Tải file CSV toàn bộ sản phẩm, cả đang bán lẫn đang ẩn (tên + mô tả gốc, bản tiếng Bồ, cột trang_thai). <b>B2.</b> Sửa 2 cột <code>title_pt</code>, <code>bio_pt</code> bằng Excel / Google Sheets / Gemini, <b>giữ nguyên cột id và tên gốc</b>. <b>B3.</b> Chọn file đã sửa: web kiểm tra từng dòng (đúng id, tên gốc khớp id để không lộn sản phẩm), hiện bảng thay đổi, bấm Nhập mới ghi. Sản phẩm được nhập tự khóa bản dịch.
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <a href="/api/admin/translate/file" className="btn-ghost border border-zinc-200">⬇️ Tải file CSV</a>
-        <label className="btn-ghost cursor-pointer border border-zinc-200">
-          📤 Chọn file đã sửa…
+        <a href="/api/admin/translate/file" className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700">⬇️ Tải file CSV (toàn bộ sản phẩm)</a>
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700">
+          📤 Nhập file đã sửa…
           <input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
         </label>
         {fileName && <span className="text-xs text-zinc-500">{fileName}</span>}
