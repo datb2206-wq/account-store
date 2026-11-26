@@ -28,6 +28,9 @@ export interface SessionTokens {
 // Refresh token hợp lệ khi jti còn trong Redis. Mỗi lần refresh -> xóa jti cũ, cấp jti mới
 // (rotation). Token cũ bị đánh cắp sẽ không dùng lại được sau khi chủ thật đã refresh.
 const refreshKey = (jti: string) => `auth:rt:${jti}`;
+// Token mới cấp cho 1 jti cũ, giữ vài giây để các request refresh song song cùng nhận (không bị đăng xuất)
+const graceKey = (jti: string) => `auth:rt-grace:${jti}`;
+const REFRESH_GRACE_SECONDS = 30;
 
 // sid: mã phiên đăng nhập. Bỏ trống = phiên mới (đăng nhập); refresh truyền sid cũ để giữ nguyên phiên.
 export async function createSession(user: { id: string; role: Role }, sid: string = randomUUID()): Promise<SessionTokens> {
@@ -44,9 +47,19 @@ export async function rotateSession(refreshToken: string) {
   const payload = await verifyRefreshToken(refreshToken);
   if (!payload) return null;
 
+  const redis = getRedis();
   // GETDEL là atomic: 2 request refresh song song chỉ 1 cái thắng
-  const owner = await getRedis().getdel(refreshKey(payload.jti));
-  if (owner !== payload.sub) return null;
+  const owner = await redis.getdel(refreshKey(payload.jti));
+  if (owner !== payload.sub) {
+    // Thua cuộc đua (trình duyệt mở/tải trước nhiều trang cùng lúc khi token vừa hết hạn):
+    // dùng lại token mới mà request thắng vừa cấp, trong vài giây, thay vì đá về trang đăng nhập
+    const shared = await redis.get(graceKey(payload.jti));
+    if (!shared) return null;
+    const tokens = JSON.parse(shared) as SessionTokens;
+    const user = await prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, role: true, status: true } });
+    if (!user || user.status === 'BANNED') return null;
+    return { user, tokens };
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
@@ -56,12 +69,14 @@ export async function rotateSession(refreshToken: string) {
   // Đã đăng nhập ở thiết bị khác (chế độ 1 thiết bị) -> không cấp token mới
   if (!(await sessionStillValid(user.id, user.role, payload.sid))) return null;
 
-  return { user, tokens: await createSession(user, payload.sid) };
+  const tokens = await createSession(user, payload.sid);
+  await redis.set(graceKey(payload.jti), JSON.stringify(tokens), 'EX', REFRESH_GRACE_SECONDS);
+  return { user, tokens };
 }
 
 export async function revokeSession(refreshToken: string) {
   const payload = await verifyRefreshToken(refreshToken);
-  if (payload) await getRedis().del(refreshKey(payload.jti));
+  if (payload) await getRedis().del(refreshKey(payload.jti), graceKey(payload.jti));
 }
 
 export function setAuthCookies(res: NextResponse, tokens: SessionTokens) {
