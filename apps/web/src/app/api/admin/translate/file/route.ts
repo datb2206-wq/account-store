@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getConfig } from '@accszone/core';
 import { prisma } from '@accszone/database';
 import { adminRoute, badRequest, parseBody } from '@/lib/admin-route';
+import { translationWhere } from '@/lib/admin-products';
 import { writeAudit } from '@/lib/audit';
 import { csvCell, parseCsv } from '@/lib/csv';
 import { getClientIp } from '@/lib/http';
@@ -22,10 +23,12 @@ const clean = (s: string) => s.replace(/\r\n?/g, '\n').trim();
 
 const productSelect = { id: true, name: true, description: true, price: true, isActive: true, autoHidden: true, category: { select: { name: true } } } as const;
 
-// Tải file: toàn bộ sản phẩm (đang bán trước, rồi đang ẩn)
-export const GET = adminRoute(async (_req, _ctx, user) => {
+// Tải file: toàn bộ sản phẩm (đang bán trước, rồi đang ẩn); ?only=pending = chỉ sản phẩm chưa duyệt / chưa khóa bản dịch
+export const GET = adminRoute(async (req, _ctx, user) => {
+  const pendingOnly = req.nextUrl.searchParams.get('only') === 'pending';
   const brl = Number((await getConfig('currency.rates'))?.BRL ?? 0);
   const products = await prisma.product.findMany({
+    ...(pendingOnly && { where: translationWhere('pending')! }),
     select: productSelect,
     orderBy: [{ isActive: 'desc' }, { category: { sortOrder: 'asc' } }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
   });
@@ -47,12 +50,12 @@ export const GET = adminRoute(async (_req, _ctx, user) => {
         .join(','),
     );
   }
-  await writeAudit({ actorId: user.id, action: 'translate.export', entity: 'Product', after: { count: products.length } });
+  await writeAudit({ actorId: user.id, action: 'translate.export', entity: 'Product', after: { count: products.length, pendingOnly } });
   const date = new Date().toISOString().slice(0, 10);
   return new NextResponse(`﻿${lines.join('\r\n')}\r\n`, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="ban-dich-pt-${date}.csv"`,
+      'Content-Disposition': `attachment; filename="ban-dich-pt-${pendingOnly ? 'chua-duyet-' : ''}${date}.csv"`,
       'Cache-Control': 'no-store',
     },
   });

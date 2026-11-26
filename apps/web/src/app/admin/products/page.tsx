@@ -21,7 +21,7 @@ const PAGE_SIZES = [20, 50, 100, 200, 500, 1000] as const;
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; status?: string; supplier?: string; page?: string; per?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; status?: string; supplier?: string; tr?: string; page?: string; per?: string }>;
 }) {
   const user = await requireStaff();
   const editable = can(user, 'products.edit');
@@ -30,12 +30,13 @@ export default async function AdminProductsPage({
   const category = params.category ?? '';
   const status = params.status === 'active' || params.status === 'inactive' || params.status === 'featured' ? params.status : '';
   const supplier = params.supplier?.trim().slice(0, 50) ?? '';
+  const tr = params.tr === 'none' || params.tr === 'pending' ? params.tr : '';
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1);
   const perNum = Number(params.per);
   const PAGE_SIZE: number = (PAGE_SIZES as readonly number[]).includes(perNum) ? perNum : 20;
   const per = PAGE_SIZE === 20 ? undefined : PAGE_SIZE;
 
-  const where = productWhere({ q, category, status, supplier });
+  const where = productWhere({ q, category, status, supplier, tr });
 
   const [total, products, categories, suppliers] = await Promise.all([
     prisma.product.count({ where }),
@@ -67,7 +68,7 @@ export default async function AdminProductsPage({
         <h1 className="text-2xl font-semibold">Sản phẩm <span className="text-base font-normal text-zinc-400">({total})</span></h1>
         <div className="flex flex-wrap gap-2">
           {/* Thẻ a thường (không prefetch): tải file CSV theo đúng bộ lọc đang xem */}
-          {editable && <a href={buildHref('/api/admin/products/export', { q: q || undefined, category: category || undefined, status: status || undefined, supplier: supplier || undefined })} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700" title="Tải file CSV (Excel / Google Sheets) các sản phẩm theo bộ lọc đang xem">⬇️ Xuất file ({total.toLocaleString('en-US')})</a>}
+          {editable && <a href={buildHref('/api/admin/products/export', { q: q || undefined, category: category || undefined, status: status || undefined, supplier: supplier || undefined, tr: tr || undefined })} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700" title="Tải file CSV (Excel / Google Sheets) các sản phẩm theo bộ lọc đang xem">⬇️ Xuất file ({total.toLocaleString('en-US')})</a>}
           <Link href="/admin/products/new" className="btn-primary">+ Thêm sản phẩm</Link>
         </div>
       </div>
@@ -91,13 +92,18 @@ export default async function AdminProductsPage({
           {suppliers.map((s) => <option key={s.id} value={s.id}>API - {s.name} ({s._count.products})</option>)}
           <option value="deleted">API đã xóa kết nối</option>
         </select>
+        <select name="tr" defaultValue={tr} className="input w-52">
+          <option value="">Bản dịch: tất cả</option>
+          <option value="none">Chưa dịch (khách thấy tên gốc)</option>
+          <option value="pending">Chưa duyệt / chưa khóa</option>
+        </select>
         <AutoSelect name="per" defaultValue={String(PAGE_SIZE)} className="input w-40" options={PAGE_SIZES.map((n) => ({ value: String(n), label: `Hiển thị ${n} / trang` }))} />
         <button className="btn-primary">Lọc</button>
-        {(q || category || status || supplier || per) && <Link href="/admin/products" className="btn-ghost">Xóa lọc</Link>}
+        {(q || category || status || supplier || tr || per) && <Link href="/admin/products" className="btn-ghost">Xóa lọc</Link>}
       </form>
 
       <ProductBulkProvider ids={editable ? products.map((p) => p.id) : []}>
-      {editable && <ProductBulkBar total={total} filter={{ q, category, status, supplier }} categories={treeOptions(categories)} />}
+      {editable && <ProductBulkBar total={total} filter={{ q, category, status, supplier, tr }} categories={treeOptions(categories)} />}
       <div className="card overflow-x-auto p-0">
         <table className="table min-w-[1100px]">
           <thead>
@@ -185,7 +191,7 @@ export default async function AdminProductsPage({
       <Pagination
         page={page}
         totalPages={totalPages}
-        hrefFor={(p) => buildHref('/admin/products', { q, category, status, supplier: supplier || undefined, per, page: p > 1 ? p : undefined })}
+        hrefFor={(p) => buildHref('/admin/products', { q, category, status, supplier: supplier || undefined, tr: tr || undefined, per, page: p > 1 ? p : undefined })}
       />
     </div>
   );

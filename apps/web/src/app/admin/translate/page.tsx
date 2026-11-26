@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { geminiKeys, getTranslateJob, getTranslateSettings, translateReady } from '@accszone/core';
 import { prisma } from '@accszone/database';
+import { translationWhere } from '@/lib/admin-products';
 import { LOCALE_LABEL, TranslateActions, TranslateFile, TranslatePreview, TranslateReplace, TranslateSettingsForm } from '@/components/admin/translate-admin';
 import { PageHeader, Panel } from '@/components/admin/ui';
 import { AutoRefresh } from '@/components/auto-refresh';
@@ -16,7 +17,7 @@ const JOB_STATUS = { RUNNING: ['Đang dịch', 'bg-sky-50 text-sky-700'], DONE: 
 
 export default async function TranslatePage() {
   const user = await requireStaff();
-  const [settings, job, total, coverage, online] = await Promise.all([
+  const [settings, job, total, coverage, online, pendingCount] = await Promise.all([
     getTranslateSettings(),
     getTranslateJob(),
     prisma.product.count({ where: { isActive: true } }),
@@ -28,6 +29,7 @@ export default async function TranslatePage() {
              count(*) FILTER (WHERE coalesce(name->>'pt','') <> '')::int AS pt
       FROM products WHERE "isActive" = true`,
     workerOnline().catch(() => false),
+    prisma.product.count({ where: translationWhere('pending')! }),
   ]);
   // Không gửi key ra trình duyệt
   const { apiKey, azureKey, geminiKey, proxy, ...publicSettings } = settings;
@@ -72,7 +74,7 @@ export default async function TranslatePage() {
 
       {can(user, 'products.edit') && (
         <Panel title="Xuất / nhập file bản dịch (CSV)">
-          <TranslateFile />
+          <TranslateFile pendingCount={pendingCount} />
         </Panel>
       )}
 

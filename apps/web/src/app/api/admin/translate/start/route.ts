@@ -10,7 +10,7 @@ import { getClientIp } from '@/lib/http';
 const schema = z
   .object({
     ids: z.array(z.string().min(1).max(50)).min(1).max(20_000).optional(),
-    filter: z.object({ q: z.string().max(200).optional(), category: z.string().max(50).optional(), status: z.string().max(20).optional(), supplier: z.string().max(50).optional() }).optional(),
+    filter: z.object({ q: z.string().max(200).optional(), category: z.string().max(50).optional(), status: z.string().max(20).optional(), supplier: z.string().max(50).optional(), tr: z.string().max(20).optional() }).optional(),
     all: z.boolean().optional(), // mọi sản phẩm đang bán
     locales: z.array(z.enum(['en', 'id', 'ru', 'zh', 'pt'])).max(5).optional(), // mặc định = ngôn ngữ trong cấu hình
     overwrite: z.boolean().default(false),
