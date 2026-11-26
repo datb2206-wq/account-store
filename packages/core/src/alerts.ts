@@ -340,6 +340,34 @@ export async function runMonitor(log?: { warn: (m: string) => void }) {
 }
 
 // ---------------------------------------------------------------- Báo cáo cuối ngày
+// Thống kê sản phẩm: đang bán / đang bán nhưng hết hàng / tự ẩn vì nguồn hết hàng / admin tự tắt
+export async function productStatusSummary() {
+  const [r] = await prisma.$queryRaw<{ total: number; selling: number; empty: number; autoHidden: number; adminHidden: number; adminHiddenStock: number }[]>(Prisma.sql`
+    SELECT count(*)::int AS total,
+           count(*) FILTER (WHERE p."isActive" AND st.qty > 0)::int AS selling,
+           count(*) FILTER (WHERE p."isActive" AND st.qty <= 0)::int AS empty,
+           count(*) FILTER (WHERE NOT p."isActive" AND p."autoHidden")::int AS "autoHidden",
+           count(*) FILTER (WHERE NOT p."isActive" AND NOT p."autoHidden")::int AS "adminHidden",
+           count(*) FILTER (WHERE NOT p."isActive" AND NOT p."autoHidden" AND st.qty > 0)::int AS "adminHiddenStock"
+    FROM products p
+    CROSS JOIN LATERAL (
+      SELECT CASE WHEN p.source = 'LOCAL'
+        THEN (SELECT count(*) FROM stock_items s WHERE s."productId" = p.id AND s.status = 'AVAILABLE')
+        ELSE coalesce(p."externalStock", 0) END AS qty
+    ) st`);
+  return r!;
+}
+
+export function productStatusLines(r: Awaited<ReturnType<typeof productStatusSummary>>) {
+  return [
+    `📦 Sản phẩm: <b>${r.total}</b>`,
+    `• Đang bán, còn hàng: <b>${r.selling}</b>`,
+    `• Đang bán nhưng hết hàng: <b>${r.empty}</b>`,
+    `• Đang ẩn vì hết hàng (có hàng lại tự bật): <b>${r.autoHidden}</b>`,
+    `• Đang ẩn do admin tắt: <b>${r.adminHidden}</b>${r.adminHiddenStock ? ` (${r.adminHiddenStock} cái nguồn vẫn còn hàng)` : ''}`,
+  ];
+}
+
 export async function sendDailyReport() {
   const s = await getTelegramSettings();
   if (!s.enabled || !s.alerts.dailyReport) return { skipped: true };
@@ -381,6 +409,7 @@ export async function sendDailyReport() {
     `💰 Tổng nạp: <b>${usd(depositRow._sum.amount)}</b> (${depositRow._count} lượt)`,
     `👤 Thành viên mới: <b>${users}</b>`,
     balances.length ? `🏦 Số dư nguồn API:\n${balances.join('\n')}` : '🏦 Chưa có nguồn API nào đang bật',
+    ...(await productStatusSummary().then(productStatusLines).catch(() => [])),
   ].join('\n');
   await sendAlert('dailyReport', text);
   return { sent: true };
