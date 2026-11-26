@@ -77,8 +77,21 @@ export async function SiteHeader({ user, q = '', category }: { user: CurrentUser
                   <span translate="no">{formatFx(user.balance.toString(), fx, locale, false) ?? formatUsd(user.balance)}</span>
                   <span className="ml-0.5 text-emerald-500">+</span>
                 </Link>
-                <Link href="/dashboard" className="hidden max-w-36 truncate text-sm font-medium text-zinc-600 hover:text-zinc-900 2xl:inline">
-                  {user.username ?? user.email}
+                {/* Avatar (Admin > Giao diện > Avatar mặc định; chưa tải = chữ cái đầu) + tên khách -> trang tài khoản */}
+                <Link
+                  href="/dashboard"
+                  title={user.username ?? user.email}
+                  className="flex h-11 shrink-0 items-center gap-2 rounded-full p-1 ring-1 ring-zinc-200 transition hover:bg-zinc-50 hover:ring-zinc-300 2xl:pr-3"
+                >
+                  {assets.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={assets.avatar} alt="" width={36} height={36} className="size-9 rounded-full object-cover ring-2 ring-white" />
+                  ) : (
+                    <span className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-emerald-500 text-sm font-bold text-white uppercase">
+                      {(user.username ?? user.email).charAt(0)}
+                    </span>
+                  )}
+                  <span className="hidden max-w-36 truncate text-sm font-medium text-zinc-700 2xl:inline">{user.username ?? user.email}</span>
                 </Link>
                 <LogoutButton label={h.signOut} compact />
               </>
