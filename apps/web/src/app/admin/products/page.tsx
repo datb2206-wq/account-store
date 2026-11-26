@@ -66,7 +66,7 @@ export default async function AdminProductsPage({
       </div>
 
       <form className="flex flex-wrap gap-2">
-        <input name="q" defaultValue={q} placeholder="Tìm theo tên (EN) hoặc slug…" className="input w-64" />
+        <input name="q" defaultValue={q} placeholder="Tìm theo tên gốc, tên hiển thị hoặc slug…" className="input w-64" />
         <select name="category" defaultValue={category} className="input w-56">
           <option value="">Tất cả danh mục</option>
           {treeOptions(categories).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
@@ -90,7 +90,8 @@ export default async function AdminProductsPage({
               {editable && <th className="w-8"><BulkAllCheckbox /></th>}
               <th>Ưu tiên</th>
               <th>Thao tác</th>
-              <th>Sản phẩm</th>
+              <th>Tên gốc (từ nguồn)</th>
+              <th>Tên hiển thị (khách thấy)</th>
               <th>Chuyên mục</th>
               <th className="text-center">Trạng thái</th>
               <th>Giá</th>
@@ -102,11 +103,14 @@ export default async function AdminProductsPage({
           </thead>
           <tbody>
             {products.length === 0 && (
-              <tr><td colSpan={editable ? 11 : 10} className="py-10 text-center text-zinc-500">Không có sản phẩm nào.</td></tr>
+              <tr><td colSpan={editable ? 12 : 11} className="py-10 text-center text-zinc-500">Không có sản phẩm nào.</td></tr>
             )}
             {products.map((p) => {
               const inStock = p.source === 'LOCAL' ? (available.get(p.id) ?? 0) : (p.externalStock ?? 0);
               const name = localized(p.name);
+              const nm = (p.name && typeof p.name === 'object' && !Array.isArray(p.name) ? p.name : {}) as Record<string, string>;
+              const srcName = nm.src ?? nm.en ?? name;
+              const shown = nm.pt ?? '';
               const margin = p.costPrice ? Number(p.price) - Number(p.costPrice) : null;
               return (
                 <tr key={p.id} className="align-middle">
@@ -118,11 +122,21 @@ export default async function AdminProductsPage({
                     <ProductRowActions id={p.id} name={name} reseller={p.source === 'RESELLER'} supplierId={p.supplierId} editable={editable} />
                   </td>
                   <td className="max-w-80">
-                    <Link href={`/admin/products/${p.id}`} className="text-[13px] font-medium uppercase hover:text-blue-600">{name}</Link>
+                    <Link href={`/admin/products/${p.id}`} className="text-[13px] font-medium uppercase hover:text-blue-600">{srcName}</Link>
                     <div className="mt-0.5 flex flex-wrap items-center gap-1">
                       <span className="font-mono text-[11px] text-zinc-400">{p.slug}</span>
                       {p.approval !== 'APPROVED' && <Badge value={p.approval === 'PENDING' ? 'Chờ duyệt' : 'Bị từ chối'} tone="gray" />}
                     </div>
+                  </td>
+                  <td className="max-w-80">
+                    {shown ? (
+                      <>
+                        <p className="text-[13px] font-medium text-emerald-800">{shown}</p>
+                        <p className="mt-0.5 text-[11px] text-zinc-400">{nm.lock ? '🔒 Đã khóa (đã duyệt)' : 'AI dịch, chưa khóa'}</p>
+                      </>
+                    ) : (
+                      <span className="text-xs text-amber-600">Chưa dịch (khách thấy tên gốc)</span>
+                    )}
                   </td>
                   <td className="text-sm text-zinc-600">{localized(p.category.name)}</td>
                   <td className="text-center">
