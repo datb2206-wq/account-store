@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@accszone/database';
 import { BulkAllCheckbox, BulkCheckbox, ProductBulkBar, ProductBulkProvider, ProductOrderControl } from '@/components/admin/product-bulk';
 import { ProductActiveToggle, ProductRowActions } from '@/components/admin/product-row-controls';
+import { AutoSelect } from '@/components/admin/auto-select';
 import { Badge } from '@/components/badge';
 import { Pagination } from '@/components/pagination';
 import { productWhere } from '@/lib/admin-products';
@@ -14,12 +15,13 @@ import { buildHref } from '@/lib/url';
 
 export const metadata: Metadata = { title: 'Sản phẩm' };
 
-const PAGE_SIZE = 20;
+// Số sản phẩm mỗi trang (admin chọn ở ô "Hiển thị")
+const PAGE_SIZES = [20, 50, 100, 200, 500, 1000] as const;
 
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; status?: string; page?: string; per?: string }>;
 }) {
   const user = await requireStaff();
   const editable = can(user, 'products.edit');
@@ -28,6 +30,9 @@ export default async function AdminProductsPage({
   const category = params.category ?? '';
   const status = params.status === 'active' || params.status === 'inactive' || params.status === 'featured' ? params.status : '';
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1);
+  const perNum = Number(params.per);
+  const PAGE_SIZE: number = (PAGE_SIZES as readonly number[]).includes(perNum) ? perNum : 20;
+  const per = PAGE_SIZE === 20 ? undefined : PAGE_SIZE;
 
   const where = productWhere({ q, category, status });
 
@@ -77,8 +82,9 @@ export default async function AdminProductsPage({
           <option value="inactive">Đã ẩn</option>
           <option value="featured">📌 Nổi bật</option>
         </select>
+        <AutoSelect name="per" defaultValue={String(PAGE_SIZE)} className="input w-40" options={PAGE_SIZES.map((n) => ({ value: String(n), label: `Hiển thị ${n} / trang` }))} />
         <button className="btn-primary">Lọc</button>
-        {(q || category || status) && <Link href="/admin/products" className="btn-ghost">Xóa lọc</Link>}
+        {(q || category || status || per) && <Link href="/admin/products" className="btn-ghost">Xóa lọc</Link>}
       </form>
 
       <ProductBulkProvider ids={editable ? products.map((p) => p.id) : []}>
@@ -170,7 +176,7 @@ export default async function AdminProductsPage({
       <Pagination
         page={page}
         totalPages={totalPages}
-        hrefFor={(p) => buildHref('/admin/products', { q, category, status, page: p > 1 ? p : undefined })}
+        hrefFor={(p) => buildHref('/admin/products', { q, category, status, per, page: p > 1 ? p : undefined })}
       />
     </div>
   );
