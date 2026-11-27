@@ -5,7 +5,8 @@
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import QRCode from 'qrcode';
-import { checkPixDeposit, createPixDeposit, createUsdtDeposit, getConfig, getPixSettings, pixReady, type UsdtNetwork } from '@accszone/core';
+import { checkPixDeposit, createPixDeposit, createUsdtDeposit, creditCommission, creditSellerEarning, emailOrder, getConfig, getPixSettings, notifyOrder, pixReady, type UsdtNetwork } from '@accszone/core';
+import { getSiteUrl } from './site';
 import { prisma, type Prisma } from '@accszone/database';
 import { formatFx, LOCALE_CURRENCY, LOCALE_META, type Fx, type Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
@@ -621,6 +622,17 @@ async function buy(ctx: Ctx, productId: string, qty: number, nonce: string) {
     throw err;
   }
   if (couponCode) await getRedis().del(`tg:coupon:${ctx.chatId}`).catch(() => {});
+  if (!result.replayed) {
+    // Giống mua trên web: báo nhóm Telegram admin + hoa hồng giới thiệu + tiền CTV (+ email nếu khách có email thật)
+    const ref = { code: result.order.code };
+    const realEmail = !isTelegramPlaceholderEmail(ctx.user.email);
+    void Promise.all([
+      notifyOrder(ref, 'Bot Telegram'),
+      creditCommission(ref),
+      creditSellerEarning(ref),
+      realEmail ? getSiteUrl().then((u) => emailOrder(ref, u)) : null,
+    ]).catch((e) => console.warn('[tg-shop] after order:', e instanceof Error ? e.message : e));
+  }
   await deliver(ctx, result.order.code);
   // Đơn nguồn API đang xử lý: chờ tối đa ~2 phút rồi gửi hàng; lâu hơn thì khách xem ở "Đơn hàng của tôi"
   if (result.order.status === 'PENDING') {
