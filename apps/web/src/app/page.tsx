@@ -222,14 +222,17 @@ export default async function ShopPage({
 
         {/* ---------- BẢNG SẢN PHẨM THEO DANH MỤC ---------- */}
         {[
-          ...(featured.length ? [{ id: 'featured', title: `📌 ${d.extras.featured}`, href: null, list: featured }] : []),
+          ...(featured.length ? [{ id: 'featured', title: `📌 ${d.extras.featured}`, label: null as string | null, cat: null as (typeof categories)[number] | null, href: null, list: featured }] : []),
           ...sections.map(({ item: category }) => {
             const categoryName = localized(category.name, locale);
             const parent = parentOf(category.parentId);
             return {
               id: category.id,
               // Tên con đã chứa tên cha ("Perfis X - Hotmail") thì không ghép lại tên cha (tránh lặp 2 lần)
-              title: parent && !categoryName.toLowerCase().startsWith(localized(parent.name, locale).toLowerCase()) ? `${localized(parent.name, locale)} - ${categoryName}` : categoryName,
+              // Tiêu đề khối: tên cha nhỏ ở trên (nhãn), tên con to đậm ở dưới
+              title: categoryName,
+              label: parent && !categoryName.toLowerCase().startsWith(localized(parent.name, locale).toLowerCase()) ? localized(parent.name, locale) : null,
+              cat: category,
               href: buildHref('/', { ...keep, category: category.slug }),
               list: byCategory.get(category.id)!,
             };
@@ -241,13 +244,27 @@ export default async function ShopPage({
           const categoryHref = block.href ?? '/';
           return (
             <section key={block.id} aria-labelledby={`cat-${block.id}`} className="space-y-2">
-              <div className={`grid items-center gap-x-4 rounded-lg px-3 py-2.5 text-white ${block.href ? 'bg-zinc-900' : 'bg-gradient-to-r from-orange-600 to-amber-500'} ${COLS}`}>
-                <h2 id={`cat-${block.id}`} className="min-w-0 text-base font-bold sm:text-lg">
-                  {block.href ? <Link href={block.href} className="hover:text-orange-400">{block.title}</Link> : block.title}
-                </h2>
-                <span className="hidden font-bold md:block">{t.colStock}</span>
+              <div
+                className={`relative grid items-center gap-x-4 overflow-hidden rounded-xl px-3 py-3 text-white shadow-md ring-1 ring-black/5 ${block.href ? 'bg-gradient-to-r from-zinc-950 via-slate-900 to-blue-950' : 'bg-gradient-to-r from-orange-600 to-amber-500'} ${COLS}`}
+              >
+                {block.href && <span className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-orange-400 to-orange-600" aria-hidden />}
+                <div className="flex min-w-0 items-center gap-3 pl-1.5">
+                  {block.cat && (
+                    <span className="hidden shrink-0 rounded-xl bg-white/10 p-1 ring-1 ring-white/15 sm:block">
+                      <CategoryIcon name={block.title} slug={block.cat.slug} iconUrl={block.cat.iconUrl} hint={ancestorsHint(block.cat.parentId)} size="md" />
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    {block.label && <p className="truncate text-[11px] font-bold tracking-widest text-orange-400 uppercase">{block.label}</p>}
+                    <h2 id={`cat-${block.id}`} className="text-base leading-snug font-extrabold tracking-tight sm:text-lg">
+                      {block.href ? <Link href={block.href} className="transition-colors hover:text-orange-300">{block.title}</Link> : block.title}
+                      <span className="ml-2 inline-flex items-center rounded-full bg-white/15 px-2 py-0.5 align-middle text-[11px] font-bold text-white/90 tabular-nums">{list.length}</span>
+                    </h2>
+                  </div>
+                </div>
+                <span className="hidden text-xs font-bold tracking-wider text-zinc-300 uppercase md:block">{t.colStock}</span>
                 <span className="hidden lg:block" />
-                <span className="hidden font-bold md:block">{t.colPrice}</span>
+                <span className="hidden text-xs font-bold tracking-wider text-zinc-300 uppercase md:block">{t.colPrice}</span>
                 <span className="hidden md:block" />
               </div>
 
