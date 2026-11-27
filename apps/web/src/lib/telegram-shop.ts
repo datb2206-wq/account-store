@@ -80,6 +80,74 @@ async function listWhere(extra: Prisma.ProductWhereInput = {}): Promise<Prisma.P
 }
 
 const short = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+const SEP = '━━━━━━━━━━━━━━━━';
+
+// Biểu tượng theo tên chuyên mục (cờ quốc gia trước, rồi nền tảng) -> danh sách trong bot dễ nhìn hơn
+const ICONS: [RegExp, string][] = [
+  [/\b(us|usa|eua|estados unidos|mỹ)\b/i, '🇺🇸'],
+  [/vietn|việt/i, '🇻🇳'],
+  [/fran[cç]a|france|pháp/i, '🇫🇷'],
+  [/eslov|slovak/i, '🇸🇰'],
+  [/pol[oô]nia|poland|ba lan/i, '🇵🇱'],
+  [/[ií]ndia\b|ấn độ/i, '🇮🇳'],
+  [/indon[eé]s/i, '🇮🇩'],
+  [/bangladesh/i, '🇧🇩'],
+  [/mianmar|myanmar/i, '🇲🇲'],
+  [/tail[aâ]nd|thai|thái/i, '🇹🇭'],
+  [/afeganist|afghan/i, '🇦🇫'],
+  [/serra leoa|sierra leone/i, '🇸🇱'],
+  [/europa|europe|châu âu/i, '🇪🇺'],
+  [/instagram/i, '📸'],
+  [/threads/i, '🧵'],
+  [/facebook|\bfb\b|\bbm\b|\bcas?\b/i, '📘'],
+  [/tiktok/i, '🎵'],
+  [/gmail|google voice/i, '📧'],
+  [/hotmail|outlook/i, '📨'],
+  [/google ads/i, '📈'],
+  [/youtube/i, '▶️'],
+  [/whatsapp/i, '💬'],
+  [/telegram/i, '✈️'],
+  [/linkedin|indeed/i, '💼'],
+  [/twitter|\/x\b/i, '🐦'],
+  [/chatgpt|\bia\b|\bai\b|openai/i, '🤖'],
+  [/prox/i, '🌐'],
+  [/discord|twitch/i, '🎮'],
+  [/reddit/i, '👽'],
+  [/bluesky/i, '🦋'],
+  [/quora/i, '❓'],
+  [/ok.ru|odnoklassniki/i, '🟠'],
+  [/etsy|trustpilot|yelp/i, '⭐'],
+  [/perfis|profile/i, '👤'],
+];
+type IconNode = { name: unknown; parentId: string | null };
+// Chuyên mục không khớp từ khóa nào -> dùng biểu tượng của chuyên mục cha (VD "Perfis Gringos" nằm trong "Contas Facebook")
+function catIcon(node: IconNode, nodes: Map<string, IconNode>, locale: Locale, depth = 0): string {
+  const own = ICONS.find(([re]) => re.test(localized(node.name, locale)))?.[1];
+  if (own && own !== '👤') return own;
+  const parent = node.parentId ? nodes.get(node.parentId) : undefined;
+  if (parent && depth < 5) {
+    const up = catIcon(parent, nodes, locale, depth + 1);
+    if (up !== '📂') return up;
+  }
+  return own ?? '📂';
+}
+// Mô tả sản phẩm dạng HTML -> chữ thường, giữ xuống dòng / gạch đầu dòng
+function descText(html: string) {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '\n• ')
+    .replace(/<\/(p|div|h[1-6]|li|ul|ol|tr)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
 const money = (ctx: Ctx, usd: { toString(): string } | number) => formatFx(usd.toString(), ctx.fx, ctx.locale, false) ?? formatUsd(usd.toString());
 const fmtDate = (ctx: Ctx, d: Date) =>
   d.toLocaleString(LOCALE_META[ctx.locale].htmlLang, { dateStyle: 'short', timeStyle: 'short', timeZone: ctx.locale === 'pt' ? 'America/Sao_Paulo' : 'UTC' });
@@ -394,16 +462,16 @@ function pager(p: number, pages: number, data: (n: number) => string) {
 }
 
 async function showCategories(ctx: Ctx, page: number, fresh = false) {
-  const { roots } = await categoryTree();
+  const { roots, nodes } = await categoryTree();
   if (!roots.length) return show(ctx, fresh, ctx.t.noProducts, [menuRow(ctx)]);
   const pages = Math.ceil(roots.length / CAT_PAGE);
   const p = Math.min(Math.max(page, 0), pages - 1);
   const kb: Keyboard = roots
     .slice(p * CAT_PAGE, (p + 1) * CAT_PAGE)
-    .map((c) => [{ text: short(`${c.children.some((ch) => ch.total > 0) ? '📁' : '📂'} ${localized(c.name, ctx.locale)} (${c.total})`, 60), callback_data: `cc:${c.id}:0` }]);
+    .map((c) => [{ text: short(`${catIcon(c, nodes, ctx.locale)} ${localized(c.name, ctx.locale).toLocaleUpperCase(LOCALE_META[ctx.locale].htmlLang)} · ${c.total}${c.children.some((ch) => ch.total > 0) ? ' ›' : ''}`, 60), callback_data: `cc:${c.id}:0` }]);
   kb.push(pager(p, pages, (n) => `cl:${n}`));
   kb.push([{ text: ctx.t.btnAllProducts, callback_data: 'ap:0' }, ...menuRow(ctx)]);
-  return show(ctx, fresh, ctx.t.categories, kb.filter((r) => r.length));
+  return show(ctx, fresh, `${ctx.t.categories}\n${SEP}\n${tr(ctx.t, 'catHint', { n: roots.length })}`, kb.filter((r) => r.length));
 }
 
 async function showSubcategories(ctx: Ctx, categoryId: string, page: number) {
@@ -415,11 +483,12 @@ async function showSubcategories(ctx: Ctx, categoryId: string, page: number) {
   const pages = Math.ceil(kids.length / CAT_PAGE);
   const p = Math.min(Math.max(page, 0), pages - 1);
   const name = localized(node.name, ctx.locale);
-  const kb: Keyboard = [[{ text: short(tr(ctx.t, 'btnAllOf', { cat: name }) + ` (${node.total})`, 60), callback_data: `c:${node.id}:0` }]];
-  kb.push(...kids.slice(p * CAT_PAGE, (p + 1) * CAT_PAGE).map((c) => [{ text: short(`📂 ${localized(c.name, ctx.locale)} (${c.total})`, 60), callback_data: `cc:${c.id}:0` }]));
+  const icon = catIcon(node, nodes, ctx.locale);
+  const kb: Keyboard = [[{ text: short(tr(ctx.t, 'btnAllOf', { cat: name }) + ` · ${node.total}`, 60), callback_data: `c:${node.id}:0` }]];
+  kb.push(...kids.slice(p * CAT_PAGE, (p + 1) * CAT_PAGE).map((c) => [{ text: short(`${catIcon(c, nodes, ctx.locale)} ${localized(c.name, ctx.locale)} · ${c.total}${c.children.some((ch) => ch.total > 0) ? ' ›' : ''}`, 60), callback_data: `cc:${c.id}:0` }]));
   kb.push(pager(p, pages, (n) => `cc:${categoryId}:${n}`));
   kb.push([{ text: ctx.t.btnBack, callback_data: node.parentId && nodes.has(node.parentId) ? `cc:${node.parentId}:0` : 'cl:0' }, ...menuRow(ctx)]);
-  return show(ctx, false, tr(ctx.t, 'subcategories', { cat: escapeHtml(name) }), kb.filter((r) => r.length));
+  return show(ctx, false, tr(ctx.t, 'subcategories', { icon, cat: escapeHtml(name.toLocaleUpperCase(LOCALE_META[ctx.locale].htmlLang)), sep: SEP, n: node.total }), kb.filter((r) => r.length));
 }
 
 // ---------------------------------------------------------------- Danh sách sản phẩm (chuyên mục / tất cả / tìm kiếm)
@@ -440,7 +509,7 @@ async function soldOf(products: { id: string; baseSold: number }[]) {
 type ListScope = { kind: 'cat'; id: string } | { kind: 'all' } | { kind: 'search'; q: string };
 
 async function showProducts(ctx: Ctx, scope: ListScope, page: number, fresh = false) {
-  let title = ctx.t.allProducts;
+  let title = `${ctx.t.allProducts}\n${SEP}`;
   let extra: Prisma.ProductWhereInput = {};
   let back = 'cl:0';
   let pageData = (n: number) => `ap:${n}`;
@@ -448,13 +517,13 @@ async function showProducts(ctx: Ctx, scope: ListScope, page: number, fresh = fa
     const { nodes } = await categoryTree();
     const node = nodes.get(scope.id);
     if (!node) return showCategories(ctx, 0);
-    title = tr(ctx.t, 'products', { cat: escapeHtml(localized(node.name, ctx.locale)) }).split('\n')[0]!;
+    title = `${catIcon(node, nodes, ctx.locale)} <b>${escapeHtml(localized(node.name, ctx.locale).toLocaleUpperCase(LOCALE_META[ctx.locale].htmlLang))}</b>\n${SEP}`;
     extra = { categoryId: { in: descendants(node) } };
     back = node.parentId && nodes.has(node.parentId) ? `cc:${node.parentId}:0` : 'cl:0';
     pageData = (n) => `c:${scope.id}:${n}`;
   } else if (scope.kind === 'search') {
     const q = scope.q;
-    title = tr(ctx.t, 'searchResults', { q: escapeHtml(short(q, 40)) });
+    title = `${tr(ctx.t, 'searchResults', { q: escapeHtml(short(q, 40)) })}\n${SEP}`;
     extra = {
       AND: [
         {
@@ -485,18 +554,22 @@ async function showProducts(ctx: Ctx, scope: ListScope, page: number, fresh = fa
     orderBy: [{ isFeatured: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
     skip: p * PRODUCT_PAGE,
     take: PRODUCT_PAGE,
-    select: { id: true, name: true, price: true, source: true, externalStock: true, baseSold: true },
+    select: { id: true, name: true, price: true, source: true, externalStock: true, baseSold: true, categoryId: true },
   });
-  const [stock, sold] = await Promise.all([stockOf(products), soldOf(products)]);
+  const [stock, sold, tree] = await Promise.all([stockOf(products), soldOf(products), categoryTree()]);
+  const iconOf = (categoryId: string) => {
+    const n = tree.nodes.get(categoryId);
+    return n ? catIcon(n, tree.nodes, ctx.locale) : '🔹';
+  };
   const lines = products.map((x, i) => {
     const s = stock.get(x.id) ?? 0;
-    const vars = { n: p * PRODUCT_PAGE + i + 1, name: escapeHtml(short(localized(x.name, ctx.locale), 90)), price: money(ctx, x.price), stock: s.toLocaleString('en-US'), sold: (sold.get(x.id) ?? 0).toLocaleString('en-US') };
+    const vars = { icon: iconOf(x.categoryId), n: p * PRODUCT_PAGE + i + 1, name: escapeHtml(short(localized(x.name, ctx.locale), 90)), price: money(ctx, x.price), stock: s.toLocaleString('en-US'), sold: (sold.get(x.id) ?? 0).toLocaleString('en-US') };
     return tr(ctx.t, s > 0 ? 'listLine' : 'listSoldOut', vars);
   });
   const kb: Keyboard = products.map((x, i) => [{ text: short(`${(stock.get(x.id) ?? 0) > 0 ? '🟢' : '🔴'} ${p * PRODUCT_PAGE + i + 1}. ${localized(x.name, ctx.locale)}`, 64), callback_data: `p:${x.id}` }]);
   kb.push(pager(p, pages, pageData));
   kb.push([{ text: ctx.t.btnBack, callback_data: back }, ...menuRow(ctx)]);
-  const text = `${title}\n<i>${tr(ctx.t, 'pageInfo', { p: p + 1, pages, total })}</i>\n\n${lines.join('\n\n')}`;
+  const text = `${title}\n📄 <i>${tr(ctx.t, 'pageInfo', { p: p + 1, pages, total })}</i>\n\n${lines.join('\n\n')}\n\n${SEP}\n${ctx.t.pickHint}`;
   return show(ctx, fresh, text, kb.filter((r) => r.length));
 }
 
@@ -523,16 +596,18 @@ async function showProduct(ctx: Ctx, productId: string, fresh = false) {
   const product = await loadProduct(productId);
   if (!product) return show(ctx, fresh, ctx.t.unavailable, [menuRow(ctx)]);
   const [stock, sold] = await Promise.all([stockOf([product]).then((m) => m.get(product.id) ?? 0), soldOf([product]).then((m) => m.get(product.id) ?? 0)]);
-  const desc = localized(product.description, ctx.locale).replace(/<[^>]+>/g, '').trim();
+  const desc = descText(localized(product.description, ctx.locale));
+  const tree = await categoryTree();
+  const catNode = tree.nodes.get(product.categoryId);
   const lines = [
-    `<b>${escapeHtml(localized(product.name, ctx.locale))}</b>`,
-    '',
-    `📂 ${ctx.t.category}: ${escapeHtml(localized(product.category.name, ctx.locale))}`,
-    `💵 ${ctx.t.price}: <b>${money(ctx, product.price)}</b>`,
-    `📦 ${stock > 0 ? `${ctx.t.stock}: <b>${stock.toLocaleString('en-US')}</b>` : ctx.t.outOfStock}`,
-    `🔥 ${ctx.t.sold}: ${sold.toLocaleString('en-US')}`,
+    `${catNode ? catIcon(catNode, tree.nodes, ctx.locale) : '🛍'} <b>${escapeHtml(localized(product.name, ctx.locale))}</b>`,
+    SEP,
+    `📂 ${ctx.t.category}: <i>${escapeHtml(localized(product.category.name, ctx.locale))}</i>`,
+    `💰 ${ctx.t.price}: <b>${money(ctx, product.price)}</b>`,
+    `📦 ${stock > 0 ? `${ctx.t.stock}: <b>${stock.toLocaleString('en-US')}</b> ✅` : `<b>${ctx.t.outOfStock}</b> ❌`}`,
+    `🔥 ${ctx.t.sold}: <b>${sold.toLocaleString('en-US')}</b>`,
     `🔢 ${ctx.t.limits}: ${product.minQty} – ${product.maxQty.toLocaleString('en-US')}`,
-    ...(desc ? ['', escapeHtml(short(desc, 900))] : []),
+    ...(desc ? ['', ctx.t.descTitle, `<blockquote expandable>${escapeHtml(short(desc, 2500))}</blockquote>`] : []),
   ];
   const max = Math.min(product.maxQty, stock);
   const kb: Keyboard = [];
@@ -540,7 +615,7 @@ async function showProduct(ctx: Ctx, productId: string, fresh = false) {
     const options = [...new Set([product.minQty, 1, 2, 5, 10, 20, 50])].filter((n) => n >= product.minQty && n <= max).slice(0, 5);
     kb.push(options.map((n) => ({ text: `🛒 ${n}`, callback_data: `q:${product.id}:${n}` })));
     kb.push([{ text: ctx.t.btnOtherQty, callback_data: `qx:${product.id}` }]);
-    lines.push('', ctx.t.chooseQty);
+    lines.push(SEP, `🛒 <b>${ctx.t.chooseQty}</b>`);
   }
   kb.push([{ text: ctx.t.btnBack, callback_data: `c:${product.categoryId}:0` }, ...menuRow(ctx)]);
   return show(ctx, fresh, lines.join('\n'), kb.filter((r) => r.length));
