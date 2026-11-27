@@ -42,6 +42,15 @@ export function brandFor(slug: string, name: string) {
   return BRANDS.find((b) => text.includes(` ${b.key} `)) ?? null;
 }
 
+// Shop bán "Perfis / Perfil / BM / Via" là tài khoản Facebook (tên danh mục thường không ghi chữ Facebook)
+const FACEBOOK_WORDS = /(^|[^a-z])(perfis|perfil|profiles?|bm|bms|via|vias|fanpage)([^a-z]|$)/;
+export function brandForCategory(slug: string, name: string, hint?: string) {
+  const own = brandFor(slug, name) ?? (hint ? brandFor(hint, '') : null);
+  if (own) return own;
+  const text = `${slug} ${name} ${hint ?? ''}`.toLowerCase();
+  return FACEBOOK_WORDS.test(text) ? (BRANDS.find((b) => b.key === 'facebook') ?? null) : null;
+}
+
 // Nền sáng (Snapchat, Grindr) dùng chữ đen
 export function brandForeground(hex: string) {
   const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));

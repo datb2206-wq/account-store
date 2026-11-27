@@ -1,4 +1,4 @@
-import { brandFor, brandForeground } from '@/lib/brand-icons';
+import { brandForCategory, brandForeground } from '@/lib/brand-icons';
 import { classifyCategory, type CategoryGlyph } from '@/lib/category-groups';
 import {
   CameraIcon, ChatIcon, GamepadIcon, GiftIcon, GlobeIcon, GridIcon, HashIcon, KeyIcon,
@@ -48,13 +48,14 @@ export function GlyphBadge({ glyph, color, size = 'md' }: { glyph: CategoryGlyph
   );
 }
 
-export function CategoryIcon({ name, slug, iconUrl, fallbackUrl, size = 'md' }: { name: string; slug: string; iconUrl?: string | null; fallbackUrl?: string | null; size?: keyof typeof SIZES }) {
+// hint: tên + slug các danh mục cha -> danh mục con không ghi tên nền tảng vẫn có logo của danh mục cha
+export function CategoryIcon({ name, slug, iconUrl, fallbackUrl, hint, size = 'md' }: { name: string; slug: string; iconUrl?: string | null; fallbackUrl?: string | null; hint?: string; size?: keyof typeof SIZES }) {
   const { box, glyph: glyphSize } = SIZES[size];
   if (iconUrl) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={iconUrl} alt="" className={`${box} shrink-0 object-contain`} loading="lazy" />;
   }
-  const brand = brandFor(slug, name);
+  const brand = brandForCategory(slug, name, hint);
   if (brand) {
     const foreground = brandForeground(brand.hex);
     return (

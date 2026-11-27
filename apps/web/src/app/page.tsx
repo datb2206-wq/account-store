@@ -137,6 +137,12 @@ export default async function ShopPage({
   const sections = flattenTree(categories).filter(({ item }) => byCategory.has(item.id));
 
   const parentOf = (id: string | null) => categories.find((c) => c.id === id);
+  // Tên + slug các danh mục cha (tối đa 5 cấp) -> icon danh mục con lấy theo nền tảng của cha
+  const ancestorsHint = (id: string | null) => {
+    const parts: string[] = [];
+    for (let c = parentOf(id), i = 0; c && i < 5; c = parentOf(c.parentId), i++) parts.push(c.slug, localized(c.name, 'en'), localized(c.name, locale));
+    return parts.join(' ');
+  };
   const inStockTotal = products.reduce((s, p) => s + stockOf(p), 0);
   const soldTotal = products.reduce((s, p) => s + (sold.get(p.id) ?? 0), 0);
 
@@ -255,11 +261,12 @@ export default async function ShopPage({
                   const minNote = p.minQty > 1 ? fmt(t.minQty, { n: p.minQty }) : null;
                   const category = catById.get(p.categoryId)!;
                   const categoryName = localized(category.name, locale);
+                  const hint = ancestorsHint(category.parentId);
                   return (
                     <li key={p.id} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2.5 rounded-lg bg-white p-3 ${COLS}`}>
                       <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
                         <span className="hidden sm:block">
-                          <CategoryIcon name={categoryName} slug={category.slug} iconUrl={category.iconUrl} fallbackUrl={assets.productDefault} size="lg" />
+                          <CategoryIcon name={categoryName} slug={category.slug} iconUrl={category.iconUrl} fallbackUrl={assets.productDefault} hint={hint} size="lg" />
                         </span>
                         <div className="min-w-0">
                           <p className="text-sm leading-6 font-medium text-zinc-900">
