@@ -19,8 +19,9 @@ const username = z.preprocess(
 
 export const registerSchema = z.object({ email, password, username });
 
+// Đăng nhập bằng email HOẶC tên đăng nhập (tài khoản tạo qua bot Telegram chỉ có tên đăng nhập dạng tg_123)
 export const loginSchema = z.object({
-  email,
+  email: z.union([email, z.string().trim().regex(/^[a-zA-Z0-9_]{3,20}$/, 'Invalid email address')]),
   password: z.string().min(1, 'Password is required').max(200),
 });
 

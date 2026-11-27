@@ -29,6 +29,8 @@ export interface TgMessage {
   from?: TgUser;
   chat: { id: number; type: string };
   text?: string;
+  caption?: string;
+  photo?: unknown;
 }
 export interface TgUpdate {
   update_id: number;
@@ -83,20 +85,61 @@ export async function editOrSend(token: string, chatId: number, messageId: numbe
   return sendText(token, chatId, text, keyboard);
 }
 
-export async function sendDocument(token: string, chatId: number, filename: string, content: string, caption?: string) {
+export async function sendDocument(token: string, chatId: number, filename: string, content: string, caption?: string, keyboard?: Keyboard) {
   const form = new FormData();
   form.set('chat_id', String(chatId));
   if (caption) {
     form.set('caption', caption.slice(0, 1000));
     form.set('parse_mode', 'HTML');
   }
+  if (keyboard) form.set('reply_markup', JSON.stringify({ inline_keyboard: keyboard }));
   form.set('document', new Blob([content], { type: 'text/plain' }), filename);
   const res = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(30_000) });
   const data = (await res.json().catch(() => null)) as { ok?: boolean; description?: string } | null;
   if (!data?.ok) throw new TelegramApiError(data?.description ?? `Telegram HTTP ${res.status}`);
 }
 
-export const answerCallback = (token: string, id: string, text?: string) =>
+// Gửi ảnh (VD mã QR PIX) kèm chú thích + nút
+export async function sendPhoto(token: string, chatId: number, png: Uint8Array, caption: string, keyboard?: Keyboard) {
+  const form = new FormData();
+  form.set('chat_id', String(chatId));
+  form.set('caption', caption.slice(0, 1000));
+  form.set('parse_mode', 'HTML');
+  if (keyboard) form.set('reply_markup', JSON.stringify({ inline_keyboard: keyboard }));
+  form.set('photo', new Blob([new Uint8Array(png)], { type: 'image/png' }), 'qr.png');
+  const res = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(30_000) });
+  const data = (await res.json().catch(() => null)) as { ok?: boolean; description?: string } | null;
+  if (!data?.ok) throw new TelegramApiError(data?.description ?? `Telegram HTTP ${res.status}`);
+}
+
+export const deleteMessage = (token: string, chatId: number, messageId: number) => tg(token, 'deleteMessage', { chat_id: chatId, message_id: messageId }).catch(() => {});
+
+// ---------------------------------------------------------------- Nhật ký webhook (Admin > Telegram): 200 dòng gần nhất trong Redis
+const LOG_KEY = (bot: string) => `tg:log:${bot}`;
+export interface BotLogEntry {
+  at: string;
+  from: string;
+  kind: 'msg' | 'btn';
+  data: string;
+  ms: number;
+  error?: string;
+}
+export async function writeBotLog(bot: string, entry: BotLogEntry) {
+  try {
+    const r = getRedis();
+    await r.lpush(LOG_KEY(bot), JSON.stringify(entry));
+    await r.ltrim(LOG_KEY(bot), 0, 199);
+  } catch {}
+}
+export async function readBotLog(bot: string): Promise<BotLogEntry[]> {
+  try {
+    return (await getRedis().lrange(LOG_KEY(bot), 0, 199)).map((s) => JSON.parse(s) as BotLogEntry);
+  } catch {
+    return [];
+  }
+}
+
+export const answerCallback =(token: string, id: string, text?: string) =>
   tg(token, 'answerCallbackQuery', { callback_query_id: id, ...(text && { text: text.slice(0, 190), show_alert: text.length > 60 }) }).catch(() => {});
 
 // ---------------------------------------------------------------- Webhook

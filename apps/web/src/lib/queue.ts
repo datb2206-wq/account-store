@@ -58,3 +58,28 @@ export async function workerOnline() {
     return false;
   }
 }
+
+// ---------------------------------------------------------------- Thông báo hàng loạt qua bot bán hàng
+const BROADCAST_LAST_KEY = 'tg:broadcast:last';
+
+export async function enqueueShopBroadcast(text: string, actorId: string) {
+  const job = await getQueue().add(JOBS.tgBroadcast, { text, actorId }, { jobId: `tg-broadcast-${Date.now()}`, removeOnComplete: { count: 20 }, removeOnFail: { count: 20 } });
+  const { getRedis } = await import('./redis');
+  await getRedis().set(BROADCAST_LAST_KEY, job.id ?? '', 'EX', 30 * 86400);
+  return job.id;
+}
+
+export type ShopBroadcastStatus = { id: string; text: string; state: string; createdAt: number; total: number; sent: number; failed: number; done: boolean };
+
+export async function lastShopBroadcast(): Promise<ShopBroadcastStatus | null> {
+  try {
+    const { getRedis } = await import('./redis');
+    const id = await getRedis().get(BROADCAST_LAST_KEY);
+    const job = id ? await getQueue().getJob(id) : null;
+    if (!job) return null;
+    const p = (typeof job.progress === 'object' ? job.progress : {}) as Partial<ShopBroadcastStatus>;
+    return { id: job.id ?? '', text: String(job.data?.text ?? ''), state: await job.getState(), createdAt: job.timestamp, total: p.total ?? 0, sent: p.sent ?? 0, failed: p.failed ?? 0, done: !!p.done };
+  } catch {
+    return null;
+  }
+}

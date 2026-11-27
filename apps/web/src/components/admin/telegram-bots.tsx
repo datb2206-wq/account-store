@@ -69,7 +69,7 @@ export function ShopBotForm({ initial, hasToken }: { initial: { enabled: boolean
   return (
     <Panel title="Bot khách hàng (bán hàng qua Telegram)" bodyClassName="space-y-4 p-5">
       <p className="text-sm text-zinc-500">
-        Khách xem sản phẩm, mua bằng số dư và nhận tài khoản ngay trong Telegram (5 ngôn ngữ). Khách bấm &quot;Kết nối Telegram&quot; ở trang Tài khoản trên web để liên kết.
+        Khách bấm Start là có tài khoản ngay (tên đăng nhập tg_&lt;ID Telegram&gt;), xem / tìm sản phẩm, nạp tiền PIX / USDT, mua bằng số dư và nhận tài khoản ngay trong Telegram. Khách đã có tài khoản web thì bấm &quot;Kết nối Telegram&quot; ở trang Tài khoản để liên kết.
         Phải là <b>bot khác</b> với bot thông báo ở trên: tạo thêm 1 bot ở @BotFather (/newbot).
       </p>
       {initial.botUsername && (
@@ -104,6 +104,71 @@ export function ShopBotForm({ initial, hasToken }: { initial: { enabled: boolean
       </div>
       <FormAlert error={error} success={success} />
       <button type="button" className="btn-primary" disabled={pending} onClick={save}>{pending ? 'Đang lưu…' : 'Lưu bot khách hàng'}</button>
+    </Panel>
+  );
+}
+
+type BroadcastStatus = { id: string; text: string; state: string; createdAt: number; total: number; sent: number; failed: number; done: boolean } | null;
+
+// Gửi thông báo hàng loạt tới mọi khách đã bấm Start bot bán hàng (worker gửi ~20 tin/giây)
+export function ShopBroadcast({ recipients, initialLast }: { recipients: number; initialLast: BroadcastStatus }) {
+  const [text, setText] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [last, setLast] = useState<BroadcastStatus>(initialLast);
+
+  async function refresh() {
+    const data = (await fetch('/api/admin/telegram/shop/broadcast', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { last: BroadcastStatus } | null;
+    if (data) setLast(data.last);
+    return data?.last ?? null;
+  }
+
+  async function send(test: boolean) {
+    if (!test && !window.confirm(`Gửi thông báo này tới ${recipients.toLocaleString('en-US')} khách?`)) return;
+    setPending(true);
+    setError(null);
+    setSuccess(null);
+    const res = await apiRequest<{ recipients?: number }>('/api/admin/telegram/shop/broadcast', 'POST', { text, test });
+    setPending(false);
+    if (!res.ok) return setError(res.data.error ?? 'Gửi thất bại');
+    if (test) return setSuccess('Đã gửi thử vào Telegram của bạn.');
+    setSuccess(`Đang gửi tới ${res.data.recipients?.toLocaleString('en-US')} khách…`);
+    // Theo dõi tiến độ tới khi xong
+    for (let i = 0; i < 600; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const s = await refresh();
+      if (!s || s.done || s.state === 'failed' || s.state === 'completed') break;
+    }
+  }
+
+  const running = last && !last.done && last.state !== 'failed' && last.state !== 'completed';
+  return (
+    <Panel title="Gửi thông báo hàng loạt (bot bán hàng)" bodyClassName="space-y-3 p-5">
+      <p className="text-sm text-zinc-500">
+        Bot nhắn tin tới <b>{recipients.toLocaleString('en-US')}</b> khách đã bấm Start (trừ tài khoản bị khóa). Gửi chậm ~20 tin/giây để Telegram không chặn bot.
+        Định dạng: <code>&lt;b&gt;đậm&lt;/b&gt;</code>, <code>&lt;i&gt;nghiêng&lt;/i&gt;</code>, <code>&lt;a href=&quot;https://...&quot;&gt;link&lt;/a&gt;</code>.
+      </p>
+      <textarea className="input min-h-32 font-mono text-sm" value={text} onChange={(e) => setText(e.target.value)} maxLength={3500} placeholder={'🔥 <b>Novidade!</b> Novos produtos na loja…'} />
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-ghost border border-zinc-200" disabled={pending || !text.trim()} onClick={() => send(true)}>Gửi thử cho tôi</button>
+        <button type="button" className="btn-primary" disabled={pending || !text.trim() || !!running || recipients === 0} onClick={() => send(false)}>{pending ? 'Đang gửi…' : `📣 Gửi tới ${recipients.toLocaleString('en-US')} khách`}</button>
+        <span className="text-xs text-zinc-400">{text.length}/3500</span>
+      </div>
+      <FormAlert error={error} success={success} />
+      {last && (
+        <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-3 text-sm">
+          <p className="font-medium text-zinc-700">
+            Đợt gần nhất ({new Date(last.createdAt).toLocaleString('vi-VN')}):{' '}
+            {running ? <span className="text-amber-600">đang gửi…</span> : last.state === 'failed' ? <span className="text-red-600">lỗi</span> : <span className="text-emerald-600">xong</span>}
+          </p>
+          <p className="mt-1 text-zinc-600">
+            Đã gửi <b className="text-emerald-700">{last.sent.toLocaleString('en-US')}</b> / {last.total.toLocaleString('en-US')} · Lỗi (khách chặn bot) <b className="text-red-600">{last.failed.toLocaleString('en-US')}</b>
+          </p>
+          <p className="mt-1 line-clamp-2 font-mono text-xs whitespace-pre-wrap text-zinc-400">{last.text}</p>
+          {running && <button type="button" className="mt-2 text-xs text-indigo-600 hover:underline" onClick={refresh}>Cập nhật tiến độ</button>}
+        </div>
+      )}
     </Panel>
   );
 }

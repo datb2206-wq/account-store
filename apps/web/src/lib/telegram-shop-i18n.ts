@@ -53,9 +53,9 @@ const en = {
   unavailable: '❌ This product is not available.',
 };
 
-export type ShopText = typeof en;
+type BaseText = typeof en;
 
-const id: ShopText = {
+const id: BaseText = {
   menu: '🛍 <b>{site}</b>\nPilih menu di bawah:',
   btnProducts: '🛍 Produk',
   btnBalance: '💰 Saldo & isi ulang',
@@ -107,7 +107,7 @@ const id: ShopText = {
   unavailable: '❌ Produk ini tidak tersedia.',
 };
 
-const ru: ShopText = {
+const ru: BaseText = {
   menu: '🛍 <b>{site}</b>\nВыберите раздел:',
   btnProducts: '🛍 Товары',
   btnBalance: '💰 Баланс и пополнение',
@@ -159,7 +159,7 @@ const ru: ShopText = {
   unavailable: '❌ Этот товар недоступен.',
 };
 
-const zh: ShopText = {
+const zh: BaseText = {
   menu: '🛍 <b>{site}</b>\n请选择：',
   btnProducts: '🛍 商品',
   btnBalance: '💰 余额与充值',
@@ -211,7 +211,7 @@ const zh: ShopText = {
   unavailable: '❌ 该商品不可购买。',
 };
 
-const pt: ShopText = {
+const pt: BaseText = {
   menu: '🛍 <b>{site}</b>\nEscolha uma opção abaixo:',
   btnProducts: '🛍 Produtos',
   btnBalance: '💰 Saldo e recarga',
@@ -263,7 +263,177 @@ const pt: ShopText = {
   unavailable: '❌ Este produto não está disponível.',
 };
 
-export const SHOP_TEXT: Record<Locale, ShopText> = { en, id, ru, zh, pt };
+// ---------------------------------------------------------------- Chức năng mới (tài khoản tự tạo, nạp tiền trong bot, lịch sử...)
+// Có bản tiếng Anh + tiếng Bồ; ngôn ngữ khác tạm dùng tiếng Anh.
+const enExtra = {
+  home: '🛍 <b>{site}</b>\n\n👤 Account: <code>{account}</code>\n💰 Balance: <b>{balance}</b>\n\nChoose an option below 👇',
+  btnCategories: '📂 Categories',
+  btnAllProducts: '🛒 All products',
+  btnSearch: '🔍 Search',
+  btnAccount: '👤 My account',
+  btnHistory: '📜 Transactions',
+  btnSettings: '⚙️ Settings',
+  btnAllOf: '🛒 All in {cat}',
+  allProducts: '🛒 <b>All products</b>',
+  subcategories: '📂 <b>{cat}</b>\nChoose a subcategory:',
+  listLine: '{n}. <b>{name}</b>\n    💵 {price} · 📦 {stock} · 🔥 {sold} sold',
+  listSoldOut: '{n}. <b>{name}</b>\n    💵 {price} · ❌ Sold out',
+  pageInfo: 'Page {p}/{pages} · {total} products',
+  category: 'Category',
+  sold: 'Sold',
+  limits: 'Order limit',
+  searchAsk: '🔍 Send a keyword to search (e.g. <i>Gmail</i>, <i>Facebook</i>):',
+  searchResults: '🔍 Results for "<b>{q}</b>"',
+  searchNone: '🔍 Nothing found for "<b>{q}</b>". Try another keyword.',
+  confirmFull:
+    '🧾 <b>Confirm your order</b>\n\n📦 {name}\n💵 Unit price: {unit}\n🔢 Quantity: <b>{qty}</b>\n\nSubtotal: {subtotal}{discountLine}\n<b>Total: {total}</b>\n\n💰 Your balance: {balance}',
+  discountLine: '\n🎟 Discount ({code}): −{discount}',
+  missing: '\n\n❌ Not enough balance. You need <b>{missing}</b> more.',
+  btnCoupon: '🎟 I have a coupon',
+  btnRemoveCoupon: '✖️ Remove coupon',
+  couponAsk: '🎟 Send your coupon code:',
+  couponBad: '❌ {reason}',
+  btnDepositNow: '💰 Top up now',
+  btnBuyAgain: '🛒 Buy again',
+  btnDownload: '📥 Download .txt',
+  banned: '⛔ Your account has been suspended. Contact support if you think this is a mistake.',
+  welcomeNew: '🎉 Welcome! Your account <code>{account}</code> was created automatically.\nYou can buy right away. To also log in on the website, set a password in 👤 <b>My account</b>.',
+  depositMenu: '💳 <b>Top up balance</b>\n\n💰 Current balance: <b>{balance}</b>\n\nChoose a payment method:',
+  depositNone: 'No payment method is available in the bot right now. Please top up on the website.',
+  btnPix: '⚡ PIX (instant)',
+  btnUsdt: '💎 USDT {network}',
+  btnWebDeposit: '🌐 Top up on the website',
+  pixAsk: '⚡ <b>PIX</b>\nChoose or send the amount in {currency} (minimum {min}{max}):',
+  maxPart: ', maximum {max}',
+  pixCreated:
+    '⚡ <b>PIX payment created</b>\n\n💵 Amount: <b>{amount}</b>\n⏰ Expires: {expires}\n\n1. Open your bank app → PIX → <b>Pix Copia e Cola</b> (or scan the QR code)\n2. Paste the code below and pay\n3. The balance is added automatically 👇',
+  pixCode: '<code>{code}</code>',
+  btnCheck: '🔄 Check payment',
+  depPending: '⏳ Payment not received yet. If you already paid, wait a moment and tap again.',
+  depDone: '✅ Payment confirmed! Your balance was updated.',
+  depExpired: '⌛ This payment request has expired. Create a new one.',
+  usdtAsk: '💎 <b>USDT {network}</b>\nSend the amount in whole USDT (minimum {min}):',
+  usdtCreated:
+    '💎 <b>USDT {network} deposit</b>\n\n1 USDT = {rate}\nSend <b>exactly</b> this amount:\n<code>{amount}</code> USDT\n\nTo the address ({network} network only):\n<code>{address}</code>\n\n⏰ Expires: {expires}\nThe balance is added automatically after the network confirms ✅',
+  badAmount: '❌ Invalid amount. Send only numbers, e.g. 50',
+  depositOk: '✅ <b>Top up confirmed!</b>\n\n➕ {amount}{bonus}\n💰 New balance: <b>{balance}</b>',
+  account:
+    '👤 <b>My account</b>\n\n🆔 Username: <code>{username}</code>\n📧 Email: {email}\n💬 Telegram: {tg}\n💰 Balance: <b>{balance}</b>\n💳 Total top-ups: {deposited}\n🛒 Total spent: {spent}\n📅 Created: {created}',
+  noEmail: '— (account created in Telegram)',
+  btnSetPassword: '🔑 Set website password',
+  pwAsk: '🔑 Send the new password (8–72 characters).\nYour message will be deleted right after.',
+  pwBad: '❌ The password must be 8–72 characters. Send it again:',
+  pwSaved: '✅ Password saved! Log in at {site} with username <code>{username}</code> and this password.',
+  pwNotAllowed: 'This account was created on the website. Change the password on the website.',
+  ordersPage: '📦 <b>My orders</b> ({total})',
+  orderDetail: '🧾 <b>Order {code}</b>\n\n📦 {name}\n🔢 Quantity: {qty}\n💵 Paid: <b>{total}</b>\n📌 Status: {status}\n📅 {date}',
+  orderItems: '\n\n<b>Accounts:</b>\n<pre>{items}</pre>',
+  orderItemsFile: '\n\n📎 {n} accounts – tap "Download .txt".',
+  history: '📜 <b>Transactions</b>',
+  noHistory: 'No transactions yet.',
+  tx_DEPOSIT: 'Top up',
+  tx_PURCHASE: 'Purchase',
+  tx_REFUND: 'Refund',
+  tx_ADJUSTMENT: 'Adjustment',
+  tx_BONUS: 'Bonus',
+  tx_COMMISSION: 'Commission',
+  tx_SELLER: 'Seller earnings',
+  settings: '⚙️ <b>Settings</b>\n\n🌐 Language: {lang}\n💱 Currency: {currency}',
+  btnCurrency: '💱 Currency',
+  currency: '💱 Choose the display currency:',
+  currencySaved: '✅ Currency updated.',
+  linkHasBalance: '⚠️ This Telegram already has an account with balance or orders (<code>{account}</code>). Contact support to merge accounts.',
+};
+
+const ptExtra: typeof enExtra = {
+  home: '🛍 <b>{site}</b>\n\n👤 Conta: <code>{account}</code>\n💰 Saldo: <b>{balance}</b>\n\nEscolha uma opção abaixo 👇',
+  btnCategories: '📂 Categorias',
+  btnAllProducts: '🛒 Todos os produtos',
+  btnSearch: '🔍 Buscar',
+  btnAccount: '👤 Minha conta',
+  btnHistory: '📜 Extrato',
+  btnSettings: '⚙️ Configurações',
+  btnAllOf: '🛒 Tudo em {cat}',
+  allProducts: '🛒 <b>Todos os produtos</b>',
+  subcategories: '📂 <b>{cat}</b>\nEscolha uma subcategoria:',
+  listLine: '{n}. <b>{name}</b>\n    💵 {price} · 📦 {stock} · 🔥 {sold} vendidos',
+  listSoldOut: '{n}. <b>{name}</b>\n    💵 {price} · ❌ Esgotado',
+  pageInfo: 'Página {p}/{pages} · {total} produtos',
+  category: 'Categoria',
+  sold: 'Vendidos',
+  limits: 'Limite por pedido',
+  searchAsk: '🔍 Envie uma palavra para buscar (ex.: <i>Gmail</i>, <i>Facebook</i>):',
+  searchResults: '🔍 Resultados para "<b>{q}</b>"',
+  searchNone: '🔍 Nada encontrado para "<b>{q}</b>". Tente outra palavra.',
+  confirmFull:
+    '🧾 <b>Confirme seu pedido</b>\n\n📦 {name}\n💵 Preço unitário: {unit}\n🔢 Quantidade: <b>{qty}</b>\n\nSubtotal: {subtotal}{discountLine}\n<b>Total: {total}</b>\n\n💰 Seu saldo: {balance}',
+  discountLine: '\n🎟 Desconto ({code}): −{discount}',
+  missing: '\n\n❌ Saldo insuficiente. Faltam <b>{missing}</b>.',
+  btnCoupon: '🎟 Tenho um cupom',
+  btnRemoveCoupon: '✖️ Remover cupom',
+  couponAsk: '🎟 Envie o código do cupom:',
+  couponBad: '❌ {reason}',
+  btnDepositNow: '💰 Recarregar agora',
+  btnBuyAgain: '🛒 Comprar novamente',
+  btnDownload: '📥 Baixar .txt',
+  banned: '⛔ Sua conta foi suspensa. Fale com o suporte se achar que é um engano.',
+  welcomeNew: '🎉 Bem-vindo! Sua conta <code>{account}</code> foi criada automaticamente.\nVocê já pode comprar. Para entrar também no site, crie uma senha em 👤 <b>Minha conta</b>.',
+  depositMenu: '💳 <b>Recarregar saldo</b>\n\n💰 Saldo atual: <b>{balance}</b>\n\nEscolha a forma de pagamento:',
+  depositNone: 'Nenhuma forma de pagamento disponível no bot agora. Recarregue pelo site.',
+  btnPix: '⚡ PIX (na hora)',
+  btnUsdt: '💎 USDT {network}',
+  btnWebDeposit: '🌐 Recarregar pelo site',
+  pixAsk: '⚡ <b>PIX</b>\nEscolha ou envie o valor em {currency} (mínimo {min}{max}):',
+  maxPart: ', máximo {max}',
+  pixCreated:
+    '⚡ <b>Pagamento PIX criado</b>\n\n💵 Valor: <b>{amount}</b>\n⏰ Expira: {expires}\n\n1. Abra o app do banco → PIX → <b>Pix Copia e Cola</b> (ou leia o QR Code)\n2. Cole o código abaixo e pague\n3. O saldo entra automaticamente 👇',
+  pixCode: '<code>{code}</code>',
+  btnCheck: '🔄 Verificar pagamento',
+  depPending: '⏳ Pagamento ainda não recebido. Se já pagou, aguarde um pouco e toque de novo.',
+  depDone: '✅ Pagamento confirmado! Seu saldo foi atualizado.',
+  depExpired: '⌛ Este pagamento expirou. Crie um novo.',
+  usdtAsk: '💎 <b>USDT {network}</b>\nEnvie o valor em USDT inteiro (mínimo {min}):',
+  usdtCreated:
+    '💎 <b>Recarga USDT {network}</b>\n\n1 USDT = {rate}\nEnvie <b>exatamente</b> este valor:\n<code>{amount}</code> USDT\n\nPara o endereço (somente rede {network}):\n<code>{address}</code>\n\n⏰ Expira: {expires}\nO saldo entra automaticamente após a confirmação da rede ✅',
+  badAmount: '❌ Valor inválido. Envie só números, ex.: 50',
+  depositOk: '✅ <b>Recarga confirmada!</b>\n\n➕ {amount}{bonus}\n💰 Novo saldo: <b>{balance}</b>',
+  account:
+    '👤 <b>Minha conta</b>\n\n🆔 Usuário: <code>{username}</code>\n📧 E-mail: {email}\n💬 Telegram: {tg}\n💰 Saldo: <b>{balance}</b>\n💳 Total recarregado: {deposited}\n🛒 Total gasto: {spent}\n📅 Criada em: {created}',
+  noEmail: '— (conta criada no Telegram)',
+  btnSetPassword: '🔑 Criar senha do site',
+  pwAsk: '🔑 Envie a nova senha (8–72 caracteres).\nSua mensagem será apagada logo em seguida.',
+  pwBad: '❌ A senha precisa ter de 8 a 72 caracteres. Envie novamente:',
+  pwSaved: '✅ Senha salva! Entre em {site} com o usuário <code>{username}</code> e esta senha.',
+  pwNotAllowed: 'Esta conta foi criada no site. Altere a senha pelo site.',
+  ordersPage: '📦 <b>Meus pedidos</b> ({total})',
+  orderDetail: '🧾 <b>Pedido {code}</b>\n\n📦 {name}\n🔢 Quantidade: {qty}\n💵 Pago: <b>{total}</b>\n📌 Status: {status}\n📅 {date}',
+  orderItems: '\n\n<b>Contas:</b>\n<pre>{items}</pre>',
+  orderItemsFile: '\n\n📎 {n} contas – toque em "Baixar .txt".',
+  history: '📜 <b>Extrato</b>',
+  noHistory: 'Nenhuma movimentação ainda.',
+  tx_DEPOSIT: 'Recarga',
+  tx_PURCHASE: 'Compra',
+  tx_REFUND: 'Reembolso',
+  tx_ADJUSTMENT: 'Ajuste',
+  tx_BONUS: 'Bônus',
+  tx_COMMISSION: 'Comissão',
+  tx_SELLER: 'Vendas',
+  settings: '⚙️ <b>Configurações</b>\n\n🌐 Idioma: {lang}\n💱 Moeda: {currency}',
+  btnCurrency: '💱 Moeda',
+  currency: '💱 Escolha a moeda de exibição:',
+  currencySaved: '✅ Moeda atualizada.',
+  linkHasBalance: '⚠️ Este Telegram já tem uma conta com saldo ou pedidos (<code>{account}</code>). Fale com o suporte para unir as contas.',
+};
+
+export type ShopText = typeof en & typeof enExtra;
+
+export const SHOP_TEXT: Record<Locale, ShopText> = {
+  en: { ...en, ...enExtra },
+  id: { ...id, ...enExtra },
+  ru: { ...ru, ...enExtra },
+  zh: { ...zh, ...enExtra },
+  pt: { ...pt, ...ptExtra },
+};
 
 export function tr(t: ShopText, key: keyof ShopText, vars: Record<string, string | number> = {}) {
   return t[key].replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));

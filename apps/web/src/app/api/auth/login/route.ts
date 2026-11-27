@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { emailLoginAlert } from '@accszone/core';
+import { isTelegramPlaceholderEmail } from '@/lib/telegram-account';
 import { prisma } from '@accszone/database';
 import { GATE_COOKIE, passedGate } from '@/lib/admin-gate';
 import { writeAudit } from '@/lib/audit';
@@ -36,13 +37,14 @@ export async function POST(req: NextRequest) {
   }
   const { email, password } = parsed.data;
 
-  const emailKey = `login:email:${email}`;
+  const emailKey = `login:email:${email.toLowerCase()}`;
   // Sai mật khẩu quá N lần vào 1 tài khoản -> tạm khóa đăng nhập tài khoản đó 15 phút (N: Admin > Bảo mật)
   const emailLimit = await rateLimit(emailKey, security.loginFailAccountLimit, 15 * 60);
   if (!emailLimit.ok) return tooManyRequests(emailLimit.retryAfter);
 
-  const user = await prisma.user.findUnique({
-    where: { email },
+  // Có @ = email, không có = tên đăng nhập (VD tài khoản tạo qua bot Telegram: tg_123456)
+  const user = await prisma.user.findFirst({
+    where: email.includes('@') ? { email } : { username: { equals: email, mode: 'insensitive' } },
     select: { id: true, email: true, username: true, role: true, status: true, passwordHash: true },
   });
   const valid = await bcrypt.compare(password, user?.passwordHash ?? (await getDummyHash()));
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
   const { passwordHash: _, status: __, ...publicUser } = user;
   const res = NextResponse.json({ user: publicUser });
   // Email cảnh báo đăng nhập (nếu admin bật), gửi sau khi đã trả kết quả
-  after(() => emailLoginAlert(user, ip, userAgent ?? ''));
+  if (!isTelegramPlaceholderEmail(user.email)) after(() => emailLoginAlert(user, ip, userAgent ?? ''));
   const sid = randomUUID();
   await claimSession(user.id, user.role, sid);
   setAuthCookies(res, await createSession(user, sid));

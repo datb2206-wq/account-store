@@ -4,6 +4,7 @@ import { prisma, type Prisma } from '@accszone/database';
 import { adminRoute, badRequest } from '@/lib/admin-route';
 import { writeAudit } from '@/lib/audit';
 import { getClientIp, readJson } from '@/lib/http';
+import { syncShopCommands } from '@/lib/telegram-shop';
 import { deleteWebhook, getMe, getShopBotSettings, setWebhook } from '@/lib/telegram-bot';
 
 // Lưu bot khách hàng. Token để trống = giữ token cũ. Bật -> kiểm tra token (getMe) và đăng ký webhook với Telegram.
@@ -28,6 +29,7 @@ export const PUT = adminRoute(async (req, _ctx, user) => {
     if (!site.startsWith('https://')) throw badRequest('Telegram chỉ gọi được web chạy HTTPS (tên miền thật).');
     try {
       await setWebhook(value.botToken, `${site}/api/webhooks/telegram/shop`);
+      await syncShopCommands(value.botToken);
     } catch (err) {
       throw badRequest(`Không đăng ký được webhook: ${err instanceof Error ? err.message : err}`);
     }

@@ -80,7 +80,14 @@ export function AuthForm({ mode, next, captchaSiteKey }: { mode: 'login' | 'regi
 
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-      <Input name="email" type="email" label={t.email} autoComplete="email" errors={fields.email} />
+      {/* Đăng nhập: nhận cả email lẫn tên đăng nhập (tài khoản tạo qua bot Telegram) */}
+      <Input
+        name="email"
+        type={isRegister ? 'email' : 'text'}
+        label={isRegister ? t.email : `${t.email} / ${t.username.replace(/\s*\(.*\)$/, '')}`}
+        autoComplete={isRegister ? 'email' : 'username'}
+        errors={fields.email}
+      />
       {isRegister && (
         <Input name="username" label={t.username} autoComplete="username" errors={fields.username} />
       )}

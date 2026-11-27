@@ -127,6 +127,7 @@ export async function notifyDeposit(transactionId: string) {
     return rate ? `${usd(v)} (≈ ${brl(Number(v?.toString() ?? 0) * rate)})` : usd(v);
   };
   const paidBrl = t.originalCurrency === 'BRL' && t.originalAmount ? Number(t.originalAmount.toString()) : undefined;
+  await notifyCustomerDeposit(t.userId, t.amount, bonus?.amount ?? null, bonus?.balanceAfter ?? t.balanceAfter, t.originalCurrency && t.originalAmount ? { currency: t.originalCurrency, amount: Number(t.originalAmount.toString()) } : null);
   await notify('deposit', {
     username: who(t.user),
     method: METHOD_LABEL[t.method] ?? t.method,
@@ -135,6 +136,97 @@ export async function notifyDeposit(transactionId: string) {
     bonus: withBrl(bonus?.amount),
     balance: withBrl(bonus?.balanceAfter ?? t.balanceAfter),
   });
+}
+
+// Báo cho KHÁCH qua bot bán hàng (nếu khách đã có Telegram gắn với tài khoản): tiền vào là nhắn ngay.
+// Số tiền hiện theo tiền mặc định của web (Admin > Tiền tệ), PIX thì hiện đúng số R$ khách trả.
+const CUSTOMER_DEPOSIT_TEXT: Record<string, { title: string; balance: string; bonus: string }> = {
+  pt: { title: '✅ <b>Recarga confirmada!</b>', balance: '💰 Novo saldo', bonus: '🎁 Bônus' },
+  en: { title: '✅ <b>Top up confirmed!</b>', balance: '💰 New balance', bonus: '🎁 Bonus' },
+};
+const HTML_LANG: Record<string, string> = { pt: 'pt-BR', en: 'en-US', id: 'id-ID', ru: 'ru-RU', zh: 'zh-CN' };
+
+async function displayCurrency(): Promise<{ code: string; rate: number; decimals: number }> {
+  try {
+    const [rates, display] = await Promise.all([getConfig('currency.rates'), getConfig('currency.display').catch(() => null)]);
+    const code = display?.defaultCurrency && display.defaultCurrency !== 'AUTO' ? display.defaultCurrency : 'USD';
+    if (code === 'USD') return { code, rate: 1, decimals: 2 };
+    const meta = display?.currencies.find((c) => c.code === code);
+    // Giống trang web: tiền tính theo VND (vndPer) thì tỷ giá = VND / vndPer
+    const rate = meta?.vndPer && rates.VND ? rates.VND / meta.vndPer : rates[code];
+    return rate ? { code, rate, decimals: meta?.decimals ?? 2 } : { code: 'USD', rate: 1, decimals: 2 };
+  } catch {
+    return { code: 'USD', rate: 1, decimals: 2 };
+  }
+}
+
+async function notifyCustomerDeposit(
+  userId: string,
+  amountUsd: { toString(): string },
+  bonusUsd: { toString(): string } | null,
+  balanceUsd: { toString(): string } | null,
+  paid: { currency: string; amount: number } | null,
+) {
+  try {
+    const [shop, user] = await Promise.all([getConfig('telegram.shop'), prisma.user.findUnique({ where: { id: userId }, select: { telegramId: true, locale: true } })]);
+    if (!shop.enabled || !shop.botToken || !user?.telegramId) return;
+    const cur = await displayCurrency();
+    const lang = HTML_LANG[user.locale] ?? 'en-US';
+    const fmt = (usdValue: { toString(): string }) =>
+      new Intl.NumberFormat(lang, { style: 'currency', currency: cur.code, minimumFractionDigits: cur.decimals, maximumFractionDigits: cur.decimals }).format(Number(usdValue.toString()) * cur.rate);
+    const t = CUSTOMER_DEPOSIT_TEXT[user.locale] ?? CUSTOMER_DEPOSIT_TEXT.en!;
+    const amount = paid && paid.currency === cur.code ? new Intl.NumberFormat(lang, { style: 'currency', currency: cur.code }).format(paid.amount) : fmt(amountUsd);
+    const lines = [t.title, '', `➕ <b>${amount}</b>`];
+    if (bonusUsd && Number(bonusUsd.toString()) > 0) lines.push(`${t.bonus}: +${fmt(bonusUsd)}`);
+    if (balanceUsd) lines.push(`${t.balance}: <b>${fmt(balanceUsd)}</b>`);
+    await sendTelegram(shop.botToken, user.telegramId, lines.join('\n'));
+  } catch (err) {
+    console.warn(`[telegram] customer deposit notify failed: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
+// Gửi thông báo hàng loạt từ bot bán hàng tới mọi khách đã bấm Start (tài khoản có Telegram, không bị khóa).
+// Telegram cho tối đa ~30 tin/giây -> gửi ~20 tin/giây; bị giới hạn (429) thì chờ đúng số giây Telegram yêu cầu.
+export interface BroadcastProgress {
+  total: number;
+  sent: number;
+  failed: number;
+  done: boolean;
+}
+
+export async function sendShopBroadcast(text: string, onProgress: (p: BroadcastProgress) => Promise<void> | void) {
+  const shop = await getConfig('telegram.shop');
+  if (!shop.enabled || !shop.botToken) throw new Error('Bot bán hàng chưa bật');
+  const users = await prisma.user.findMany({ where: { telegramId: { not: null }, status: { not: 'BANNED' } }, select: { telegramId: true } });
+  const p: BroadcastProgress = { total: users.length, sent: 0, failed: 0, done: false };
+  await onProgress(p);
+  for (const [i, u] of users.entries()) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const res = await fetch(`https://api.telegram.org/bot${encodeURIComponent(shop.botToken)}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ chat_id: u.telegramId, text: text.slice(0, 4000), parse_mode: 'HTML', disable_web_page_preview: true }),
+        signal: AbortSignal.timeout(10_000),
+      }).catch(() => null);
+      const data = (await res?.json().catch(() => null)) as { ok?: boolean; parameters?: { retry_after?: number } } | null;
+      if (data?.ok) {
+        p.sent++;
+        break;
+      }
+      const wait = data?.parameters?.retry_after;
+      if (wait && attempt < 2) {
+        await new Promise((r) => setTimeout(r, (wait + 1) * 1000));
+        continue;
+      }
+      p.failed++; // khách đã chặn bot / xóa tài khoản Telegram
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+    if (i % 25 === 24) await onProgress(p);
+  }
+  p.done = true;
+  await onProgress(p);
+  return p;
 }
 
 export async function notifyRefund(orderId: string, amount: { toString(): string }, reason: string) {

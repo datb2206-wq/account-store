@@ -11,7 +11,7 @@
 //   fulfill-order    theo sự kiện -> web đẩy vào ngay khi khách mua hàng RESELLER
 import { Queue, Worker, type Job } from 'bullmq';
 import { prisma } from '@accszone/database';
-import { AUTOMATION_EVERY_MS, backfillSellerEarnings, reportSystemError, reportSystemOk, runMonitor, sendDailyReport, expireStaleDeposits, fulfillResellerOrder, notifyLowBalance, processEmailCampaigns, processTranslations, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, supplierClient, sweepPixDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
+import { AUTOMATION_EVERY_MS, backfillSellerEarnings, reportSystemError, reportSystemOk, runMonitor, sendDailyReport, expireStaleDeposits, fulfillResellerOrder, notifyLowBalance, processEmailCampaigns, processTranslations, releaseSellerEarnings, runDueAutomations, scanUsdtDeposits, sendShopBroadcast, supplierClient, sweepPixDeposits, sweepResellerOrders, syncSupplier, updateFxRates } from '@accszone/core';
 import {
   FULFILL_JOB_OPTIONS,
   fulfillJobId,
@@ -164,6 +164,13 @@ async function processJob(job: Job) {
       const released = await releaseSellerEarnings();
       if (released) log('ctv').info(`released ${released} seller earnings`);
       return runDueAutomations(log('auto'));
+    }
+
+    case JOBS.tgBroadcast: {
+      const { text } = job.data as { text: string };
+      const r = await sendShopBroadcast(text, (p) => job.updateProgress({ ...p }));
+      log('broadcast').info(`sent ${r.sent}/${r.total}, failed ${r.failed}`);
+      return r;
     }
 
     case JOBS.updateFx:

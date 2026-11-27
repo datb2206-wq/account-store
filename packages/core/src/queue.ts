@@ -16,6 +16,7 @@ export const JOBS = {
   monitor: 'run-monitor', // mỗi 5 phút: cảnh báo Telegram (nguồn API lỗi, kho sắp hết, tiền chưa cộng...)
   sweepPix: 'sweep-pix-deposits', // mỗi phút: hỏi cổng PIX các lệnh đang chờ (nếu có link kiểm tra)
   dailyReport: 'daily-report', // 23:55 giờ VN: báo cáo cuối ngày qua Telegram
+  tgBroadcast: 'telegram-shop-broadcast', // admin bấm gửi: bot bán hàng nhắn tin tới mọi khách đã bấm Start
   emailCampaigns: 'send-email-campaigns', // mỗi phút: gửi tiếp 1 đợt email chiến dịch // định kỳ: chạy công việc tự động (Admin > Tự động hóa)
 } as const;
 
