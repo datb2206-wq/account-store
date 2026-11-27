@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { SiteChrome } from '@/components/site-chrome';
 import { StorefrontOnly } from '@/components/storefront-only';
 import { I18nProvider } from '@/i18n/client';
@@ -35,10 +36,13 @@ const TRANSLATE_GUARD = `(function(){if(typeof Node!=='function'||!Node.prototyp
 var r=Node.prototype.removeChild;Node.prototype.removeChild=function(c){if(c.parentNode!==this)return c;return r.apply(this,arguments)};
 var i=Node.prototype.insertBefore;Node.prototype.insertBefore=function(n,ref){if(ref&&ref.parentNode!==this)return n;return i.apply(this,arguments)}})();`;
 
+// Phông Inter (có dấu tiếng Việt / Bồ Đào Nha), tải lúc build và phục vụ từ chính web -> chữ rõ, đậm hơn phông mặc định của máy
+const inter = Inter({ subsets: ['latin', 'latin-ext', 'vietnamese'], display: 'swap', variable: '--font-inter' });
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { locale, locales, d, fx } = await getI18n();
   return (
-    <html lang={LOCALE_META[locale].htmlLang}>
+    <html lang={LOCALE_META[locale].htmlLang} className={inter.variable}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: TRANSLATE_GUARD }} />
       </head>

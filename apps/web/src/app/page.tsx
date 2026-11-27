@@ -269,7 +269,7 @@ export default async function ShopPage({
                           <CategoryIcon name={categoryName} slug={category.slug} iconUrl={category.iconUrl} fallbackUrl={assets.productDefault} hint={hint} size="lg" />
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm leading-6 font-medium text-zinc-900">
+                          <p className="text-[15px] leading-6 font-bold text-zinc-950">
                             {name}
                             {p.isFeatured && (
                               <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-bold text-amber-800">📌 {d.extras.featured}</span>
@@ -278,7 +278,7 @@ export default async function ShopPage({
                               <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 align-middle text-[10px] font-bold text-orange-700"><FireIcon size={10} /> {t.hot}</span>
                             )}
                           </p>
-                          {description && <p className="mt-0.5 line-clamp-2 text-[13px] leading-5 text-zinc-500">{description.split('\n')[0]}</p>}
+                          {description && <p className="mt-0.5 line-clamp-2 text-[13px] leading-5 font-medium text-zinc-700">{description.split('\n')[0]}</p>}
                           {/* Mobile: tồn kho + đã bán dưới tên */}
                           <p className="mt-1.5 flex items-center gap-2 text-sm md:hidden">
                             <StockCount stock={stock} t={t} locale={locale} />

@@ -2,6 +2,7 @@
 
 @theme {
   --color-page: #e4e7ec;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer components {
