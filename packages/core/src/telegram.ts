@@ -63,23 +63,26 @@ export async function siteName() {
   }
 }
 
-export async function sendTelegram(botToken: string, chatId: string, text: string) {
+export type InlineKeyboard = ({ text: string; callback_data: string } | { text: string; url: string })[][];
+
+export async function sendTelegram(botToken: string, chatId: string, text: string, keyboard?: InlineKeyboard) {
   const res = await fetch(`https://api.telegram.org/bot${encodeURIComponent(botToken)}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 4000), parse_mode: 'HTML', disable_web_page_preview: true }),
+    body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 4000), parse_mode: 'HTML', disable_web_page_preview: true, ...(keyboard?.length && { reply_markup: { inline_keyboard: keyboard } }) }),
     signal: AbortSignal.timeout(8_000),
   });
   const data = (await res.json().catch(() => null)) as { ok?: boolean; description?: string } | null;
   if (!data?.ok) throw new Error(data?.description ?? `Telegram HTTP ${res.status}`);
 }
 
-async function notify(event: TelegramEvent, vars: Record<string, string>) {
+// keyboard: nút bấm dưới tin (chỉ gắn khi bật "Nhận lệnh admin", vì bot admin mới xử lý được nút)
+async function notify(event: TelegramEvent, vars: Record<string, string>, keyboard?: InlineKeyboard) {
   try {
     const s = await getTelegramSettings();
     if (!s.enabled || !s.botToken || !s.chatId || !s.events[event] || !s.templates[event].trim()) return;
     const text = renderTemplate(s.templates[event], { site: await siteName(), time: new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }), ...vars });
-    await sendTelegram(s.botToken, s.chatId, text);
+    await sendTelegram(s.botToken, s.chatId, text, s.adminCommands ? keyboard : undefined);
   } catch (err) {
     console.warn(`[telegram] ${event} failed: ${err instanceof Error ? err.message : err}`);
   }
@@ -89,6 +92,7 @@ const who = (u: { username: string | null; email: string }) => u.username ?? u.e
 
 // ref: id hoặc mã đơn (route mua hàng chỉ có mã đơn)
 const ORDER_SELECT = {
+  id: true,
   code: true,
   quantity: true,
   totalAmount: true,
@@ -133,7 +137,7 @@ export async function notifyOrder(ref: { id: string } | { code: string }, ip?: s
     apiCode: apiCode ? `#${apiCode}` : '—',
     supplier: domain || 'Kho riêng',
     ip: ip ?? '',
-  });
+  }, [[{ text: '🧾 Chi tiết đơn', callback_data: `ov:${o.id}` }, { text: '💸 Hoàn tiền', callback_data: `rfn:${o.id}` }]]);
 }
 
 const METHOD_LABEL: Record<string, string> = { USDT_TRC20: 'USDT TRC20', USDT_BEP20: 'USDT BEP20', BANK_TRANSFER: 'Ngân hàng', MANUAL: 'Admin cộng tay', MOMO: 'MoMo', CUSTOM: 'Nạp thủ công', CARD: 'Thẻ cào', PIX: 'PIX' };

@@ -1050,6 +1050,7 @@ async function submitWarranty(ctx: Ctx, code: string, raw: string) {
   const o = await prisma.order.findFirst({
     where: { code, userId: ctx.user.id },
     select: {
+      id: true,
       code: true,
       quantity: true,
       totalAmount: true,
@@ -1077,9 +1078,19 @@ async function submitWarranty(ctx: Ctx, code: string, raw: string) {
     '💬 <b>Nội dung:</b>',
     `<blockquote>${escapeHtml(raw.slice(0, 1500))}</blockquote>`,
     '',
-    group.adminCommands ? '↩️ <i>Bấm "Trả lời" (Reply) tin này để nhắn thẳng cho khách qua bot bán hàng.</i>' : `<i>Liên hệ khách: ${tgName}</i>`,
+    group.adminCommands ? '↩️ <i>Bấm "💬 Trả lời khách" (hoặc Reply tin này) để nhắn thẳng cho khách qua bot bán hàng.</i>' : `<i>Liên hệ khách: ${tgName}</i>`,
   ];
-  const sent = await tg<{ message_id: number }>(group.botToken, 'sendMessage', { chat_id: group.chatId, text: lines.join('\n').slice(0, 4000), parse_mode: 'HTML', disable_web_page_preview: true });
+  const buttons = group.adminCommands
+    ? {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '💬 Trả lời khách', callback_data: 'wrp' }, { text: '🧾 Chi tiết đơn', callback_data: `ov:${o.id}` }],
+            [{ text: '💸 Hoàn tiền', callback_data: `rfn:${o.id}` }, { text: '✅ Đã xử lý', callback_data: 'wdn' }],
+          ],
+        },
+      }
+    : {};
+  const sent = await tg<{ message_id: number }>(group.botToken, 'sendMessage', { chat_id: group.chatId, text: lines.join('\n').slice(0, 4000), parse_mode: 'HTML', disable_web_page_preview: true, ...buttons });
   await getRedis()
     .set(warrantyKey(group.chatId, sent.message_id), JSON.stringify({ chat: ctx.chatId, code: o.code, locale: ctx.locale }), 'EX', 30 * 86400)
     .catch(() => {});

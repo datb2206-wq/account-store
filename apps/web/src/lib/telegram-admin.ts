@@ -10,7 +10,7 @@ import { formatUsd } from './format';
 import { can, type Permission } from './permissions';
 import { STAFF_ROLES } from './auth';
 import { rateLimit } from './rate-limit';
-import { answerCallback, consumeLinkCode, displayName, editOrSend, escapeHtml, getShopBotSettings, sendText, warrantyKey, type Keyboard, type TgMessage, type TgUpdate, type TgUser } from './telegram-bot';
+import { answerCallback, consumeLinkCode, displayName, editOrSend, escapeHtml, getShopBotSettings, sendText, tg, warrantyKey, type Keyboard, type TgMessage, type TgUpdate, type TgUser } from './telegram-bot';
 import { getRedis } from './redis';
 import { SHOP_TEXT, tr } from './telegram-shop-i18n';
 import type { Locale } from '@/i18n/config';
@@ -103,6 +103,47 @@ export async function handleAdminUpdate(update: TgUpdate, settings: TelegramSett
   }
 }
 
+type WarrantyTicket = { chat: number; code: string; locale: Locale };
+const readTicket = async (chatId: number, messageId?: number) => {
+  if (!messageId) return null;
+  const raw = await getRedis().get(warrantyKey(chatId, messageId)).catch(() => null);
+  return raw ? (JSON.parse(raw) as WarrantyTicket) : null;
+};
+
+// Nút "💬 Trả lời khách": bot gửi tin chờ nhập (force_reply) -> admin gõ câu trả lời ngay trên điện thoại
+async function askWarrantyReply(ctx: Ctx, cbId: string) {
+  const ticket = await readTicket(ctx.chatId, ctx.messageId);
+  if (!ticket) return answerCallback(ctx.token, cbId, 'Yêu cầu này đã quá hạn (30 ngày).');
+  await answerCallback(ctx.token, cbId);
+  const prompt = await tg<{ message_id: number }>(ctx.token, 'sendMessage', {
+    chat_id: ctx.chatId,
+    text: `✍️ Nhập câu trả lời cho khách (đơn <code>${escapeHtml(ticket.code)}</code>) rồi gửi:`,
+    parse_mode: 'HTML',
+    reply_markup: { force_reply: true, selective: true, input_field_placeholder: 'Câu trả lời cho khách…' },
+    ...(ctx.messageId && { reply_parameters: { message_id: ctx.messageId, allow_sending_without_reply: true } }),
+  });
+  await getRedis().set(warrantyKey(ctx.chatId, prompt.message_id), JSON.stringify(ticket), 'EX', 86400).catch(() => {});
+}
+
+// Nút "✅ Đã xử lý": đổi nút thành dòng ghi người xử lý + báo khách
+async function markWarrantyDone(ctx: Ctx, cbId: string) {
+  const ticket = await readTicket(ctx.chatId, ctx.messageId);
+  const time = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+  await tg(ctx.token, 'editMessageReplyMarkup', {
+    chat_id: ctx.chatId,
+    message_id: ctx.messageId,
+    reply_markup: { inline_keyboard: [[{ text: `✅ Đã xử lý · ${ctx.staff.email.split('@')[0]} · ${time}`, callback_data: 'noop' }]] },
+  }).catch(() => {});
+  await answerCallback(ctx.token, cbId, '✅ Đã đánh dấu xử lý xong');
+  if (!ticket) return;
+  const shop = await getShopBotSettings();
+  if (shop.enabled && shop.botToken) {
+    const st = SHOP_TEXT[ticket.locale] ?? SHOP_TEXT.en;
+    await sendText(shop.botToken, ticket.chat, tr(st, 'wrDone', { code: escapeHtml(ticket.code) }), [[{ text: st.btnMenu, callback_data: 'm' }]]).catch(() => {});
+  }
+  await writeAudit({ actorId: ctx.staff.id, action: 'telegram.warranty.done', entity: 'Order', entityId: ticket.code, ip: AUDIT_IP });
+}
+
 // Admin Reply tin "YÊU CẦU BẢO HÀNH" trong nhóm -> gửi câu trả lời cho khách qua bot bán hàng
 async function relayWarrantyReply(ctx: Ctx, replied: TgMessage, text: string) {
   const raw = await getRedis().get(warrantyKey(ctx.chatId, replied.message_id)).catch(() => null);
@@ -169,6 +210,21 @@ async function onCallback(ctx: Ctx, data: string, cbId: string) {
       const o = await prisma.order.findUnique({ where: { id }, select: { code: true } });
       return o ? showOrder(ctx, o.code, true) : undefined;
     }
+    // Nút dưới tin báo trong nhóm: mở chi tiết đơn ở tin MỚI (không ghi đè tin báo)
+    case 'ov':
+    case 'rfn': {
+      await answerCallback(ctx.token, cbId);
+      const o = await prisma.order.findUnique({ where: { id }, select: { code: true } });
+      if (!o) return;
+      if (kind === 'rfn' && !allowed(ctx, 'orders.refund')) return sendText(ctx.token, ctx.chatId, '⛔ Bạn không có quyền hoàn tiền.');
+      return showOrder(ctx, o.code, false, kind === 'rfn');
+    }
+    case 'wrp':
+      return askWarrantyReply(ctx, cbId);
+    case 'wdn':
+      return markWarrantyDone(ctx, cbId);
+    case 'noop':
+      return answerCallback(ctx.token, cbId);
     case 'tp':
       if (!allowed(ctx, 'products.edit')) return answerCallback(ctx.token, cbId, '⛔ Không có quyền sửa sản phẩm');
       return toggleProduct(ctx, id, cbId);
@@ -307,7 +363,7 @@ async function rejectDepositCb(ctx: Ctx, id: string, cbId: string) {
 // ---------------------------------------------------------------- Đơn hàng
 const STATUS: Record<string, string> = { COMPLETED: '✅ Hoàn tất', PENDING: '⏳ Đang xử lý', FAILED: '❌ Lỗi', REFUNDED: '↩️ Đã hoàn tiền' };
 
-async function showOrder(ctx: Ctx, code: string, edit = false) {
+async function showOrder(ctx: Ctx, code: string, edit = false, askRefund = false) {
   if (!code) return sendText(ctx.token, ctx.chatId, 'Cú pháp: /don &lt;mã đơn&gt;');
   const o = await prisma.order.findFirst({
     where: { code: { equals: code.trim(), mode: 'insensitive' } },
@@ -335,7 +391,12 @@ async function showOrder(ctx: Ctx, code: string, edit = false) {
     `Thời gian: ${o.createdAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`,
     ...(o.failReason ? [`Lý do: ${escapeHtml(o.failReason)}`] : []),
   ].join('\n');
-  const kb: Keyboard = o.status === 'COMPLETED' || o.status === 'PENDING' ? [[{ text: '💸 Hoàn tiền toàn bộ', callback_data: `rf:${o.id}` }]] : [];
+  const refundable = o.status === 'COMPLETED' || o.status === 'PENDING';
+  if (askRefund && refundable) {
+    // Bấm "Hoàn tiền" ở tin báo: hiện đơn + hỏi xác nhận luôn (bấm nhầm không mất tiền)
+    return sendText(ctx.token, ctx.chatId, `${text}\n\n⚠️ Hoàn <b>toàn bộ</b> tiền đơn này cho khách?`, [[{ text: '✅ Đồng ý hoàn tiền', callback_data: `rfy:${o.id}` }, { text: '✖️ Hủy', callback_data: `od:${o.id}` }]]);
+  }
+  const kb: Keyboard = refundable ? [[{ text: '💸 Hoàn tiền toàn bộ', callback_data: `rf:${o.id}` }]] : [];
   return edit ? editOrSend(ctx.token, ctx.chatId, ctx.messageId, text, kb) : sendText(ctx.token, ctx.chatId, text, kb);
 }
 
