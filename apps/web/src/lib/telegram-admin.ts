@@ -55,8 +55,8 @@ export async function handleAdminUpdate(update: TgUpdate, settings: TelegramSett
   const token = settings.botToken;
   const text = msg?.text?.trim() ?? '';
 
-  // Liên kết: /start <mã> (mã tạo ở trang admin, hết hạn sau 10 phút)
-  if (chat.type === 'private' && text.startsWith('/start ')) {
+  // Liên kết: /start <mã> (mã tạo ở trang admin, hết hạn sau 10 phút). "/start reply" = mở chat để trả lời bảo hành
+  if (chat.type === 'private' && text.startsWith('/start ') && text !== '/start reply') {
     const userId = await consumeLinkCode(text.slice(7).trim());
     const user = userId ? await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, role: true, status: true } }) : null;
     if (!user || user.status === 'BANNED' || !STAFF_ROLES.includes(user.role)) {
@@ -90,10 +90,14 @@ export async function handleAdminUpdate(update: TgUpdate, settings: TelegramSett
   try {
     if (cb) {
       await onCallback(ctx, cb.data ?? '', cb.id);
+    } else if (text === '/start reply') {
+      await relayPendingReply(ctx, text);
     } else if (text.startsWith('/')) {
       await onCommand(ctx, text);
-    } else if (msg?.reply_to_message && text) {
-      await relayWarrantyReply(ctx, msg.reply_to_message, text);
+    } else if (msg?.reply_to_message && text && (await relayWarrantyReply(ctx, msg.reply_to_message, text))) {
+      // đã chuyển cho khách
+    } else if (text) {
+      await relayPendingReply(ctx, text);
     }
   } catch (err) {
     const message = DomainError.is(err) ? err.message : err instanceof Error ? err.message : String(err);
@@ -111,18 +115,77 @@ const readTicket = async (chatId: number, messageId?: number) => {
 };
 
 // Nút "💬 Trả lời khách": bot gửi tin chờ nhập (force_reply) -> admin gõ câu trả lời ngay trên điện thoại
+// Nút "💬 Trả lời khách": trong nhóm bot chỉ nhận tin Reply nó (chế độ riêng tư của Telegram) -> hay bị lỡ.
+// Nên mở ô nhập ở CHAT RIÊNG với bot admin: tin tiếp theo admin gõ ở đó (15 phút) được chuyển cho khách.
+type PendingReply = WarrantyTicket & { group: number; groupMsg?: number };
+const pendingKey = (tgId: number) => `tg:wrpend:${tgId}`;
+let botUsername: string | null = null;
+
 async function askWarrantyReply(ctx: Ctx, cbId: string) {
   const ticket = await readTicket(ctx.chatId, ctx.messageId);
   if (!ticket) return answerCallback(ctx.token, cbId, 'Yêu cầu này đã quá hạn (30 ngày).');
+  const pending: PendingReply = { ...ticket, group: ctx.chatId, groupMsg: ctx.messageId };
+  await getRedis().set(pendingKey(ctx.from.id), JSON.stringify(pending), 'EX', 900).catch(() => {});
+  const sentPrivate = await sendText(ctx.token, ctx.from.id, `✍️ <b>Trả lời khách</b> · đơn <code>${escapeHtml(ticket.code)}</code>\n\nGõ câu trả lời ngay tại đây rồi gửi (trong 15 phút). Bot sẽ chuyển cho khách qua bot bán hàng.`)
+    .then(() => true)
+    .catch(() => false);
+  if (sentPrivate) {
+    if (!botUsername) botUsername = await tg<{ username: string }>(ctx.token, 'getMe').then((m) => m.username).catch(() => null);
+    // Mở luôn chat riêng với bot (điện thoại + máy tính)
+    if (ctx.chatId !== ctx.from.id && botUsername) {
+      return tg(ctx.token, 'answerCallbackQuery', { callback_query_id: cbId, url: `https://t.me/${botUsername}?start=reply` }).catch(() => answerCallback(ctx.token, cbId, '📩 Mở chat riêng với bot admin để gõ câu trả lời'));
+    }
+    return answerCallback(ctx.token, cbId, '✍️ Gõ câu trả lời ở chat riêng với bot');
+  }
+  // Chưa từng chat riêng với bot -> nhập ngay trong nhóm (phải Reply tin này)
   await answerCallback(ctx.token, cbId);
   const prompt = await tg<{ message_id: number }>(ctx.token, 'sendMessage', {
     chat_id: ctx.chatId,
-    text: `✍️ Nhập câu trả lời cho khách (đơn <code>${escapeHtml(ticket.code)}</code>) rồi gửi:`,
+    text: `✍️ Bấm <b>Trả lời (Reply)</b> tin này, gõ câu trả lời cho khách (đơn <code>${escapeHtml(ticket.code)}</code>) rồi gửi:`,
     parse_mode: 'HTML',
     reply_markup: { force_reply: true, selective: true, input_field_placeholder: 'Câu trả lời cho khách…' },
     ...(ctx.messageId && { reply_parameters: { message_id: ctx.messageId, allow_sending_without_reply: true } }),
   });
   await getRedis().set(warrantyKey(ctx.chatId, prompt.message_id), JSON.stringify(ticket), 'EX', 86400).catch(() => {});
+}
+
+async function sendToCustomer(ctx: Ctx, t: WarrantyTicket, text: string) {
+  const shop = await getShopBotSettings();
+  if (!shop.enabled || !shop.botToken) {
+    await sendText(ctx.token, ctx.chatId, '⚠️ Bot bán hàng đang tắt, không gửi được cho khách.');
+    return false;
+  }
+  const st = SHOP_TEXT[t.locale] ?? SHOP_TEXT.en;
+  try {
+    await sendText(shop.botToken, t.chat, tr(st, 'wrReply', { code: escapeHtml(t.code), text: escapeHtml(text.slice(0, 3500)) }), [[{ text: st.btnWarranty, callback_data: `wr:${t.code}` }, { text: st.btnMenu, callback_data: 'm' }]]);
+  } catch (err) {
+    await sendText(ctx.token, ctx.chatId, `❌ Không gửi được cho khách: ${escapeHtml(err instanceof Error ? err.message : String(err))}\n(Khách đã chặn bot hoặc chưa từng bấm Start)`);
+    return false;
+  }
+  await writeAudit({ actorId: ctx.staff.id, action: 'telegram.warranty.reply', entity: 'Order', entityId: t.code, after: { text: text.slice(0, 500) }, ip: AUDIT_IP });
+  return true;
+}
+
+// Tin admin gõ ở chat riêng (hoặc trong nhóm nếu bot đọc được) sau khi bấm "Trả lời khách"
+async function relayPendingReply(ctx: Ctx, text: string) {
+  const raw = await getRedis().get(pendingKey(ctx.from.id)).catch(() => null);
+  if (!raw) {
+    if (text === '/start reply') await sendText(ctx.token, ctx.chatId, 'Không có yêu cầu bảo hành nào đang chờ trả lời. Bấm "💬 Trả lời khách" dưới tin bảo hành trong nhóm.');
+    return;
+  }
+  const p = JSON.parse(raw) as PendingReply;
+  if (text === '/start reply') return sendText(ctx.token, ctx.chatId, `✍️ Gõ câu trả lời cho khách (đơn <code>${escapeHtml(p.code)}</code>) rồi gửi:`);
+  if (ctx.chatId !== ctx.from.id && ctx.chatId !== p.group) return;
+  if (!(await sendToCustomer(ctx, p, text))) return;
+  await getRedis().del(pendingKey(ctx.from.id)).catch(() => {});
+  if (ctx.chatId === ctx.from.id) await sendText(ctx.token, ctx.chatId, `✅ Đã gửi cho khách (đơn <code>${escapeHtml(p.code)}</code>).`);
+  // Ghi lại trong nhóm (trả lời đúng tin bảo hành) để cả nhóm thấy đã trả lời gì
+  await tg(ctx.token, 'sendMessage', {
+    chat_id: p.group,
+    text: `💬 <b>${escapeHtml(ctx.staff.email.split('@')[0] ?? '')}</b> đã trả lời khách · đơn <code>${escapeHtml(p.code)}</code>:\n<blockquote>${escapeHtml(text.slice(0, 1500))}</blockquote>`,
+    parse_mode: 'HTML',
+    ...(p.groupMsg && { reply_parameters: { message_id: p.groupMsg, allow_sending_without_reply: true } }),
+  }).catch(() => {});
 }
 
 // Nút "✅ Đã xử lý": đổi nút thành dòng ghi người xử lý + báo khách
@@ -146,15 +209,13 @@ async function markWarrantyDone(ctx: Ctx, cbId: string) {
 
 // Admin Reply tin "YÊU CẦU BẢO HÀNH" trong nhóm -> gửi câu trả lời cho khách qua bot bán hàng
 async function relayWarrantyReply(ctx: Ctx, replied: TgMessage, text: string) {
-  const raw = await getRedis().get(warrantyKey(ctx.chatId, replied.message_id)).catch(() => null);
-  if (!raw) return; // reply tin khác trong nhóm -> bỏ qua
-  const t = JSON.parse(raw) as { chat: number; code: string; locale: Locale };
-  const shop = await getShopBotSettings();
-  if (!shop.enabled || !shop.botToken) return sendText(ctx.token, ctx.chatId, '⚠️ Bot bán hàng đang tắt, không gửi được cho khách.');
-  const st = SHOP_TEXT[t.locale] ?? SHOP_TEXT.en;
-  await sendText(shop.botToken, t.chat, tr(st, 'wrReply', { code: escapeHtml(t.code), text: escapeHtml(text.slice(0, 3500)) }), [[{ text: st.btnWarranty, callback_data: `wr:${t.code}` }, { text: st.btnMenu, callback_data: 'm' }]]);
-  await writeAudit({ actorId: ctx.staff.id, action: 'telegram.warranty.reply', entity: 'Order', entityId: t.code, after: { text: text.slice(0, 500) }, ip: AUDIT_IP });
-  return sendText(ctx.token, ctx.chatId, `✅ Đã gửi trả lời cho khách (đơn <code>${escapeHtml(t.code)}</code>).`);
+  const t = await readTicket(ctx.chatId, replied.message_id);
+  if (!t) return false; // reply tin khác trong nhóm -> bỏ qua
+  if (await sendToCustomer(ctx, t, text)) {
+    await getRedis().del(pendingKey(ctx.from.id)).catch(() => {});
+    await sendText(ctx.token, ctx.chatId, `✅ Đã gửi trả lời cho khách (đơn <code>${escapeHtml(t.code)}</code>).`);
+  }
+  return true;
 }
 
 function allowed(ctx: Ctx, perm: Permission) {
