@@ -109,6 +109,7 @@ model User {
 
   // API key cho khách hàng muốn mua qua API (lưu HASH, không lưu plain)
   apiKeyHash    String?    @unique
+  apiKeyEnc     String?    // bản mã hóa để khách xem lại key trong trang Tài liệu API / bot
   twoFactorSecret String?  // mã hóa trước khi lưu
 
   // Vai trò quản trị (Admin > Admin Role). Chỉ áp dụng cho STAFF: null = quyền nhân viên mặc định

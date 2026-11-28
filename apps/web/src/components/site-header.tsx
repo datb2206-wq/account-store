@@ -55,7 +55,7 @@ export async function SiteHeader({ user, q = '', category }: { user: CurrentUser
           <SearchForm q={q} placeholder={h.searchPlaceholder} label={h.search} className="hidden min-w-0 flex-1 md:flex" />
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <ContactLink href={contactHref(site.resellerApiUrl)} title={h.resellerApi} className={`${action} bg-orange-600 text-white hover:bg-orange-700`}>
+            <ContactLink href={contactHref(site.resellerApiUrl) ?? '/dashboard/api'} title={h.resellerApi} className={`${action} bg-orange-600 text-white hover:bg-orange-700`}>
               <CodeIcon size={16} /> {h.resellerApi}
             </ContactLink>
             <ContactLink href={contactHref(site.supplierContact)} title={h.becomeSupplier} className={`${action} border border-zinc-300 text-zinc-800 hover:border-zinc-400 hover:bg-zinc-50`}>

@@ -40,7 +40,7 @@ export async function SiteFooter() {
             {publishedPages(extras).map((p) => (
               <Link key={p.slug} href={`/pages/${p.slug}`} className="hover:text-white">{p.title}</Link>
             ))}
-            <ContactLink href={contactHref(site.resellerApiUrl)} className="hover:text-white">{d.header.resellerApi}</ContactLink>
+            <ContactLink href={contactHref(site.resellerApiUrl) ?? '/dashboard/api'} className="hover:text-white">{d.header.resellerApi}</ContactLink>
             <ContactLink href={contactHref(site.supplierContact)} className="hover:text-white">{d.header.becomeSupplier}</ContactLink>
           </span>
         </div>

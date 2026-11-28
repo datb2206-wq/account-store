@@ -7,7 +7,7 @@ export const SUPPORT_OPEN_EVENT = 'support:open';
 export function ContactLink({ href, className, title, children }: { href: string | null; className?: string; title?: string; children: React.ReactNode }) {
   if (href) {
     return (
-      <a href={href} target={href.startsWith('mailto:') ? undefined : '_blank'} rel="noreferrer" className={className} title={title}>
+      <a href={href} target={href.startsWith('mailto:') || href.startsWith('/') ? undefined : '_blank'} rel="noreferrer" className={className} title={title}>
         {children}
       </a>
     );

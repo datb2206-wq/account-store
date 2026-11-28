@@ -354,6 +354,14 @@ const enExtra = {
   wrTooMany: '⏳ You have sent several requests. Please wait a bit before sending another.',
   wrOff: '🛡 Warranty via the bot is not available right now. Please contact support.',
   wrReply: '💬 <b>Support reply</b> · order <code>{code}</code>\n\n{text}',
+  btnApiKey: '🔑 API Key',
+  btnApiRegen: '♻️ Generate new key',
+  btnApiRegenYes: '✅ Yes, generate a new key',
+  btnDocs: '📘 API documentation',
+  apiKeyNew: '🔑 <b>Your API Key</b> (buy automatically via API):\n<code>{key}</code>\n\n💡 Already have an account on the website? Paste that account\'s API Key here to connect it to this Telegram.',
+  apiKeyView: '🔑 <b>Your API Key</b>\n━━━━━━━━━━━━━━━━\n<code>{key}</code>\n\nSend it in the header <code>X-API-Key</code>. Full guide: 📘 API documentation.\n⚠️ Do not share it: anyone with this key can buy with your balance.',
+  apiRegenAsk: '⚠️ Generate a new API Key? The current key stops working immediately.',
+  apiKeyBad: '❌ API Key not found. Copy it again from the website (API documentation page).',
 };
 
 const ptExtra: typeof enExtra = {
@@ -445,6 +453,14 @@ const ptExtra: typeof enExtra = {
   wrTooMany: '⏳ Você já enviou vários pedidos. Aguarde um pouco antes de enviar outro.',
   wrOff: '🛡 A garantia pelo bot não está disponível agora. Fale com o suporte.',
   wrReply: '💬 <b>Resposta do suporte</b> · pedido <code>{code}</code>\n\n{text}',
+  btnApiKey: '🔑 API Key',
+  btnApiRegen: '♻️ Gerar nova chave',
+  btnApiRegenYes: '✅ Sim, gerar nova chave',
+  btnDocs: '📘 Documentação da API',
+  apiKeyNew: '🔑 <b>Sua API Key</b> (compre automaticamente via API):\n<code>{key}</code>\n\n💡 Já tem conta no site? Cole aqui a API Key daquela conta para conectá-la a este Telegram.',
+  apiKeyView: '🔑 <b>Sua API Key</b>\n━━━━━━━━━━━━━━━━\n<code>{key}</code>\n\nEnvie no cabeçalho <code>X-API-Key</code>. Guia completo: 📘 Documentação da API.\n⚠️ Não compartilhe: quem tiver esta chave pode comprar com seu saldo.',
+  apiRegenAsk: '⚠️ Gerar uma nova API Key? A chave atual para de funcionar imediatamente.',
+  apiKeyBad: '❌ API Key não encontrada. Copie de novo no site (página Documentação da API).',
 };
 
 export type ShopText = typeof en & typeof enExtra;

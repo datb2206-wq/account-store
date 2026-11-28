@@ -76,6 +76,7 @@ export default async function DashboardPage() {
         <p className="text-sm text-zinc-500">{rich(t.memberSince, { date: <LocalTime value={user.createdAt} /> })}</p>
       </div>
         <div className="flex flex-wrap gap-2">
+          <Link href="/dashboard/api" className="btn-ghost border border-zinc-200">🔑 API</Link>
           {affiliateOn && <Link href="/dashboard/affiliate" className="btn-ghost border border-zinc-200">🎁 {d.affiliate.menu}</Link>}
           {sellerOn && <Link href="/dashboard/seller" className="btn-ghost border border-zinc-200">🏪 {d.seller.menu}</Link>}
         </div>

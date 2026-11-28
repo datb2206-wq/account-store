@@ -20,6 +20,7 @@ import { rateLimit } from './rate-limit';
 import { getSiteExtras } from './site-extras';
 import { getRedis } from './redis';
 import { createTelegramAccount, isTelegramPlaceholderEmail } from './telegram-account';
+import { API_KEY_RE, getApiKey, regenerateApiKey, userByApiKey } from './api-keys';
 import {
   answerCallback,
   consumeLinkCode,
@@ -278,6 +279,11 @@ async function onText(ctx: Ctx, text: string, messageId: number) {
     return showHome(ctx, true);
   }
 
+  // Khách dán API Key của tài khoản web -> liên kết Telegram với tài khoản đó (tin chứa key bị xóa)
+  if (/^ak_\S+$/.test(text)) {
+    await deleteMessage(ctx.token, ctx.chatId, messageId);
+    return linkByApiKey(ctx, text);
+  }
   const state = await getChatState(BOT, ctx.chatId);
   if (state === 'pw') {
     await deleteMessage(ctx.token, ctx.chatId, messageId); // không để mật khẩu nằm lại trong khung chat
@@ -320,12 +326,27 @@ async function linkAccount(ctx: Ctx, code: string) {
     await sendText(ctx.token, ctx.chatId, ctx.t.linkInvalid);
     return;
   }
+  return linkToUser(ctx, user);
+}
+
+async function linkByApiKey(ctx: Ctx, key: string) {
+  const user = API_KEY_RE.test(key) ? await userByApiKey(key) : null;
+  if (!user || user.status !== 'ACTIVE') return sendText(ctx.token, ctx.chatId, ctx.t.apiKeyBad, [menuRow(ctx)]);
+  if (user.telegramId === String(ctx.from.id)) return showHome(ctx, true); // đã liên kết sẵn
+  const ok = await linkToUser(ctx, user);
+  if (!ok) return;
+  // Nạp lại ngữ cảnh theo tài khoản vừa liên kết rồi hiện menu
+  Object.assign(ctx, await buildCtx(ctx.settings, ctx.siteUrl, ctx.chatId, ctx.from, undefined, false));
+  return showHome(ctx, true);
+}
+
+async function linkToUser(ctx: Ctx, user: { id: string; email: string; username: string | null }) {
   const telegramId = String(ctx.from.id);
   // Telegram này đang có tài khoản tự tạo còn tiền / đơn -> không gỡ (khách sẽ mất số dư), nhờ admin gộp
   const current = await prisma.user.findUnique({ where: { telegramId }, select: { id: true, email: true, username: true, balance: true, _count: { select: { orders: true } } } });
   if (current && current.id !== user.id && isTelegramPlaceholderEmail(current.email) && (current.balance.gt(0) || current._count.orders > 0)) {
     await sendText(ctx.token, ctx.chatId, tr(ctx.t, 'linkHasBalance', { account: escapeHtml(current.username ?? current.email) }));
-    return;
+    return false;
   }
   await prisma.$transaction([
     // 1 Telegram chỉ gắn 1 tài khoản: gỡ khỏi tài khoản cũ (nếu có)
@@ -333,6 +354,7 @@ async function linkAccount(ctx: Ctx, code: string) {
     prisma.user.update({ where: { id: user.id }, data: { telegramId, telegramName: displayName(ctx.from) || null } }),
   ]);
   await sendText(ctx.token, ctx.chatId, tr(ctx.t, 'linked', { account: escapeHtml(user.username ?? user.email) }));
+  return true;
 }
 
 // ---------------------------------------------------------------- Nút bấm
@@ -389,6 +411,12 @@ async function onCallback(ctx: Ctx, data: string) {
       return showOrders(ctx, Number(a) || 0);
     case 'od':
       return showOrder(ctx, a);
+    case 'ak':
+      return showApiKey(ctx);
+    case 'akr':
+      return show(ctx, false, ctx.t.apiRegenAsk, [[{ text: ctx.t.btnApiRegenYes, callback_data: 'aky' }], [{ text: ctx.t.btnBack, callback_data: 'ak' }, ...menuRow(ctx)]]);
+    case 'aky':
+      return showApiKey(ctx, true);
     case 'wl':
       return showWarrantyOrders(ctx, Number(a) || 0);
     case 'wr':
@@ -416,7 +444,14 @@ const show = (ctx: Ctx, fresh: boolean, text: string, kb: Keyboard) => (fresh ? 
 const menuRow = (ctx: Ctx) => [{ text: ctx.t.btnMenu, callback_data: 'm' }];
 
 async function showHome(ctx: Ctx, fresh = false) {
-  if (ctx.isNew) await sendText(ctx.token, ctx.chatId, tr(ctx.t, 'welcomeNew', { account: escapeHtml(accountName(ctx)) }));
+  if (ctx.isNew) {
+    await sendText(ctx.token, ctx.chatId, tr(ctx.t, 'welcomeNew', { account: escapeHtml(accountName(ctx)) }));
+    // Tài khoản tự tạo có luôn API key (mua qua API / dán vào bot khác)
+    if (ctx.user) {
+      const key = await getApiKey(ctx.user.id, true).catch(() => null);
+      if (key) await sendText(ctx.token, ctx.chatId, tr(ctx.t, 'apiKeyNew', { key }));
+    }
+  }
   const kb: Keyboard = [
     [
       { text: ctx.t.btnCategories, callback_data: 'cl:0' },
@@ -875,10 +910,25 @@ async function showAccount(ctx: Ctx, fresh = false) {
     created: fmtDate(ctx, ctx.user.createdAt),
   });
   const kb: Keyboard = [];
-  if (botAccount) kb.push([{ text: ctx.t.btnSetPassword, callback_data: 'pw' }]);
+  kb.push([...(botAccount ? [{ text: ctx.t.btnSetPassword, callback_data: 'pw' }] : []), { text: ctx.t.btnApiKey, callback_data: 'ak' }]);
   kb.push([{ text: ctx.t.btnDeposit, callback_data: 'dp' }, { text: ctx.t.btnHistory, callback_data: 'h:0' }]);
   kb.push([{ text: ctx.t.btnWebsite, url: `${ctx.siteUrl}/login` }, ...menuRow(ctx)]);
   return show(ctx, fresh, text, kb);
+}
+
+async function showApiKey(ctx: Ctx, regenerate = false) {
+  if (!ctx.user) return showHome(ctx);
+  if (regenerate) {
+    const limit = await rateLimit(`apikey:regen:${ctx.user.id}`, 10, 3600).catch(() => ({ ok: true as const }));
+    if (!limit.ok) return show(ctx, false, ctx.t.tooFast, [menuRow(ctx)]);
+  }
+  const key = regenerate ? await regenerateApiKey(ctx.user.id) : await getApiKey(ctx.user.id, true);
+  const kb: Keyboard = [
+    [{ text: ctx.t.btnDocs, url: `${ctx.siteUrl.replace(/\/+$/, '')}/dashboard/api` }],
+    [{ text: ctx.t.btnApiRegen, callback_data: 'akr' }],
+    [{ text: ctx.t.btnBack, callback_data: 'ac' }, ...menuRow(ctx)],
+  ];
+  return show(ctx, false, tr(ctx.t, 'apiKeyView', { key: escapeHtml(key ?? '') }), kb);
 }
 
 async function askPassword(ctx: Ctx) {
