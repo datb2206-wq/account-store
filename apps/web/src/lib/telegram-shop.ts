@@ -32,6 +32,7 @@ import {
   sendDocument,
   sendPhoto,
   sendText,
+  downloadFile,
   setChatState,
   tg,
   warrantyKey,
@@ -194,10 +195,10 @@ export async function handleShopUpdate(update: TgUpdate, settings: ShopBotSettin
       await onCallback(ctx, cb.data ?? '');
     } else if (msg?.text) {
       await onText(ctx, text, msg.message_id);
-    } else if (msg?.caption || msg?.photo) {
-      // Ảnh (VD chụp lỗi) khi đang gửi yêu cầu bảo hành: dùng chú thích làm nội dung
-      const state = await getChatState(BOT, ctx.chatId);
-      if (state?.startsWith('wr:')) await submitWarranty(ctx, state.slice(3), `${msg.caption?.trim() ?? ''}\n📷 (khách có gửi kèm ảnh – nhờ khách gửi lại qua hỗ trợ nếu cần)`.trim());
+    } else if (msg?.photo?.length || msg?.document?.mime_type?.startsWith('image/')) {
+      // Ảnh chụp lỗi trong lúc gửi bảo hành
+      const fileId = msg.photo?.length ? msg.photo[msg.photo.length - 1]!.file_id : msg.document!.file_id;
+      await onWarrantyPhoto(ctx, fileId, msg.caption?.trim() ?? '');
     }
   } catch (err) {
     error = err instanceof Error ? err.message.slice(0, 300) : String(err);
@@ -302,6 +303,7 @@ async function onText(ctx: Ctx, text: string, messageId: number) {
     return showConfirm(ctx, productId, Number(qty), true);
   }
   if (state?.startsWith('wr:')) return submitWarranty(ctx, state.slice(3), text);
+  if (state?.startsWith('wrx:')) return warrantyExtra(ctx, state, { text });
   if (state === 'pix') {
     const amount = text.replace(',', '.').replace(/[^\d.]/g, '');
     if (!/^\d{1,9}(\.\d{1,2})?$/.test(amount)) return sendText(ctx.token, ctx.chatId, ctx.t.badAmount);
@@ -1042,7 +1044,7 @@ async function askWarranty(ctx: Ctx, code: string) {
   return sendText(ctx.token, ctx.chatId, tr(ctx.t, 'wrAsk', { code: o.code, name: escapeHtml(`${localized(o.product.name, ctx.locale)} × ${o.quantity}`) }), [[{ text: ctx.t.btnCancel, callback_data: 'm' }]]);
 }
 
-async function submitWarranty(ctx: Ctx, code: string, raw: string) {
+async function submitWarranty(ctx: Ctx, code: string, raw: string, photo?: Uint8Array | null) {
   await setChatState(BOT, ctx.chatId, null);
   if (!ctx.user) return showHome(ctx, true);
   const limit = await rateLimit(`tg:wr:${ctx.user.id}`, 5, 3600).catch(() => ({ ok: true as const }));
@@ -1094,8 +1096,35 @@ async function submitWarranty(ctx: Ctx, code: string, raw: string) {
   await getRedis()
     .set(warrantyKey(group.chatId, sent.message_id), JSON.stringify({ chat: ctx.chatId, code: o.code, locale: ctx.locale }), 'EX', 30 * 86400)
     .catch(() => {});
-  const kb: Keyboard = [...(ctx.settings.supportUrl ? [[{ text: ctx.t.btnSupport, url: ctx.settings.supportUrl }]] : []), menuRow(ctx)];
+  if (photo) await sendPhoto(group.botToken, group.chatId, photo, `📷 Ảnh lỗi · đơn <code>${escapeHtml(o.code)}</code>`, undefined, sent.message_id).catch(() => {});
+  // 15 phút tiếp theo: khách gửi thêm ảnh / ghi chú -> gắn vào cùng yêu cầu (trả lời tin trong nhóm)
+  await setChatState(BOT, ctx.chatId, `wrx:${o.code}:${sent.message_id}`);
+  await getRedis().expire(`tg:state:${BOT}:${ctx.chatId}`, 900).catch(() => {});
+  const kb: Keyboard = [[{ text: ctx.t.btnWrDone, callback_data: 'm' }], ...(ctx.settings.supportUrl ? [[{ text: ctx.t.btnSupport, url: ctx.settings.supportUrl }]] : [])];
   return sendText(ctx.token, ctx.chatId, tr(ctx.t, 'wrSent', { code: o.code }), kb);
+}
+
+// Ảnh khách gửi: đang nhập lý do -> ảnh (+ chú thích) thành yêu cầu; đã gửi yêu cầu -> gửi thêm ảnh vào yêu cầu đó
+async function onWarrantyPhoto(ctx: Ctx, fileId: string, caption: string) {
+  const state = await getChatState(BOT, ctx.chatId);
+  if (!state?.startsWith('wr:') && !state?.startsWith('wrx:')) return sendText(ctx.token, ctx.chatId, ctx.t.wrPhotoHint, [[{ text: ctx.t.btnWarranty, callback_data: 'wl:0' }], menuRow(ctx)]);
+  const photo = await downloadFile(ctx.token, fileId);
+  if (!photo) return sendText(ctx.token, ctx.chatId, ctx.t.wrPhotoBad);
+  if (state.startsWith('wr:')) return submitWarranty(ctx, state.slice(3), caption || '📷 (xem ảnh)', photo);
+  return warrantyExtra(ctx, state, { text: caption, photo });
+}
+
+async function warrantyExtra(ctx: Ctx, state: string, add: { text?: string; photo?: Uint8Array }) {
+  const [, code = '', mid = ''] = state.split(':');
+  const group = await adminGroup();
+  if (!group || !/^\d+$/.test(mid)) return showHome(ctx, true);
+  const replyTo = Number(mid);
+  const note = add.text?.trim() ? `💬 Khách bổ sung · đơn <code>${escapeHtml(code)}</code>:\n<blockquote>${escapeHtml(add.text.trim().slice(0, 900))}</blockquote>` : `📷 Ảnh khách gửi thêm · đơn <code>${escapeHtml(code)}</code>`;
+  if (add.photo) await sendPhoto(group.botToken, group.chatId, add.photo, note, undefined, replyTo);
+  else await tg(group.botToken, 'sendMessage', { chat_id: group.chatId, text: note, parse_mode: 'HTML', reply_parameters: { message_id: replyTo, allow_sending_without_reply: true } });
+  await setChatState(BOT, ctx.chatId, state); // gia hạn thêm 15 phút
+  await getRedis().expire(`tg:state:${BOT}:${ctx.chatId}`, 900).catch(() => {});
+  return sendText(ctx.token, ctx.chatId, ctx.t.wrExtraSent, [[{ text: ctx.t.btnWrDone, callback_data: 'm' }]]);
 }
 
 async function sendOrderFile(ctx: Ctx, code: string) {

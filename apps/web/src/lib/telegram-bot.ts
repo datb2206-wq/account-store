@@ -30,7 +30,8 @@ export interface TgMessage {
   chat: { id: number; type: string };
   text?: string;
   caption?: string;
-  photo?: unknown;
+  photo?: { file_id: string; file_size?: number }[];
+  document?: { file_id: string; mime_type?: string; file_size?: number };
   reply_to_message?: TgMessage;
 }
 export interface TgUpdate {
@@ -100,10 +101,11 @@ export async function sendDocument(token: string, chatId: number, filename: stri
   if (!data?.ok) throw new TelegramApiError(data?.description ?? `Telegram HTTP ${res.status}`);
 }
 
-// Gửi ảnh (VD mã QR PIX) kèm chú thích + nút
-export async function sendPhoto(token: string, chatId: number, png: Uint8Array, caption: string, keyboard?: Keyboard) {
+// Gửi ảnh (VD mã QR PIX, ảnh lỗi bảo hành) kèm chú thích + nút; replyTo = trả lời 1 tin có sẵn
+export async function sendPhoto(token: string, chatId: number | string, png: Uint8Array, caption: string, keyboard?: Keyboard, replyTo?: number) {
   const form = new FormData();
   form.set('chat_id', String(chatId));
+  if (replyTo) form.set('reply_parameters', JSON.stringify({ message_id: replyTo, allow_sending_without_reply: true }));
   form.set('caption', caption.slice(0, 1000));
   form.set('parse_mode', 'HTML');
   if (keyboard) form.set('reply_markup', JSON.stringify({ inline_keyboard: keyboard }));
@@ -111,6 +113,21 @@ export async function sendPhoto(token: string, chatId: number, png: Uint8Array, 
   const res = await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(30_000) });
   const data = (await res.json().catch(() => null)) as { ok?: boolean; description?: string } | null;
   if (!data?.ok) throw new TelegramApiError(data?.description ?? `Telegram HTTP ${res.status}`);
+}
+
+// Tải file khách gửi cho bot (ảnh chụp lỗi...). File của bot nào chỉ bot đó tải được -> tải về rồi bot admin gửi lại
+const MAX_FILE = 10 * 1024 * 1024;
+export async function downloadFile(token: string, fileId: string): Promise<Uint8Array | null> {
+  try {
+    const f = await tg<{ file_path?: string; file_size?: number }>(token, 'getFile', { file_id: fileId });
+    if (!f.file_path || (f.file_size ?? 0) > MAX_FILE) return null;
+    const res = await fetch(`https://api.telegram.org/file/bot${encodeURIComponent(token)}/${f.file_path}`, { signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) return null;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    return buf.length <= MAX_FILE ? buf : null;
+  } catch {
+    return null;
+  }
 }
 
 export const deleteMessage = (token: string, chatId: number, messageId: number) => tg(token, 'deleteMessage', { chat_id: chatId, message_id: messageId }).catch(() => {});
