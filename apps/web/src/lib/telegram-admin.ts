@@ -10,7 +10,10 @@ import { formatUsd } from './format';
 import { can, type Permission } from './permissions';
 import { STAFF_ROLES } from './auth';
 import { rateLimit } from './rate-limit';
-import { answerCallback, consumeLinkCode, displayName, editOrSend, escapeHtml, sendText, type Keyboard, type TgUpdate, type TgUser } from './telegram-bot';
+import { answerCallback, consumeLinkCode, displayName, editOrSend, escapeHtml, getShopBotSettings, sendText, warrantyKey, type Keyboard, type TgMessage, type TgUpdate, type TgUser } from './telegram-bot';
+import { getRedis } from './redis';
+import { SHOP_TEXT, tr } from './telegram-shop-i18n';
+import type { Locale } from '@/i18n/config';
 
 const AUDIT_IP = 'telegram';
 // Admin xem tên gốc (thường là tiếng Việt từ web nguồn), không phải bản dịch
@@ -89,6 +92,8 @@ export async function handleAdminUpdate(update: TgUpdate, settings: TelegramSett
       await onCallback(ctx, cb.data ?? '', cb.id);
     } else if (text.startsWith('/')) {
       await onCommand(ctx, text);
+    } else if (msg?.reply_to_message && text) {
+      await relayWarrantyReply(ctx, msg.reply_to_message, text);
     }
   } catch (err) {
     const message = DomainError.is(err) ? err.message : err instanceof Error ? err.message : String(err);
@@ -96,6 +101,19 @@ export async function handleAdminUpdate(update: TgUpdate, settings: TelegramSett
     if (cb) await answerCallback(token, cb.id, `❌ ${message}`);
     else await sendText(token, chat.id, `❌ ${escapeHtml(message.slice(0, 500))}`).catch(() => {});
   }
+}
+
+// Admin Reply tin "YÊU CẦU BẢO HÀNH" trong nhóm -> gửi câu trả lời cho khách qua bot bán hàng
+async function relayWarrantyReply(ctx: Ctx, replied: TgMessage, text: string) {
+  const raw = await getRedis().get(warrantyKey(ctx.chatId, replied.message_id)).catch(() => null);
+  if (!raw) return; // reply tin khác trong nhóm -> bỏ qua
+  const t = JSON.parse(raw) as { chat: number; code: string; locale: Locale };
+  const shop = await getShopBotSettings();
+  if (!shop.enabled || !shop.botToken) return sendText(ctx.token, ctx.chatId, '⚠️ Bot bán hàng đang tắt, không gửi được cho khách.');
+  const st = SHOP_TEXT[t.locale] ?? SHOP_TEXT.en;
+  await sendText(shop.botToken, t.chat, tr(st, 'wrReply', { code: escapeHtml(t.code), text: escapeHtml(text.slice(0, 3500)) }), [[{ text: st.btnWarranty, callback_data: `wr:${t.code}` }, { text: st.btnMenu, callback_data: 'm' }]]);
+  await writeAudit({ actorId: ctx.staff.id, action: 'telegram.warranty.reply', entity: 'Order', entityId: t.code, after: { text: text.slice(0, 500) }, ip: AUDIT_IP });
+  return sendText(ctx.token, ctx.chatId, `✅ Đã gửi trả lời cho khách (đơn <code>${escapeHtml(t.code)}</code>).`);
 }
 
 function allowed(ctx: Ctx, perm: Permission) {

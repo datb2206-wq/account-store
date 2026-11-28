@@ -7,7 +7,7 @@ export type TelegramSettings = ConfigValue<'telegram'>;
 export type TelegramEvent = keyof TelegramSettings['events'];
 
 export const TELEGRAM_VARIABLES: Record<TelegramEvent, [string, string][]> = {
-  order: [['site', 'Tên website'], ['username', 'Khách mua'], ['product', 'Sản phẩm'], ['amount', 'Số lượng'], ['pay', 'Thành tiền (USD)'], ['code', 'Mã đơn'], ['source', 'Kho riêng / tên nguồn API'], ['ip', 'IP khách'], ['time', 'Thời gian']],
+  order: [['site', 'Tên website'], ['username', 'Khách mua'], ['product', 'Sản phẩm'], ['amount', 'Số lượng'], ['pay', 'Thành tiền (USD)'], ['code', 'Mã đơn'], ['source', 'Kho riêng / nguồn API + mã đơn bên nguồn'], ['apiCode', 'Mã đơn bên nguồn API'], ['supplier', 'Tên miền nguồn API (VD buyaccfb.com)'], ['ip', 'IP khách'], ['time', 'Thời gian']],
   deposit: [['site', 'Tên website'], ['username', 'Khách nạp'], ['method', 'Phương thức'], ['amount', 'Số tiền (USD)'], ['received', 'Số tiền thực nhận (VD 500,000 VND / 25 USDT)'], ['bonus', 'Tiền khuyến mãi (USD)'], ['balance', 'Số dư sau nạp'], ['time', 'Thời gian']],
   refund: [['site', 'Tên website'], ['username', 'Khách'], ['code', 'Mã đơn'], ['amount', 'Số tiền hoàn (USD)'], ['reason', 'Lý do'], ['time', 'Thời gian']],
   lowBalance: [['site', 'Tên website'], ['supplier', 'Tên nguồn API'], ['balance', 'Số dư còn lại (USD)'], ['threshold', 'Ngưỡng cảnh báo (USD)'], ['time', 'Thời gian']],
@@ -88,14 +88,39 @@ async function notify(event: TelegramEvent, vars: Record<string, string>) {
 const who = (u: { username: string | null; email: string }) => u.username ?? u.email;
 
 // ref: id hoặc mã đơn (route mua hàng chỉ có mã đơn)
+const ORDER_SELECT = {
+  code: true,
+  quantity: true,
+  totalAmount: true,
+  status: true,
+  externalOrderId: true,
+  user: { select: { username: true, email: true } },
+  product: { select: { name: true } },
+  supplier: { select: { name: true, baseUrl: true } },
+} as const;
+
+// Tên miền nguồn API (VD https://buyaccfb.com/api -> buyaccfb.com); không đọc được URL thì dùng tên nguồn
+export function supplierDomain(s: { name: string; baseUrl: string }) {
+  try {
+    return new URL(s.baseUrl).hostname.replace(/^(www|api)\./, '');
+  } catch {
+    return s.name;
+  }
+}
+
 export async function notifyOrder(ref: { id: string } | { code: string }, ip?: string) {
-  const o = await prisma.order
-    .findUnique({
-      where: ref,
-      select: { code: true, quantity: true, totalAmount: true, user: { select: { username: true, email: true } }, product: { select: { name: true } }, supplier: { select: { name: true } } },
-    })
-    .catch(() => null);
+  const load = () => prisma.order.findUnique({ where: ref, select: ORDER_SELECT }).catch(() => null);
+  let o = await load();
   if (!o) return;
+  // Đơn nguồn API: chờ web nguồn trả mã đơn (tối đa ~60 giây) để tin báo có luôn mã đơn bên nguồn
+  for (let i = 0; i < 20 && o?.supplier && o.status === 'PENDING' && !o.externalOrderId; i++) {
+    await new Promise((r) => setTimeout(r, 3_000));
+    o = (await load()) ?? o;
+  }
+  if (!o) return;
+  const domain = o.supplier ? supplierDomain(o.supplier) : '';
+  const apiCode = o.externalOrderId ?? '';
+  const statusNote = o.status === 'REFUNDED' || o.status === 'FAILED' ? ' · ❌ Đơn nguồn lỗi, đã hoàn tiền' : o.status === 'PENDING' ? ' · ⏳ Nguồn đang xử lý' : '';
   const name = o.product.name as Record<string, string> | null;
   await notify('order', {
     username: who(o.user),
@@ -104,7 +129,9 @@ export async function notifyOrder(ref: { id: string } | { code: string }, ip?: s
     amount: String(o.quantity),
     pay: usd(o.totalAmount),
     code: o.code,
-    source: o.supplier ? `Nguồn API: ${o.supplier.name}` : 'Kho riêng',
+    source: o.supplier ? `Nguồn: ${domain}${apiCode ? ` · Mã đơn API: #${apiCode}` : ''}${statusNote}` : 'Kho riêng',
+    apiCode: apiCode ? `#${apiCode}` : '—',
+    supplier: domain || 'Kho riêng',
     ip: ip ?? '',
   });
 }

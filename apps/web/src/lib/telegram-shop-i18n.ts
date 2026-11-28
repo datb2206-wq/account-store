@@ -346,6 +346,14 @@ const enExtra = {
   currency: '💱 Choose the display currency:',
   currencySaved: '✅ Currency updated.',
   linkHasBalance: '⚠️ This Telegram already has an account with balance or orders (<code>{account}</code>). Contact support to merge accounts.',
+  btnWarranty: '🛡 Warranty',
+  wrList: '🛡 <b>Warranty support</b>\n━━━━━━━━━━━━━━━━\nChoose the order that has a problem 👇',
+  wrNone: '🛡 You have no completed orders to request warranty for.',
+  wrAsk: '🛡 <b>Warranty – order {code}</b>\n📦 {name}\n\n✍️ Describe the problem in one message (which account, what error appears…).\nOur team will reply right here in this chat.',
+  wrSent: '✅ <b>Warranty request sent!</b>\n🧾 Order <code>{code}</code>\n\nOur team will check and reply here as soon as possible.',
+  wrTooMany: '⏳ You have sent several requests. Please wait a bit before sending another.',
+  wrOff: '🛡 Warranty via the bot is not available right now. Please contact support.',
+  wrReply: '💬 <b>Support reply</b> · order <code>{code}</code>\n\n{text}',
 };
 
 const ptExtra: typeof enExtra = {
@@ -429,6 +437,14 @@ const ptExtra: typeof enExtra = {
   currency: '💱 Escolha a moeda de exibição:',
   currencySaved: '✅ Moeda atualizada.',
   linkHasBalance: '⚠️ Este Telegram já tem uma conta com saldo ou pedidos (<code>{account}</code>). Fale com o suporte para unir as contas.',
+  btnWarranty: '🛡 Garantia',
+  wrList: '🛡 <b>Suporte de garantia</b>\n━━━━━━━━━━━━━━━━\nEscolha o pedido com problema 👇',
+  wrNone: '🛡 Você não tem pedidos concluídos para solicitar garantia.',
+  wrAsk: '🛡 <b>Garantia – pedido {code}</b>\n📦 {name}\n\n✍️ Descreva o problema em uma mensagem (qual conta, qual erro aparece…).\nNossa equipe vai responder aqui mesmo neste chat.',
+  wrSent: '✅ <b>Pedido de garantia enviado!</b>\n🧾 Pedido <code>{code}</code>\n\nNossa equipe vai verificar e responder aqui o mais rápido possível.',
+  wrTooMany: '⏳ Você já enviou vários pedidos. Aguarde um pouco antes de enviar outro.',
+  wrOff: '🛡 A garantia pelo bot não está disponível agora. Fale com o suporte.',
+  wrReply: '💬 <b>Resposta do suporte</b> · pedido <code>{code}</code>\n\n{text}',
 };
 
 export type ShopText = typeof en & typeof enExtra;

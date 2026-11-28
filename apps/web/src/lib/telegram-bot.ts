@@ -31,6 +31,7 @@ export interface TgMessage {
   text?: string;
   caption?: string;
   photo?: unknown;
+  reply_to_message?: TgMessage;
 }
 export interface TgUpdate {
   update_id: number;
@@ -193,6 +194,9 @@ export async function setChatState(bot: string, chatId: number, value: string | 
   else await getRedis().set(key, value, 'EX', 600);
 }
 export const getChatState = (bot: string, chatId: number) => getRedis().get(`tg:state:${bot}:${chatId}`);
+
+// Yêu cầu bảo hành gửi vào nhóm admin: tin nhắn trong nhóm -> khách nào (để admin Reply là chuyển cho khách)
+export const warrantyKey = (adminChatId: string | number, messageId: number) => `tg:wr:${adminChatId}:${messageId}`;
 
 export const displayName = (u: TgUser) => (u.username ? `@${u.username}` : [u.first_name, u.last_name].filter(Boolean).join(' ')).slice(0, 100);
 

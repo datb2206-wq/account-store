@@ -5,7 +5,7 @@
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import QRCode from 'qrcode';
-import { checkPixDeposit, createPixDeposit, createUsdtDeposit, creditCommission, creditSellerEarning, emailOrder, getConfig, getPixSettings, notifyOrder, pixReady, type UsdtNetwork } from '@accszone/core';
+import { checkPixDeposit, createPixDeposit, createUsdtDeposit, creditCommission, creditSellerEarning, emailOrder, getConfig, getPixSettings, getTelegramSettings, notifyOrder, pixReady, supplierDomain, type UsdtNetwork } from '@accszone/core';
 import { getSiteUrl } from './site';
 import { prisma, type Prisma } from '@accszone/database';
 import { formatFx, LOCALE_CURRENCY, LOCALE_META, type Fx, type Locale } from '@/i18n/config';
@@ -32,6 +32,8 @@ import {
   sendPhoto,
   sendText,
   setChatState,
+  tg,
+  warrantyKey,
   writeBotLog,
   type Keyboard,
   type ShopBotSettings,
@@ -191,6 +193,10 @@ export async function handleShopUpdate(update: TgUpdate, settings: ShopBotSettin
       await onCallback(ctx, cb.data ?? '');
     } else if (msg?.text) {
       await onText(ctx, text, msg.message_id);
+    } else if (msg?.caption || msg?.photo) {
+      // Ảnh (VD chụp lỗi) khi đang gửi yêu cầu bảo hành: dùng chú thích làm nội dung
+      const state = await getChatState(BOT, ctx.chatId);
+      if (state?.startsWith('wr:')) await submitWarranty(ctx, state.slice(3), `${msg.caption?.trim() ?? ''}\n📷 (khách có gửi kèm ảnh – nhờ khách gửi lại qua hỗ trợ nếu cần)`.trim());
     }
   } catch (err) {
     error = err instanceof Error ? err.message.slice(0, 300) : String(err);
@@ -289,6 +295,7 @@ async function onText(ctx: Ctx, text: string, messageId: number) {
     await getRedis().set(`tg:coupon:${ctx.chatId}`, `${productId}:${text.slice(0, 40).trim().toUpperCase()}`, 'EX', 1800).catch(() => {});
     return showConfirm(ctx, productId, Number(qty), true);
   }
+  if (state?.startsWith('wr:')) return submitWarranty(ctx, state.slice(3), text);
   if (state === 'pix') {
     const amount = text.replace(',', '.').replace(/[^\d.]/g, '');
     if (!/^\d{1,9}(\.\d{1,2})?$/.test(amount)) return sendText(ctx.token, ctx.chatId, ctx.t.badAmount);
@@ -382,6 +389,10 @@ async function onCallback(ctx: Ctx, data: string) {
       return showOrders(ctx, Number(a) || 0);
     case 'od':
       return showOrder(ctx, a);
+    case 'wl':
+      return showWarrantyOrders(ctx, Number(a) || 0);
+    case 'wr':
+      return askWarranty(ctx, a);
     case 'ot':
       return sendOrderFile(ctx, a);
     case 'h':
@@ -421,9 +432,10 @@ async function showHome(ctx: Ctx, fresh = false) {
       { text: ctx.t.btnHistory, callback_data: 'h:0' },
     ],
     [
+      { text: ctx.t.btnWarranty, callback_data: 'wl:0' },
       { text: ctx.t.btnSettings, callback_data: 'st' },
-      ctx.settings.supportUrl ? { text: ctx.t.btnSupport, url: ctx.settings.supportUrl } : { text: ctx.t.btnWebsite, url: ctx.siteUrl },
     ],
+    [ctx.settings.supportUrl ? { text: ctx.t.btnSupport, url: ctx.settings.supportUrl } : { text: ctx.t.btnWebsite, url: ctx.siteUrl }],
   ];
   const text = ctx.user
     ? tr(ctx.t, 'home', { site: escapeHtml(ctx.site), account: escapeHtml(accountName(ctx)), balance: money(ctx, ctx.user.balance) })
@@ -733,7 +745,7 @@ async function deliver(ctx: Ctx, code: string) {
   }
   if (!order.items.length) return sendText(ctx.token, ctx.chatId, tr(ctx.t, 'noItems', { code: o.code, status: ctx.t[`st_${o.status as 'COMPLETED'}`] }), [menuRow(ctx)]);
   const caption = `${tr(ctx.t, 'delivered', { code: o.code })}\n${name} × ${o.quantity} · ${money(ctx, o.totalAmount)}`;
-  await sendDocument(ctx.token, ctx.chatId, `${o.code}.txt`, `${order.items.join('\n')}\n`, caption);
+  await sendDocument(ctx.token, ctx.chatId, `${o.code}.txt`, `${order.items.join('\n')}\n`, caption, [[{ text: ctx.t.btnWarranty, callback_data: `wr:${o.code}` }]]);
   const balance = await prisma.user.findUnique({ where: { id: ctx.user.id }, select: { balance: true } });
   if (balance) ctx.user.balance = balance.balance;
   return showHome(ctx, true);
@@ -934,9 +946,95 @@ async function showOrder(ctx: Ctx, code: string) {
   if (order.items.length) text += joined.length <= 2500 ? tr(ctx.t, 'orderItems', { items: escapeHtml(joined) }) : tr(ctx.t, 'orderItemsFile', { n: order.items.length });
   const kb: Keyboard = [];
   if (order.items.length) kb.push([{ text: ctx.t.btnDownload, callback_data: `ot:${o.code}` }]);
-  kb.push([{ text: ctx.t.btnBuyAgain, callback_data: `p:${meta.productId}` }]);
+  kb.push([...(o.status === 'COMPLETED' ? [{ text: ctx.t.btnWarranty, callback_data: `wr:${o.code}` }] : []), { text: ctx.t.btnBuyAgain, callback_data: `p:${meta.productId}` }]);
   kb.push([{ text: ctx.t.btnBack, callback_data: 'o:0' }, ...menuRow(ctx)]);
   return show(ctx, false, text, kb);
+}
+
+// ---------------------------------------------------------------- Bảo hành: khách chọn đơn -> gửi mô tả lỗi -> báo nhóm admin.
+// Admin bấm "Trả lời" (Reply) tin đó trong nhóm -> bot admin chuyển câu trả lời cho khách qua bot này (telegram-admin.ts).
+const WR_PAGE = 8;
+
+async function showWarrantyOrders(ctx: Ctx, page: number) {
+  if (!ctx.user) return showHome(ctx);
+  const where = { userId: ctx.user.id, status: 'COMPLETED' as const };
+  const total = await prisma.order.count({ where });
+  if (!total) return show(ctx, false, ctx.t.wrNone, [[{ text: ctx.t.btnOrders, callback_data: 'o:0' }], menuRow(ctx)]);
+  const pages = Math.ceil(total / WR_PAGE);
+  const p = Math.min(Math.max(page, 0), pages - 1);
+  const orders = await prisma.order.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    skip: p * WR_PAGE,
+    take: WR_PAGE,
+    select: { code: true, quantity: true, product: { select: { name: true } } },
+  });
+  const kb: Keyboard = orders.map((o) => [{ text: short(`🧾 ${o.code} · ${localized(o.product.name, ctx.locale)} × ${o.quantity}`, 64), callback_data: `wr:${o.code}` }]);
+  kb.push(pager(p, pages, (n) => `wl:${n}`));
+  kb.push(menuRow(ctx));
+  return show(ctx, false, ctx.t.wrList, kb.filter((r) => r.length));
+}
+
+async function adminGroup() {
+  const s = await getTelegramSettings().catch(() => null);
+  return s?.enabled && s.botToken && s.chatId ? s : null;
+}
+
+async function askWarranty(ctx: Ctx, code: string) {
+  if (!ctx.user || !/^[A-Z0-9-]{4,40}$/i.test(code)) return showWarrantyOrders(ctx, 0);
+  const o = await prisma.order.findFirst({ where: { code, userId: ctx.user.id, status: 'COMPLETED' }, select: { code: true, quantity: true, product: { select: { name: true } } } });
+  if (!o) return showWarrantyOrders(ctx, 0);
+  if (!(await adminGroup())) {
+    const kb: Keyboard = [...(ctx.settings.supportUrl ? [[{ text: ctx.t.btnSupport, url: ctx.settings.supportUrl }]] : []), menuRow(ctx)];
+    return sendText(ctx.token, ctx.chatId, ctx.t.wrOff, kb);
+  }
+  await setChatState(BOT, ctx.chatId, `wr:${o.code}`);
+  return sendText(ctx.token, ctx.chatId, tr(ctx.t, 'wrAsk', { code: o.code, name: escapeHtml(`${localized(o.product.name, ctx.locale)} × ${o.quantity}`) }), [[{ text: ctx.t.btnCancel, callback_data: 'm' }]]);
+}
+
+async function submitWarranty(ctx: Ctx, code: string, raw: string) {
+  await setChatState(BOT, ctx.chatId, null);
+  if (!ctx.user) return showHome(ctx, true);
+  const limit = await rateLimit(`tg:wr:${ctx.user.id}`, 5, 3600).catch(() => ({ ok: true as const }));
+  if (!limit.ok) return sendText(ctx.token, ctx.chatId, ctx.t.wrTooMany, [menuRow(ctx)]);
+  const o = await prisma.order.findFirst({
+    where: { code, userId: ctx.user.id },
+    select: {
+      code: true,
+      quantity: true,
+      totalAmount: true,
+      createdAt: true,
+      externalOrderId: true,
+      product: { select: { name: true } },
+      supplier: { select: { name: true, baseUrl: true } },
+      user: { select: { username: true, email: true } },
+    },
+  });
+  const group = await adminGroup();
+  if (!o || !group) return sendText(ctx.token, ctx.chatId, ctx.t.wrOff, [menuRow(ctx)]);
+  const pname = o.product.name as Record<string, string> | null;
+  const productName = pname?.vi ?? pname?.src ?? pname?.en ?? Object.values(pname ?? {})[0] ?? '';
+  const tgName = ctx.from.username ? `@${ctx.from.username}` : escapeHtml([ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ') || String(ctx.from.id));
+  const lines = [
+    '🛡 <b>YÊU CẦU BẢO HÀNH</b>',
+    '━━━━━━━━━━━━━━━━',
+    `👤 Khách: <b>${escapeHtml(o.user.username ?? o.user.email)}</b> · Telegram: <a href="tg://user?id=${ctx.from.id}">${tgName}</a>`,
+    `🧾 Mã đơn: <code>${escapeHtml(o.code)}</code>`,
+    ...(o.supplier ? [`🔗 Nguồn: ${escapeHtml(supplierDomain(o.supplier))}${o.externalOrderId ? ` · Mã đơn API: <code>#${escapeHtml(o.externalOrderId)}</code>` : ''}`] : ['🏠 Kho riêng']),
+    `📦 ${escapeHtml(productName)} × ${o.quantity}`,
+    `💵 ${formatUsd(o.totalAmount.toString())} · 📅 ${o.createdAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`,
+    '',
+    '💬 <b>Nội dung:</b>',
+    `<blockquote>${escapeHtml(raw.slice(0, 1500))}</blockquote>`,
+    '',
+    group.adminCommands ? '↩️ <i>Bấm "Trả lời" (Reply) tin này để nhắn thẳng cho khách qua bot bán hàng.</i>' : `<i>Liên hệ khách: ${tgName}</i>`,
+  ];
+  const sent = await tg<{ message_id: number }>(group.botToken, 'sendMessage', { chat_id: group.chatId, text: lines.join('\n').slice(0, 4000), parse_mode: 'HTML', disable_web_page_preview: true });
+  await getRedis()
+    .set(warrantyKey(group.chatId, sent.message_id), JSON.stringify({ chat: ctx.chatId, code: o.code, locale: ctx.locale }), 'EX', 30 * 86400)
+    .catch(() => {});
+  const kb: Keyboard = [...(ctx.settings.supportUrl ? [[{ text: ctx.t.btnSupport, url: ctx.settings.supportUrl }]] : []), menuRow(ctx)];
+  return sendText(ctx.token, ctx.chatId, tr(ctx.t, 'wrSent', { code: o.code }), kb);
 }
 
 async function sendOrderFile(ctx: Ctx, code: string) {
