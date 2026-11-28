@@ -167,7 +167,7 @@ export async function handleShopUpdate(update: TgUpdate, settings: ShopBotSettin
   const started = Date.now();
   const text = msg?.text?.trim() ?? '';
   // Đặt mật khẩu: không ghi nội dung tin nhắn vào nhật ký
-  const logData = cb ? (cb.data ?? '') : text.startsWith('/') ? text.slice(0, 60) : `(${text.length} ký tự)`;
+  const logData = cb ? (cb.data ?? '') : text.startsWith('/') ? text.slice(0, 60) : msg?.photo || msg?.document ? `(ảnh, chú thích ${msg.caption?.length ?? 0} ký tự)` : `(${text.length} ký tự)`;
   let error: string | undefined;
 
   const limit = await rateLimit(`tg:shop:${from.id}`, 40, 60).catch(() => ({ ok: true as const }));
@@ -1096,7 +1096,11 @@ async function submitWarranty(ctx: Ctx, code: string, raw: string, photo?: Uint8
   await getRedis()
     .set(warrantyKey(group.chatId, sent.message_id), JSON.stringify({ chat: ctx.chatId, code: o.code, locale: ctx.locale }), 'EX', 30 * 86400)
     .catch(() => {});
-  if (photo) await sendPhoto(group.botToken, group.chatId, photo, `📷 Ảnh lỗi · đơn <code>${escapeHtml(o.code)}</code>`, undefined, sent.message_id).catch(() => {});
+  // Ảnh kèm luôn lý do lỗi trong chú thích (nhìn ảnh là thấy lý do, không phải kéo lên tin trên)
+  if (photo) {
+    const reason = raw.trim() && raw !== PHOTO_ONLY ? `\n💬 <b>Lý do:</b> ${escapeHtml(raw.trim().slice(0, 800))}` : '\n💬 <i>Khách chưa ghi lý do</i>';
+    await sendPhoto(group.botToken, group.chatId, photo, `📷 Ảnh lỗi · đơn <code>${escapeHtml(o.code)}</code>${reason}`, undefined, sent.message_id).catch(() => {});
+  }
   // 15 phút tiếp theo: khách gửi thêm ảnh / ghi chú -> gắn vào cùng yêu cầu (trả lời tin trong nhóm)
   await setChatState(BOT, ctx.chatId, `wrx:${o.code}:${sent.message_id}`);
   await getRedis().expire(`tg:state:${BOT}:${ctx.chatId}`, 900).catch(() => {});
@@ -1105,12 +1109,13 @@ async function submitWarranty(ctx: Ctx, code: string, raw: string, photo?: Uint8
 }
 
 // Ảnh khách gửi: đang nhập lý do -> ảnh (+ chú thích) thành yêu cầu; đã gửi yêu cầu -> gửi thêm ảnh vào yêu cầu đó
+const PHOTO_ONLY = '📷 (khách chỉ gửi ảnh, chưa ghi lý do)';
 async function onWarrantyPhoto(ctx: Ctx, fileId: string, caption: string) {
   const state = await getChatState(BOT, ctx.chatId);
   if (!state?.startsWith('wr:') && !state?.startsWith('wrx:')) return sendText(ctx.token, ctx.chatId, ctx.t.wrPhotoHint, [[{ text: ctx.t.btnWarranty, callback_data: 'wl:0' }], menuRow(ctx)]);
   const photo = await downloadFile(ctx.token, fileId);
   if (!photo) return sendText(ctx.token, ctx.chatId, ctx.t.wrPhotoBad);
-  if (state.startsWith('wr:')) return submitWarranty(ctx, state.slice(3), caption || '📷 (xem ảnh)', photo);
+  if (state.startsWith('wr:')) return submitWarranty(ctx, state.slice(3), caption || PHOTO_ONLY, photo);
   return warrantyExtra(ctx, state, { text: caption, photo });
 }
 
@@ -1119,7 +1124,9 @@ async function warrantyExtra(ctx: Ctx, state: string, add: { text?: string; phot
   const group = await adminGroup();
   if (!group || !/^\d+$/.test(mid)) return showHome(ctx, true);
   const replyTo = Number(mid);
-  const note = add.text?.trim() ? `💬 Khách bổ sung · đơn <code>${escapeHtml(code)}</code>:\n<blockquote>${escapeHtml(add.text.trim().slice(0, 900))}</blockquote>` : `📷 Ảnh khách gửi thêm · đơn <code>${escapeHtml(code)}</code>`;
+  const note = add.photo
+    ? `📷 Ảnh khách gửi thêm · đơn <code>${escapeHtml(code)}</code>${add.text?.trim() ? `\n💬 <b>Lý do:</b> ${escapeHtml(add.text.trim().slice(0, 800))}` : ''}`
+    : `💬 <b>Khách bổ sung lý do</b> · đơn <code>${escapeHtml(code)}</code>:\n<blockquote>${escapeHtml((add.text ?? '').trim().slice(0, 900))}</blockquote>`;
   if (add.photo) await sendPhoto(group.botToken, group.chatId, add.photo, note, undefined, replyTo);
   else await tg(group.botToken, 'sendMessage', { chat_id: group.chatId, text: note, parse_mode: 'HTML', reply_parameters: { message_id: replyTo, allow_sending_without_reply: true } });
   await setChatState(BOT, ctx.chatId, state); // gia hạn thêm 15 phút
