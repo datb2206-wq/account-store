@@ -98,7 +98,7 @@ const ORDER_SELECT = {
   totalAmount: true,
   status: true,
   externalOrderId: true,
-  user: { select: { username: true, email: true } },
+  user: { select: { username: true, email: true, telegramName: true } },
   product: { select: { name: true } },
   supplier: { select: { name: true, baseUrl: true } },
 } as const;
@@ -126,8 +126,10 @@ export async function notifyOrder(ref: { id: string } | { code: string }, ip?: s
   const apiCode = o.externalOrderId ?? '';
   const statusNote = o.status === 'REFUNDED' || o.status === 'FAILED' ? ' · ❌ Đơn nguồn lỗi, đã hoàn tiền' : o.status === 'PENDING' ? ' · ⏳ Nguồn đang xử lý' : '';
   const name = o.product.name as Record<string, string> | null;
+  // Kênh mua: ghi ngay cạnh tên khách (mẫu tin mặc định không có {ip}) -> nhìn là biết đơn từ bot / API
+  const via = ip === 'Bot Telegram' ? ` · 🤖 Bot Telegram${o.user.telegramName ? ` ${o.user.telegramName}` : ''}` : ip === 'API' ? ' · 🔑 API' : '';
   await notify('order', {
-    username: who(o.user),
+    username: `${who(o.user)}${via}`,
     // Báo cho admin: ưu tiên tên gốc của web nguồn (thường là tiếng Việt), không phải bản đã dịch
     product: name?.vi ?? name?.src ?? name?.en ?? Object.values(name ?? {})[0] ?? '',
     amount: String(o.quantity),
